@@ -1,0 +1,30 @@
+{
+  "instances": [
+    {
+      "name": "opm-main",
+      "display_name": "Grand Line",
+      "url": "https://onepieceminecraft.fr/launcher/files.json",
+      "version": "1.21.1",
+      "loader_type": "neoforge",
+      "loader_version": "latest",
+      "verify": true,
+      "ignored": [
+        "options.txt",
+        "optionsof.txt",
+        "servers.dat",
+        "logs",
+        "screenshots",
+        "saves",
+        "crash-reports",
+        "resourcepacks",
+        "shaderpacks"
+      ],
+      "whitelist_active": false,
+      "whitelist": [],
+      "status_host": "play.onepieceminecraft.fr",
+      "status_port": 25565,
+      "sort_order": 0,
+      "enabled": true
+    }
+  ]
+}
