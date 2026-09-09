@@ -6,7 +6,7 @@
       "url": "https://auth.onepieceminecraft.fr/launcher/files.json",
       "version": "1.21.1",
       "loader_type": "neoforge",
-      "loader_version": "latest",
+      "loader_version": "21.1.248",
       "verify": true,
       "ignored": [
         "options.txt",
