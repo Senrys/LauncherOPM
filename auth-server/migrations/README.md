@@ -378,10 +378,15 @@ de `migrations/env.py` :
 deux tables de version dans la base, et un `pg_dump` qui ne raconte plus une
 histoire unique.
 
-> **État actuel du dépôt : option A.** `env.py` vise `alembic_version`. Si vous
-> préférez l'option B, faites la bascule **avant** la première application en
-> production : après coup, il faudrait défaire à la main la ligne écrite dans
-> `alembic_version`.
+> **État actuel du dépôt : option B.** `env.py` vise `alembic_version_launcher`.
+> La bascule a été faite avant toute application en production, comme il se doit.
+> L'option A a été essayée et abandonnée : elle échoue sur
+> `KeyError: <révision du site>` tant que les fichiers de révision du site ne
+> sont pas visibles depuis ce dépôt, et le dépôt du site n'est pas ici.
+>
+> Conséquence pratique : **n'exportez jamais `OPM_SITE_ALEMBIC_REVISION`.**
+> L'étape 2 (relever la révision du site) et l'étape 3 (chaîner) de la §3
+> ne s'appliquent plus.
 
 Dans les deux cas, la migration vérifie la cohérence au démarrage et refuse de
 s'exécuter sur une configuration bancale (étape 5, troisième contrôle).

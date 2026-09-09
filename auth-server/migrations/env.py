@@ -179,9 +179,14 @@ def _options_communes() -> dict[str, Any]:
     """Options passées à ``context.configure`` dans les deux modes."""
     return {
         "target_metadata": target_metadata,
-        # La table de versions est celle du site : notre migration se chaîne à
-        # son historique (voir README.md).
-        "version_table": "alembic_version",
+        # OPTION B de README.md §5 : nos migrations ont leur PROPRE table de
+        # versions. L'option A (partager « alembic_version » avec le site)
+        # exigeait qu'Alembic voie ici les fichiers de révision du site, absents
+        # de ce dépôt : « alembic upgrade head » échouait sur
+        # « KeyError: <révision du site> ». Les deux historiques sont désormais
+        # indépendants — OPM_SITE_ALEMBIC_REVISION reste vide pour toujours,
+        # « down_revision » vaut None, et le site n'a rien à savoir de nous.
+        "version_table": "alembic_version_launcher",
         "include_schemas": False,
         "include_name": include_name,
         "include_object": include_object,
