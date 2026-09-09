@@ -1,0 +1,54 @@
+# Serveur d'authentification One Piece Minecraft — unité systemd.
+#
+# Installation (sur 188.165.232.148) :
+#   sudo cp /opt/opm-auth/auth-server/deploy/opm-auth.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now opm-auth
+#
+# Journal :  sudo journalctl -u opm-auth -f
+#
+# Adaptez User/Group et WorkingDirectory si vous n'installez pas dans /opt/opm-auth.
+
+[Unit]
+Description=Serveur d'authentification One Piece Minecraft
+Documentation=https://github.com/Senrys/LauncherOPM
+# Le serveur lit la base du site : il ne démarre qu'après PostgreSQL.
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=opmauth
+Group=opmauth
+WorkingDirectory=/opt/opm-auth/auth-server
+
+# UN SEUL worker. La limitation de débit (5 connexions/minute par IP, etc.) est
+# tenue en mémoire dans chaque processus : avec 4 workers, un attaquant obtient
+# 4 fois le quota. Passez à plusieurs workers seulement après avoir activé Redis
+# (extra « redis » de pyproject.toml).
+ExecStart=/opt/opm-auth/auth-server/.venv/bin/uvicorn opm_auth.main:app \
+          --host 127.0.0.1 --port 8000 --workers 1 --proxy-headers \
+          --forwarded-allow-ips 127.0.0.1
+
+# N'écoute que sur la boucle locale : c'est nginx qui expose le service.
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=30s
+KillSignal=SIGINT
+
+# ── Durcissement ─────────────────────────────────────────────────────────────
+# Le service n'a besoin d'écrire que dans keys/ et data/ (textures).
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/opm-auth/auth-server/keys /opt/opm-auth/auth-server/data
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target
