@@ -1,0 +1,22 @@
+# Vérifie toutes les 2 minutes si le modpack a changé.
+#
+# Pourquoi un minuteur plutôt qu'une surveillance inotify : les unités « .path »
+# de systemd ne sont PAS récursives. Surveiller /var/www/opm-launcher ne verrait
+# pas un mod déposé dans mods/ — il faudrait déclarer chaque sous-dossier, et
+# tout nouveau dossier passerait à la trappe. Le minuteur, lui, ne rate rien.
+#
+# Le coût est négligeable puisque le générateur est incrémental : un passage
+# sans changement se contente de « stat » les fichiers.
+
+[Unit]
+Description=Régénération périodique du manifeste files.json
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=2min
+# Rattrape le passage manqué si la machine était éteinte.
+Persistent=true
+Unit=opm-files-json.service
+
+[Install]
+WantedBy=timers.target
