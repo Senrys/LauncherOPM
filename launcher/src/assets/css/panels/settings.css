@@ -1,0 +1,727 @@
+/* ============================================================================
+   ÉCRAN PARAMÈTRES — panels/settings.html
+   Traduction fidèle de DesignMaquette/Launcher OPM.dc.html (bloc « Paramètres »)
+   et des quatre sous-écrans COMPTES / JAVA & MÉMOIRE / RÉSOLUTION / LAUNCHER.
+
+   Rappels de découpage :
+   - layout/shell.css possède .opm-screen (flex:1, min-width:0, padding 26/28).
+   - components/*.css possèdent .opm-kicker, .opm-btn, .opm-card, .opm-switch,
+     .opm-field et .opm-skeleton : on ne fait ici que les ajuster au contexte.
+   - Les blocs .opm-account et .opm-link-ms sont déclarés sans portée : ils sont
+     réutilisés tels quels par l'écran de connexion. Le popover de comptes, lui,
+     les redéfinit sous .opm-popover--accounts (spécificité supérieure).
+   ========================================================================== */
+
+/* ------------------------------------------------------------------ GABARIT */
+
+.opm-settings {
+  display: flex;
+  gap: 22px;
+}
+
+.opm-settings[hidden] { display: none; }
+
+
+/* ============================================================================
+   COLONNE DE NAVIGATION (206 px)
+   ========================================================================== */
+
+.opm-settings__nav {
+  flex: none;
+  width: var(--w-settings-nav);
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.opm-settings__title {
+  margin: 0 0 6px;
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: .03em;
+  color: var(--text-light);
+}
+
+.opm-settings__navbtn {
+  flex: none;
+  display: flex;
+  align-items: center;
+  height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--line-dark);
+  border-radius: var(--r-md);
+  background: var(--veil-55);
+  color: color-mix(in srgb, var(--text-light) 80%, transparent);
+  font: 700 12.5px/1 var(--font-ui);
+  letter-spacing: var(--ls-btn);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--t-nav) ease,
+              color var(--t-nav) ease,
+              border-color var(--t-nav) ease;
+}
+
+.opm-settings__navbtn:hover { border-color: var(--aqua); }
+
+.opm-settings__navbtn--active {
+  background: var(--aqua);
+  color: var(--ink);
+}
+
+.opm-settings__navbtn:focus-visible {
+  outline: none;
+  box-shadow: var(--sh-focus);
+}
+
+/* Encart d'état des fichiers : poussé en bas de la colonne. */
+.opm-settings__files {
+  margin-top: auto;
+  padding: 14px;
+  border: 1px solid var(--line-dark-soft);
+  border-radius: var(--r-lg-alt);
+  background: var(--veil-60);
+}
+
+.opm-settings__files .opm-kicker {
+  margin: 0;
+  font-size: var(--fs-kicker-sm);
+  letter-spacing: var(--ls-kicker-sm);
+  color: var(--aqua);
+}
+
+.opm-settings__files p {
+  margin: 7px 0 0;
+  font: 500 var(--fs-small)/1.5 var(--font-ui);
+  color: var(--text-light-68);
+}
+
+.opm-settings__reset {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  border: 1px solid color-mix(in srgb, var(--text-light) 22%, transparent);
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--text-light-75);
+  font: 700 11px/1 var(--font-ui);
+  letter-spacing: var(--ls-tag);
+  cursor: pointer;
+  transition: background var(--t-nav) ease, color var(--t-nav) ease;
+}
+
+.opm-settings__reset:hover {
+  background: color-mix(in srgb, var(--white) 8%, transparent);
+  color: var(--text-light);
+}
+
+.opm-settings__reset:focus-visible {
+  outline: none;
+  box-shadow: var(--sh-focus);
+}
+
+
+/* ============================================================================
+   CARTE CLAIRE + SOUS-ÉCRANS
+   ========================================================================== */
+
+.opm-settings__panel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden auto;
+  padding: 26px 30px;
+  background: var(--paper);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-xl);
+  box-shadow: var(--sh-card);
+}
+
+/* Carte imbriquée dans un panneau DÉJÀ clair — c'est le cas que components/
+   card.css annonce sans le traiter. La maquette y pose du blanc franc sur un
+   filet ordinaire (l. 216, 302), et surtout aucune ombre : celle des cartes
+   flottantes (--sh-card, 24 px de décalage et 50 px de flou) creuserait un
+   trou noir au milieu d'une surface papier. */
+.opm-settings__panel .opm-card--light {
+  background: var(--white);
+  border-color: var(--line);
+  box-shadow: none;
+}
+
+.opm-subscreen { animation: opmRise var(--t-panel) ease both; }
+
+/* Doit l'emporter sur l'animation, qui rendrait le sous-écran visible. */
+.opm-subscreen[hidden] { display: none; }
+
+/* ------------------------------------------- hiérarchie commune aux sections */
+
+.opm-subscreen .opm-kicker { margin: 0; }
+
+/* Les sections suivantes d'un même sous-écran reprennent de l'air. */
+.opm-subscreen .opm-kicker:not(:first-child) { margin-top: 28px; }
+.opm-subscreen[data-sub="launcher"] .opm-kicker:not(:first-child) { margin-top: 22px; }
+
+.opm-subscreen h2 {
+  margin: 12px 0 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-h2);
+  font-weight: 400;
+  line-height: 1;
+  color: var(--text-dark);
+}
+
+/* Les paragraphes de présentation sont les seuls <p> sans classe du sous-écran :
+   les viser ainsi évite d'écraser la typographie des kickers, qui sont des <p>
+   eux aussi et perdraient contre un sélecteur d'élément. */
+.opm-subscreen > p:not([class]) {
+  margin: 11px 0 0;
+  max-width: 660px;
+  font: 400 var(--fs-body)/1.55 var(--font-ui);
+  color: var(--text-body);
+  text-wrap: pretty;
+}
+
+/* Champ isolé (arguments JVM) : même respiration que les autres blocs. */
+.opm-subscreen > .opm-field { margin-top: 14px; }
+
+
+/* ============================================================================
+   SOUS-ÉCRAN « COMPTES »
+   ========================================================================== */
+
+.opm-account-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.opm-account {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: var(--r-xl);
+}
+
+/* Compte de lancement : cerclé d'aqua. */
+.opm-account--primary { box-shadow: var(--sh-ring-primary); }
+
+.opm-account__avatar {
+  position: relative;
+  flex: none;
+  width: 56px;
+  height: 56px;
+  overflow: hidden;
+  border-radius: var(--r-lg);
+  background: var(--foam);
+  object-fit: cover;
+  image-rendering: pixelated;
+}
+
+/* Variante où l'avatar est un conteneur portant l'image (connexion, popover). */
+.opm-account__avatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: pixelated;
+}
+
+.opm-account__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.opm-account__name {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  font: 700 16px/1.2 var(--font-ui);
+  color: var(--text-dark);
+}
+
+.opm-account__badge {
+  flex: none;
+  padding: 4px 7px;
+  border-radius: var(--r-xs);
+  background: var(--aqua);
+  color: var(--ink);
+  font: 700 var(--fs-kicker-sm)/1 var(--font-ui);
+  letter-spacing: .16em;
+}
+
+/* Le badge et le bouton « DÉFINIR PRINCIPAL » s'excluent mutuellement. */
+.opm-account:not(.opm-account--primary) .opm-account__badge { display: none; }
+.opm-account--primary .opm-account__action:not(.opm-account__action--remove) { display: none; }
+
+.opm-account__meta {
+  margin: 4px 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 400 var(--fs-small)/1.3 var(--font-ui);
+  color: var(--muted);
+}
+
+/* Mention légale : hors carte, elle respire et s'enroule. */
+.opm-subscreen > .opm-account__meta {
+  margin-top: 18px;
+  max-width: 660px;
+  overflow: visible;
+  white-space: normal;
+  line-height: 1.5;
+}
+
+.opm-account__action {
+  flex: none;
+  padding: 10px 14px;
+  border: 1px solid var(--line-3);
+  border-radius: var(--r-sm-alt);
+  background: transparent;
+  color: var(--teal);
+  font: 700 11px/1 var(--font-ui);
+  letter-spacing: .1em;
+  cursor: pointer;
+  transition: background var(--t-fast) ease,
+              color var(--t-fast) ease,
+              border-color var(--t-fast) ease;
+}
+
+.opm-account__action:hover { background: var(--mist-2); }
+.opm-account__action:focus-visible { outline: none; box-shadow: var(--sh-focus); }
+
+/* Retrait d'un compte : bouton icône, rouge au survol. */
+.opm-account__action--remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border-color: var(--line);
+  color: var(--muted-2);
+}
+
+.opm-account__action--remove:hover {
+  background: var(--mist-2);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.opm-account-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 12px;
+  padding: 18px;
+  border: 1.5px dashed var(--line-4);
+  border-radius: var(--r-xl);
+  background: transparent;
+  color: var(--teal);
+  font: 700 12px/1 var(--font-ui);
+  letter-spacing: var(--ls-btn);
+  cursor: pointer;
+  transition: background var(--t-fast) ease, border-color var(--t-fast) ease;
+}
+
+.opm-account-add:hover {
+  background: var(--mist-3);
+  border-color: var(--teal);
+}
+
+.opm-account-add:focus-visible { outline: none; box-shadow: var(--sh-focus); }
+
+/* ------------------------------------------ rattachement Microsoft (§6.3 UI) */
+
+.opm-link-ms { margin-top: 18px; }
+
+.opm-link-ms__state {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 16px;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: var(--r-xl);
+}
+
+.opm-link-ms__state[hidden] { display: none; }
+
+.opm-link-ms__face {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--r-lg-alt);
+  background: var(--foam);
+  object-fit: cover;
+  image-rendering: pixelated;
+}
+
+.opm-link-ms__info {
+  flex: 1;
+  min-width: 180px;
+}
+
+.opm-link-ms__name {
+  margin: 0;
+  font: 700 15px/1.2 var(--font-ui);
+  color: var(--text-dark);
+}
+
+.opm-link-ms__meta {
+  margin: 4px 0 0;
+  font: 400 var(--fs-small)/1.5 var(--font-ui);
+  color: var(--muted);
+}
+
+/* Dans l'état « non rattaché », la mention est elle-même l'élément flexible. */
+.opm-link-ms__state > .opm-link-ms__meta {
+  flex: 1;
+  min-width: 220px;
+  margin-top: 0;
+}
+
+.opm-link-ms__actions {
+  flex: none;
+  display: flex;
+  gap: 8px;
+}
+
+
+/* ============================================================================
+   SOUS-ÉCRAN « JAVA & MÉMOIRE »
+   ========================================================================== */
+
+.opm-ram {
+  margin-top: 20px;
+  padding: 20px 22px;
+}
+
+/* Kicker/valeur à gauche sur deux lignes, repères machine à droite. */
+.opm-ram__head {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  column-gap: 20px;
+  align-items: end;
+}
+
+.opm-ram .opm-kicker {
+  grid-column: 1;
+  grid-row: 1;
+  margin: 0;
+  font-size: 9.5px;
+  letter-spacing: var(--ls-kicker-sm);
+  color: var(--teal);
+}
+
+.opm-ram__value {
+  grid-column: 1;
+  grid-row: 2;
+  margin: 5px 0 0;
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 400;
+  line-height: 1;
+  color: var(--text-dark);
+}
+
+/* « sur N Go » : retour à la police d'interface, sur la ligne de base. */
+.opm-ram__value > span:last-child {
+  margin-left: 8px;
+  font: 400 12px/1 var(--font-ui);
+  color: var(--muted);
+}
+
+.opm-ram__hint {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: end;
+  margin: 0;
+  font: 500 var(--fs-small)/1.6 var(--font-ui);
+  color: var(--muted);
+  text-align: right;
+}
+
+.opm-ram__hint b {
+  font-weight: 700;
+  color: var(--teal);
+}
+
+/* ------------------------------------------------------------- jauge rayée */
+
+.opm-ram__gauge {
+  position: relative;
+  height: 20px;
+  margin-top: 18px;
+  overflow: hidden;
+  background: var(--mist);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+}
+
+/* `left` et `width` sont posés au runtime : ce sont des valeurs calculées. */
+.opm-ram__fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  background: repeating-linear-gradient(90deg,
+              var(--aqua) 0 8px,
+              var(--aqua-alt) 8px 16px);
+  transition: left var(--t-fast) ease, width var(--t-fast) ease;
+}
+
+.opm-ram__mid {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--line-5);
+}
+
+.opm-ram__scale {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  font: 600 9.5px/1 var(--font-ui);
+  letter-spacing: .1em;
+  color: var(--muted-2);
+}
+
+/* ---------------------------------------------------------------- curseurs */
+
+.opm-ram__sliders {
+  display: flex;
+  gap: 26px;
+  margin-top: 18px;
+}
+
+.opm-ram__slider {
+  flex: 1;
+  min-width: 0;
+}
+
+.opm-ram__slider label {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+  font: 600 var(--fs-small)/1 var(--font-ui);
+  color: var(--text-dark);
+  cursor: pointer;
+}
+
+.opm-ram__slider label span { color: var(--teal); }
+
+.opm-ram__slider input[type="range"] { width: 100%; }
+
+/* ------------------------------------------------------- note contextuelle */
+
+.opm-ram__note {
+  margin-top: 14px;
+  padding: 11px 13px;
+  border-radius: var(--r-md);
+  background: var(--mist);
+  font: 500 var(--fs-small)/1.5 var(--font-ui);
+  color: var(--teal);
+}
+
+/* Tant qu'aucune note n'est calculée, pas de bloc vide. */
+.opm-ram__note:empty { display: none; }
+
+/* Bandeau d'avertissement partagé (RAM hors plage, erreurs de connexion).
+   Déclaré après .opm-ram__note pour l'emporter à spécificité égale. */
+.opm-note--warn {
+  padding: 11px 13px;
+  border-radius: var(--r-md);
+  background: var(--mist);
+  font: 500 var(--fs-small)/1.5 var(--font-ui);
+  color: var(--warn);
+}
+
+.opm-note--warn[hidden] { display: none; }
+
+/* -------------------------------------------------------- emplacement Java */
+
+.opm-path {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.opm-path__value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 12px 14px;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  font: 500 12px/1.2 var(--font-ui);
+  color: var(--text-dark);
+}
+
+.opm-path .opm-btn { flex: none; }
+
+
+/* ============================================================================
+   SOUS-ÉCRAN « RÉSOLUTION »
+   ========================================================================== */
+
+.opm-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.opm-preset {
+  padding: 12px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--white);
+  color: var(--text-dark);
+  font: 700 12px/1 var(--font-ui);
+  letter-spacing: .06em;
+  cursor: pointer;
+  transition: background var(--t-fast) ease,
+              color var(--t-fast) ease,
+              border-color var(--t-fast) ease;
+}
+
+.opm-preset:hover { border-color: var(--aqua); }
+
+.opm-preset--active {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--aqua);
+}
+
+.opm-preset:focus-visible { outline: none; box-shadow: var(--sh-focus); }
+
+.opm-resfields {
+  display: flex;
+  align-items: flex-end;
+  gap: 22px;
+  margin-top: 18px;
+  padding: 20px 22px;
+}
+
+.opm-resfields .opm-field {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+
+/* Les deux nombres de la résolution ne sont pas des champs de saisie ordinaires :
+   la maquette (l. 302-306) les creuse dans la carte blanche sur --paper-2, et
+   leur donne un cran de graisse et de taille de plus que le champ courant. */
+.opm-resfields .opm-field__input {
+  background: var(--paper-2);
+  font-weight: 600;
+  font-size: var(--fs-body);
+}
+
+.opm-resfields__x {
+  flex: none;
+  padding-bottom: 12px;
+  font: 700 16px/1 var(--font-ui);
+  color: var(--muted-3);
+}
+
+/* Aperçu de ratio : largeur fixe, hauteur calculée au runtime. */
+.opm-preview {
+  flex: none;
+  width: 120px;
+  padding-bottom: 4px;
+  text-align: center;
+}
+
+.opm-preview__box {
+  width: 96px;
+  margin: 0 auto;
+  background: var(--mist-2);
+  border: 2px solid var(--aqua);
+  border-radius: var(--r-xs-alt);
+}
+
+.opm-preview__ratio {
+  margin: 7px 0 0;
+  font: 500 10.5px/1 var(--font-ui);
+  color: var(--muted);
+}
+
+
+/* ============================================================================
+   LIGNES À INTERRUPTEUR (résolution + launcher)
+   ========================================================================== */
+
+.opm-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+/* Dernière ligne d'une série : pas de filet sous elle. */
+.opm-row:not(:has(+ .opm-row)) { border-bottom: none; }
+
+.opm-subscreen[data-sub="reso"] > .opm-row:first-of-type     { margin-top: 6px; }
+.opm-subscreen[data-sub="launcher"] > .opm-row:first-of-type { margin-top: 14px; }
+
+.opm-row__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.opm-row__title {
+  margin: 0;
+  font: 600 var(--fs-body-lg)/1.3 var(--font-ui);
+  color: var(--text-dark);
+}
+
+.opm-row__desc {
+  margin: 3px 0 0;
+  font: 400 var(--fs-small)/1.4 var(--font-ui);
+  color: var(--muted);
+}
+
+/* Curseur de volume, logé sous sa description. */
+.opm-row__text input[type="range"] {
+  display: block;
+  max-width: 280px;
+  margin-top: 8px;
+}
+
+.opm-row .opm-switch { flex: none; }
+
+/* Le séparateur du bouton n'a de sens qu'une fois la taille du cache connue. */
+[data-bind="cache-size"]:not(:empty)::before { content: " · "; }
+
+
+/* ============================================================================
+   SQUELETTES DE CHARGEMENT
+   Les emplacements vides ont besoin d'une dimension minimale pour être vus.
+   ========================================================================== */
+
+.opm-settings__files .opm-skeleton { display: inline-block; min-width: 54px; min-height: 11px; }
+.opm-ram__value .opm-skeleton      { display: inline-block; min-width: 42px; min-height: 11px; }
+.opm-ram__hint .opm-skeleton       { display: inline-block; min-width: 46px; min-height: 11px; }
+.opm-ram__scale .opm-skeleton      { display: inline-block; min-width: 48px; min-height: 10px; }
+.opm-path__value.opm-skeleton      { min-height: 40px; }

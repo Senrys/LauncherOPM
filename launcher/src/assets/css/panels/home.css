@@ -1,0 +1,504 @@
+/* ============================================================================
+   ÉCRAN ACCUEIL — panels/home.html
+   Traduction fidèle de DesignMaquette/Launcher OPM.dc.html (bloc « Accueil »).
+   Toutes les couleurs, formes et durées passent par base/tokens.css.
+
+   Rappels de découpage :
+   - layout/shell.css possède .opm-screen (flex:1, min-width:0, padding 26/28).
+     Ce fichier ne pose que la mise en page interne de l'accueil.
+   - Les classes ne servent qu'au style ; le JS s'accroche aux data-*.
+   ========================================================================== */
+
+/* ------------------------------------------------------------------ GABARIT */
+
+.opm-home {
+  display: flex;
+  gap: 24px;
+}
+
+/* Le panneau masqué le reste, quelle que soit la mécanique de bascule. */
+.opm-home[hidden] { display: none; }
+
+
+/* ============================================================================
+   CARTE « JOURNAL DE BORD »
+   Colonne flexible de 620 px : chaque enfant porte lui-même sa marge de 28 px,
+   les tuiles sont poussées en bas par margin-top:auto.
+   ========================================================================== */
+
+.opm-news {
+  flex: 0 0 var(--w-news-card);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--paper);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-xl);
+  box-shadow: var(--sh-card);
+}
+
+/* Sous 1240 px la carte cède du terrain à la scène (UI-SPEC §1.8). */
+@media (max-width: 1240px) {
+  .opm-news {
+    flex: 1 1 480px;
+    min-width: 420px;
+  }
+}
+
+/* ---------------------------------------------------------------- en-tête */
+
+.opm-news__head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 24px 28px 14px;
+}
+
+/* Date / version de la dernière mise à jour, poussée à droite. */
+.opm-news__meta {
+  margin: 0 0 0 auto;
+  font: 500 10.5px/1 var(--font-ui);
+  letter-spacing: .1em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------------ titre */
+
+.opm-news__title {
+  margin: 0 28px;
+  font-family: var(--font-display);
+  font-size: var(--fs-h1);
+  font-weight: 400;
+  line-height: .96;
+  letter-spacing: .005em;
+  color: var(--text-dark);
+  text-wrap: balance;
+}
+
+/* Seconde ligne du titre : c'est elle qui porte le teal. */
+.opm-news__title span:nth-of-type(2) { color: var(--teal); }
+
+.opm-news__lead {
+  margin: 14px 28px 0;
+  max-width: 520px;
+  font: 400 var(--fs-body-lg)/1.55 var(--font-ui);
+  color: var(--text-body);
+  text-wrap: pretty;
+}
+
+/* ------------------------------------------------------------------ liens */
+
+.opm-news__links {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin: 16px 28px 18px;
+}
+
+.opm-news__links button {
+  padding: 0;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+  transition: color var(--t-fast) ease;
+}
+
+/* Lien principal : teal souligné 2 px aqua. */
+.opm-news__links button:first-child {
+  font: 700 12px/1 var(--font-ui);
+  letter-spacing: .08em;
+  color: var(--teal);
+  border-bottom: 2px solid var(--aqua);
+  padding-bottom: 2px;
+}
+
+/* Lien secondaire : simple mention discrète. */
+.opm-news__links button:last-child {
+  font: 500 12px/1 var(--font-ui);
+  color: var(--muted);
+}
+
+.opm-news__links button:hover { color: var(--text-dark); }
+.opm-news__links button:focus-visible {
+  outline: none;
+  border-radius: var(--r-xs);
+  box-shadow: var(--sh-focus);
+}
+
+/* -------------------------------------------------- bandeau « hors ligne » */
+
+/* « Données hors ligne · relevées … », posé sous l'en-tête du journal quand le
+   processus principal a servi une réponse depuis un cache périmé (docs/DATA.md
+   §5). La boîte vient de .opm-note (components/feedback.css) ; ce modificateur
+   n'en change que le ton : la donnée affichée n'est pas fausse, elle est
+   vieille — donc ni le teal du lien ni l'ocre de l'avertissement, mais le gris
+   des mentions secondaires, sur le survol clair et derrière un filet pointillé,
+   comme tout ce qui est provisoire dans la maquette.
+   Le panneau DONATION emploie le même bandeau : ce modificateur a vocation à
+   rejoindre components/feedback.css, propriétaire de .opm-note. */
+
+.opm-note--offline {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 14px;
+  padding: 9px 12px;
+  background: var(--mist-2);
+  border: 1px dashed var(--line-4);
+  font: 500 var(--fs-meta)/1.35 var(--font-ui);
+  color: var(--muted);
+}
+
+/* Pastille sourde : la grammaire de .opm-kicker__dot, en muet. */
+.opm-note--offline::before {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted-2);
+}
+
+/* Doit l'emporter sur le display:flex ci-dessus : .opm-note[hidden] de
+   feedback.css est déclaré plus haut dans la cascade. */
+.opm-note--offline[hidden] { display: none; }
+
+/* Dans le journal de bord, le bandeau reprend la gouttière de 28 px que chaque
+   enfant de la carte porte lui-même, et l'air qui précède le titre. */
+.opm-news > .opm-note--offline { margin: 0 28px 16px; }
+
+
+/* -------------------------------------------------------------- séparateur */
+
+.opm-news__sep {
+  height: 1px;
+  margin: 0 28px;
+  background: var(--line);
+}
+
+/* ------------------------------------------------------- liste d'actualités */
+
+.opm-news__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 16px 28px 6px;
+}
+
+/* Débordement de 10 px de chaque côté : le survol mord sur la marge. */
+.opm-news-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: calc(100% + 20px);
+  margin: 0 -10px;
+  padding: 9px 10px;
+  background: none;
+  border: 0;
+  border-radius: var(--r-md);
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--t-fast) ease;
+}
+
+.opm-news-item:hover { background: var(--mist-2); }
+.opm-news-item:focus-visible {
+  outline: none;
+  box-shadow: var(--sh-focus);
+}
+
+.opm-news-item__tag {
+  flex: none;
+  padding: 5px 7px;
+  border-radius: var(--r-xs);
+  font: 700 9.5px/1 var(--font-ui);
+  letter-spacing: var(--ls-tag);
+  color: var(--teal);
+  background: var(--chip);
+}
+
+/* ACTUALITÉ (défaut), ÉVÉNEMENT, MISE À JOUR. */
+.opm-news-item__tag--news   { color: var(--teal); background: var(--chip); }
+.opm-news-item__tag--event  { color: var(--ink);  background: var(--aqua); }
+.opm-news-item__tag--update { color: var(--aqua); background: var(--ink); }
+
+.opm-news-item__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 600 var(--fs-body)/1.3 var(--font-ui);
+  color: var(--text-dark);
+}
+
+.opm-news-item__date {
+  flex: none;
+  font: 400 var(--fs-meta)/1 var(--font-ui);
+  color: var(--muted-2);
+}
+
+
+/* ============================================================================
+   TUILES DE BAS DE CARTE — fréquentation, événement RP, votes
+   ========================================================================== */
+
+.opm-tiles {
+  display: flex;
+  gap: 15px;
+  margin: 0 28px 24px;
+  margin-top: auto;      /* colle les tuiles au bas de la carte */
+  padding-top: 18px;
+}
+
+/* 178 px est la largeur de la maquette, mais elle y est POSÉE dans une carte
+   dont la largeur utile n'en laisse que 562 pour trois tuiles et deux gouttières
+   de 15 : la troisième y déborde de 2 px, et de bien plus dès que la carte cède
+   du terrain sous 1240 px. On garde donc 178 comme base et on laisse les trois
+   tuiles se partager la ligne à égalité. */
+.opm-tile {
+  flex: 1 1 178px;
+  min-width: 0;
+  padding: 13px 14px;
+  border-radius: var(--r-lg);
+}
+
+.opm-tile--light { background: var(--white); border: 1px solid var(--line); }
+.opm-tile--dark  { background: var(--ink); }
+.opm-tile--aqua  { background: var(--aqua); }
+
+.opm-tile__label {
+  margin: 0;
+  font: 700 var(--fs-kicker-sm)/1 var(--font-ui);
+  letter-spacing: var(--ls-kicker-sm);
+}
+
+.opm-tile--light .opm-tile__label { color: var(--teal); }
+.opm-tile--dark  .opm-tile__label { color: var(--aqua); }
+.opm-tile--aqua  .opm-tile__label { color: var(--ink-4); }
+
+/* Chiffre vedette : Anton, la valeur et son unité alignées sur la ligne de base. */
+.opm-tile__value {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 6px 0 0;
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 400;
+  line-height: 1;
+  color: var(--text-dark);
+}
+
+.opm-tile__unit {
+  font: 400 var(--fs-small)/1 var(--font-ui);
+  color: var(--muted);
+}
+
+.opm-tile--aqua .opm-tile__value { gap: 5px; }
+.opm-tile--aqua .opm-tile__unit  { color: var(--ink-4); }
+
+/* Tuile sombre : compte à rebours plus compact, nom de l'événement en dessous. */
+.opm-tile--dark .opm-tile__value {
+  margin-top: 8px;
+  font-size: 23px;
+  letter-spacing: .01em;
+  color: var(--white);
+}
+
+.opm-tile--dark .opm-tile__unit {
+  display: block;
+  margin: 8px 0 0;
+  font-size: var(--fs-meta);
+  color: var(--text-light-62);
+}
+
+/* ------------------------------------------------------------- segments 8× */
+
+.opm-tile__segments {
+  display: flex;
+  gap: 3px;
+  margin-top: 10px;
+}
+
+.opm-tile__seg {
+  flex: 1;
+  height: 6px;
+  border-radius: var(--r-2xs);
+  background: var(--bar-off);
+}
+
+.opm-tile__seg--on  { background: var(--bar-on); }
+.opm-tile__seg--mid { background: var(--bar-mid); }
+.opm-tile__seg--off { background: var(--bar-off); }
+
+/* ------------------------------------------------------------ bouton VOTER */
+
+.opm-tile__cta {
+  display: block;
+  width: 100%;
+  margin-top: 9px;
+  padding: 8px 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: var(--ink);
+  color: var(--aqua);
+  font: 700 10.5px/1 var(--font-ui);
+  letter-spacing: .1em;
+  text-align: center;
+  cursor: pointer;
+  transition: transform var(--t-fast) ease;
+}
+
+.opm-tile__cta:hover { transform: translateY(-1px); }
+.opm-tile__cta:focus-visible { outline: none; box-shadow: var(--sh-focus); }
+
+/* Même mécanique que [data-bind="cache-size"] dans panels/settings.css : le
+   séparateur appartient au style, pas à la donnée, et n'apparaît qu'une fois la
+   récompense du palier réellement reçue. */
+.opm-tile__cta [data-bind="votes-reward"]:not(:empty)::before { content: " · "; }
+
+
+/* ============================================================================
+   SCÈNE DU PERSONNAGE
+   Trois calques empilés dans une boîte en position:relative : badge d'état,
+   halo, personnage flottant, puis l'identité en bas à gauche.
+   ========================================================================== */
+
+.opm-scene {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+/* --------------------------------------------------------- badge de statut */
+
+.opm-scene__status {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 15px;
+  background: var(--veil-84);
+  /* Badge flottant sur la vidéo : même bordure que les popovers (.22). */
+  border: 1px solid var(--line-dark-22);
+  border-radius: var(--r-lg);
+}
+
+/* Ici la pastille du kicker devient ronde, 8 px, et bat au rythme du serveur. */
+.opm-scene__status .opm-kicker__dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--aqua);
+  animation: opmPulse 2s ease-in-out infinite;
+}
+
+.opm-scene__kicker {
+  margin: 0;
+  font: 700 var(--fs-kicker-sm)/1 var(--font-ui);
+  letter-spacing: var(--ls-kicker);
+  color: var(--aqua);
+}
+
+.opm-scene__status .opm-scene__kicker { letter-spacing: .2em; }
+
+.opm-scene__status .opm-scene__sub {
+  margin: 3px 0 0;
+  font: 600 12px/1.2 var(--font-ui);
+  color: var(--text-light);
+}
+
+/* ------------------------------------------------------------------- halo */
+
+.opm-scene__halo {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 400px;
+  height: 400px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side,
+              color-mix(in srgb, var(--aqua) 32%, transparent),
+              transparent);
+  pointer-events: none;
+}
+
+/* -------------------------------------------------------------- personnage */
+
+/* 404 px de haut, ancré en bas à droite, comme dans la maquette. La largeur
+   suit : le personnage composé par utils/skin.js fait 16 × 32 unités, la
+   silhouette de repli a ses propres proportions, et aucune des deux ne doit
+   être étirée. */
+.opm-scene__char {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  height: 404px;
+  width: auto;
+  filter: var(--sh-char);
+  animation: opmFloat 7s ease-in-out infinite;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Seul le rendu du skin est de l'art pixel : c'est un canevas de 128 × 256
+   servi en `data:` par utils/skin.js, qu'il faut agrandir sans lissage. La
+   silhouette neutre, elle, est une image en pleine résolution (644 × 790) que
+   `pixelated` réduirait en escalier — elle garde donc le filtrage par défaut. */
+.opm-scene__char[src^="data:"] { image-rendering: pixelated; }
+
+/* ---------------------------------------------------------------- identité */
+
+.opm-scene__id {
+  position: absolute;
+  left: 0;
+  bottom: 6px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.opm-scene__name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 400;
+  line-height: 1;
+  color: var(--text-light);
+}
+
+.opm-scene__id .opm-scene__sub {
+  margin: 0;
+  max-width: 200px;
+  font: 500 var(--fs-small)/1.35 var(--font-ui);
+  color: var(--text-light-66);
+}
+
+
+/* ============================================================================
+   SQUELETTES DE CHARGEMENT
+   Les emplacements de données partent vides : sans dimension minimale, un
+   .opm-skeleton s'effondrerait à zéro et le squelette serait invisible.
+   ========================================================================== */
+
+.opm-news__meta.opm-skeleton            { display: inline-block; min-width: 150px; min-height: 11px; }
+.opm-news__title .opm-skeleton          { display: inline-block; min-width: 260px; min-height: 30px; }
+.opm-news__title span:nth-of-type(2).opm-skeleton { min-width: 200px; }
+.opm-news__lead.opm-skeleton            { min-height: 62px; }
+.opm-news-item__tag.opm-skeleton        { min-width: 72px; min-height: 20px; }
+.opm-news-item__label.opm-skeleton      { min-height: 14px; }
+.opm-news-item__date.opm-skeleton       { min-width: 34px; min-height: 12px; }
+.opm-tile__value .opm-skeleton          { display: inline-block; min-width: 56px; min-height: 24px; }
+.opm-tile__unit .opm-skeleton           { display: inline-block; min-width: 48px; min-height: 12px; }
+.opm-tile--dark .opm-tile__unit.opm-skeleton { min-width: 110px; min-height: 12px; }
+.opm-scene__sub.opm-skeleton            { display: block; min-width: 180px; min-height: 13px; }
+.opm-scene__name.opm-skeleton           { display: block; min-width: 140px; min-height: 22px; }

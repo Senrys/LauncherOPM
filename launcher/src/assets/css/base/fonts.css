@@ -1,0 +1,103 @@
+/* ============================================================================
+   OPM LAUNCHER — POLICES
+   Les deux seules familles du launcher : Anton (titres, onglets, chiffres
+   vedettes, bouton JOUER) et Space Grotesk (tout le reste).
+
+   Les fichiers sont embarqués dans l'application (aucun appel réseau : la CSP
+   de launcher.html n'autorise que 'self'). Ils sont produits par
+   `npm run fonts` dans assets/fonts/, un fichier WOFF2 par graisse,
+   couvrant latin + latin-ext (indispensable pour « Œ », « Ÿ », « — »).
+
+   Les familles « … Local » sont les replis déclarés dans tokens.css : elles
+   habillent des polices système avec les métriques des polices réelles, pour
+   qu'aucune ligne ne bouge pendant le `swap`.
+   ========================================================================== */
+
+/* -------------------------------------------------------------------- ANTON
+   Une seule graisse dessinée (400). Les faux gras sont interdits : les titres
+   n'emploient jamais font-weight au-delà de 400 sur cette famille. */
+@font-face {
+  font-family: 'Anton';
+  src: url('../../fonts/Anton-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ------------------------------------------------------------ SPACE GROTESK
+   Quatre graisses réellement utilisées par la maquette : 400, 500, 600, 700. */
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('../../fonts/SpaceGrotesk-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('../../fonts/SpaceGrotesk-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('../../fonts/SpaceGrotesk-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('../../fonts/SpaceGrotesk-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ============================================================================
+   REPLIS À MÉTRIQUES CORRIGÉES
+   Ces deux familles occupent, dans les piles de tokens.css, la place juste
+   après la police réelle. Elles ne chargent aucun fichier : elles réutilisent
+   une police déjà présente sur la machine et lui imposent les métriques
+   verticales et la chasse de la police OPM. Résultat : pendant le `swap`, et
+   même si un fichier manque, la mise en page ne se décale pas.
+   ========================================================================== */
+
+/* Repli d'Anton — condensée très grasse. Impact et Haettenschweiler partagent
+   sa hauteur de capitale ; seule la chasse demande un léger resserrement. */
+@font-face {
+  font-family: 'Anton Local';
+  src: local('Anton'),
+       local('Anton Regular'),
+       local('Impact'),
+       local('Haettenschweiler'),
+       local('Arial Narrow Bold');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  size-adjust: 97%;
+  ascent-override: 106%;
+  descent-override: 24%;
+  line-gap-override: 0%;
+}
+
+/* Repli de Space Grotesk — grotesque à hauteur d'x généreuse. Segoe UI (Windows)
+   et Helvetica Neue (macOS) sont légèrement plus étroites : on les élargit. */
+@font-face {
+  font-family: 'Space Grotesk Local';
+  src: local('Space Grotesk'),
+       local('Segoe UI'),
+       local('Helvetica Neue'),
+       local('Arial');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+  size-adjust: 103%;
+  ascent-override: 96%;
+  descent-override: 25%;
+  line-gap-override: 0%;
+}

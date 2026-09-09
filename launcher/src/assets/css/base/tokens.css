@@ -1,0 +1,221 @@
+/* ============================================================================
+   OPM LAUNCHER — DESIGN TOKENS
+   Source de vérité unique. Extrait au pixel près de DesignMaquette/Launcher OPM.dc.html
+   Aucune couleur en dur ailleurs dans le CSS : tout passe par ces variables.
+   ========================================================================== */
+
+:root {
+  /* ---------------------------------------------------------------- COULEURS
+     Famille sombre — la coque du launcher */
+  --abyss:            #050D0C;  /* fond hors-fenêtre / racine. C'est aussi la
+                                   couleur peinte par Electron avant le premier
+                                   rendu (windows/mainWindow.js) : les quatre
+                                   coins découpés par --r-2xl la retrouvent. */
+  --hull:             #0A1413;  /* fond de fenêtre de la maquette. Aucune règle
+                                   ne s'en sert : dans l'application, la vidéo et
+                                   son dégradé de repli couvrent toute la surface,
+                                   et ce qui reste visible est --abyss. Conservé
+                                   comme relevé de la palette, pas comme dette. */
+  --deep:             #08110F;  /* panneaux flottants (console, menu compte) */
+  --ink:              #0F1A19;  /* encre : texte foncé ET aplats sombres */
+  --ink-2:            #124840;  /* teal très profond (titres sur aqua) */
+  --ink-3:            #134339;  /* corps de texte sur aqua */
+  --ink-4:            #144B42;  /* kickers sur aqua */
+  --slot:             #12211F;  /* fond de vignette d'avatar (maquette l. 496, 501, 512) :
+                                   une encre plus verte que --ink, choisie pour se détacher
+                                   du voile de la barre du bas pendant le rendu du skin */
+
+  /* Encre des voiles de fond, en composantes RVB pour pouvoir la moduler en
+     alpha (maquette l. 37-38). Elle se situe entre --abyss et --hull et ne sert
+     qu'aux dégradés de la coque et du splash, jamais à un aplat. */
+  --veil-ink:         6 16 15;
+
+  /* Ciel et mer du dégradé de repli, joué quand la vidéo de fond est absente
+     ou désactivée (maquette l. 36). Trois teintes propres à cette image. */
+  --sky-high:         #7FB6D8;
+  --sky-low:          #A9CFE2;
+  --sea:              #2C6C86;
+
+  /* Voiles translucides posés sur la vidéo de fond */
+  --veil-90:          rgba(6, 14, 13, .90);  /* barre de titre */
+  --veil-95:          rgba(6, 14, 13, .95);  /* barre du bas */
+  --veil-86:          rgba(6, 14, 13, .86);  /* carte donateurs */
+  --veil-84:          rgba(6, 14, 13, .84);  /* badge statut serveur */
+  --veil-72:          rgba(6, 14, 13, .72);  /* voile de modale (UI-SPEC §5) */
+  --veil-60:          rgba(6, 14, 13, .60);  /* encart état des fichiers */
+  --veil-55:          rgba(6, 14, 13, .55);  /* onglet secondaire inactif */
+  --veil-50:          rgba(6, 14, 13, .50);  /* rail social */
+
+  /* Plaque de squelette de chargement sur fond SOMBRE : le voile de l'encart
+     d'état des fichiers relevé d'un souffle d'aqua. Dérivé de --veil-60 pour
+     rester une plaque sombre sur la vidéo, additionné d'aqua pour rester
+     visible sur un aplat déjà opaque (--deep du popover, --ink des tuiles). */
+  --veil-skeleton:    color-mix(in srgb, var(--aqua) 12%, var(--veil-60));
+
+  /* Famille aqua — la signature OPM */
+  --aqua:             #91D9D1;  /* accent principal */
+  --aqua-alt:         #A6E1DA;  /* rayure alternée (jauge RAM) */
+  --teal:             #1D5C51;  /* teal primaire : liens, kickers, actif */
+
+  /* Famille claire — les cartes de contenu */
+  --paper:            #F2FAF8;  /* surface claire principale */
+  --paper-2:          #F7FCFB;  /* champ de saisie clair */
+  --white:            #FFFFFF;  /* carte imbriquée */
+  --mist:             #EDF7F5;  /* encart de note */
+  --mist-2:           #E4F4F0;  /* survol clair */
+  --mist-3:           #E7F5F2;  /* survol pointillé */
+  --foam:             #DFF1EE;  /* surface claire tertiaire / piste de jauge */
+  --foam-2:           #D8ECE8;  /* piste des sliders natifs */
+
+  /* Bordures */
+  --line:             #DEEDE9;  /* bordure claire par défaut */
+  --line-2:           #CFE9E4;  /* bordure de carte claire */
+  --line-3:           #C7E5DF;  /* bordure de bouton clair */
+  --line-4:           #B9DED7;  /* bordure pointillée */
+  --line-5:           #CFE3DF;  /* repère central de jauge */
+  --line-6:           #C7D6D3;  /* interrupteur éteint */
+  --line-dark-22:     rgba(145, 217, 209, .22); /* panneaux flottants : popovers
+                                   (maquette l. 470, 484) et badge d'état du
+                                   serveur (l. 165) — un cran au-dessus de la
+                                   bordure sombre courante */
+  --line-dark:        rgba(145, 217, 209, .20); /* bordure sur fond sombre */
+  --line-dark-soft:   rgba(145, 217, 209, .14);
+  --line-dark-hair:   rgba(145, 217, 209, .12);
+  --line-dark-faint:  rgba(145, 217, 209, .10); /* filet du rail social (l. 93) */
+  --line-dark-strong: rgba(145, 217, 209, .30);
+
+  /* Aplats aqua clairs */
+  --chip:             #CDEBE5;  /* étiquette ACTUALITÉ */
+  --bar-on:           #91D9D1;  /* segment de jauge plein */
+  --bar-mid:          #C9E9E3;  /* segment partiel */
+  --bar-off:          #DFF1EE;  /* segment vide */
+
+  /* Brillance blanche qui balaie les surfaces en attente (maquette l. 529 :
+     bande de la jauge de téléchargement, reprise par les squelettes clairs). */
+  --shine:            rgba(255, 255, 255, .55);
+
+  /* Texte */
+  --text-light:       #EAF8F6;  /* texte principal sur fond sombre */
+  --text-light-75:    rgba(234, 248, 246, .75); /* « TOUT RÉINITIALISER » (l. 204) */
+  --text-light-72:    rgba(234, 248, 246, .72);
+  --text-light-68:    rgba(234, 248, 246, .68); /* encart d'état des fichiers (l. 202) */
+  --text-light-66:    rgba(234, 248, 246, .66);
+  --text-light-62:    rgba(234, 248, 246, .62);
+  --text-light-60:    rgba(234, 248, 246, .60);
+  --text-light-55:    rgba(234, 248, 246, .55);
+  --text-light-50:    rgba(234, 248, 246, .50);
+  --text-dark:        #0F1A19;  /* texte principal sur fond clair */
+  --text-body:        #40534F;  /* paragraphe sur fond clair */
+  --muted:            #5B6E6A;  /* secondaire clair */
+  --muted-2:          #7C8C89;  /* tertiaire clair */
+  --muted-3:          #9FB3AF;  /* symbole « × » de résolution */
+
+  /* États */
+  --warn:             #8A5A22;  /* note RAM hors plage */
+  --danger:           #C0392B;  /* survol du bouton fermer */
+  --idle:             #5E6E6B;  /* jauge en maintenance */
+  --success:          #1D5C51;  /* jauge terminée */
+
+  /* --------------------------------------------------------------- TYPO */
+  --font-display:     'Anton', 'Anton Local', Impact, 'Haettenschweiler', 'Arial Narrow Bold', sans-serif;
+  --font-ui:          'Space Grotesk', 'Space Grotesk Local', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono:        ui-monospace, 'SFMono-Regular', 'Cascadia Mono', Menlo, Consolas, monospace;
+
+  /* Échelle de graisses/tailles réellement employées par la maquette */
+  --fs-kicker:        10px;    /* 700, letter-spacing .22em */
+  --fs-kicker-sm:     9px;     /* 700, letter-spacing .18em */
+  --fs-meta:          11px;
+  --fs-small:         11.5px;
+  --fs-body:          13px;
+  --fs-body-lg:       13.5px;
+  --fs-nav:           15px;    /* Anton, letter-spacing .09em */
+  --fs-h2:            29px;    /* Anton */
+  --fs-h1:            37px;    /* Anton */
+
+  --ls-kicker:        .22em;
+  --ls-kicker-sm:     .18em;
+  --ls-tag:           .14em;
+  --ls-btn:           .12em;
+  --ls-nav:           .09em;
+
+  /* --------------------------------------------------------------- FORMES
+     Échelle relevée sur la maquette. Les quatre « alt » ne sont pas des
+     approximations : ce sont des rayons que la maquette emploie tels quels,
+     entre deux crans de l'échelle principale. */
+  --r-2xs:            2px;   /* segments de jauge des tuiles (maquette l. 145) */
+  --r-xs:             3px;
+  --r-xs-alt:         4px;   /* case « LANCEMENT AUTO » (l. 543) et cadre d'aperçu
+                                de résolution (l. 305) */
+  --r-sm:             5px;
+  --r-sm-alt:         6px;   /* vignette d'avatar 32 px du popover (l. 496) et
+                                bouton « DÉFINIR PRINCIPAL » (l. 274) */
+  --r-md:             7px;
+  --r-lg-alt:         8px;   /* vignette 46 px de la barre du bas (l. 512), encart
+                                d'état des fichiers (l. 200), cartes de palier
+                                (l. 429) et boutons hauts de la carte de don (l. 402) */
+  --r-lg:             9px;
+  --r-xl:             10px;
+  --r-xl-alt:         12px;  /* coin haut-droit du bouton de fermeture (l. 73) :
+                                le rayon de la fenêtre moins sa bordure */
+  --r-2xl:            14px;  /* cadre de la fenêtre (maquette l. 34), posé sur
+                                .opm-app dans layout/shell.css */
+  --r-pill:           99px;
+
+  /* --------------------------------------------------------------- OMBRES */
+  /* Ombre portée du cadre de fenêtre de la maquette. Sans emploi ici, et c'est
+     volontaire : une fenêtre sans cadre reçoit son ombre du système, et une
+     ombre CSS posée sur .opm-app serait de toute façon rognée par la fenêtre. */
+  --sh-window:        0 40px 90px rgba(0, 0, 0, .65);
+  --sh-card:          0 24px 50px rgba(0, 0, 0, .40);
+  --sh-pop:           0 18px 40px rgba(0, 0, 0, .50);
+  --sh-play:          0 12px 30px rgba(145, 217, 209, .32);
+  --sh-knob:          0 1px 3px rgba(0, 0, 0, .30);
+  --sh-focus:         0 0 0 3px rgba(145, 217, 209, .35);
+  /* Cerclage du compte de lancement (maquette l. 268 : `0 0 0 2px #91D9D1`) :
+     une ombre sans flou, donc un anneau — mais bien un box-shadow. */
+  --sh-ring-primary:  0 0 0 2px var(--aqua);
+  /* Ombre portée du personnage de l'accueil : un filtre, pas un box-shadow. */
+  --sh-char:          drop-shadow(-22px 16px 34px rgba(0, 0, 0, .55));
+  /* Les deux ombres du splash, elles aussi posées sur un noir pur que la
+     famille d'ombres ci-dessus n'expose pas autrement (maquette l. 570, 572). */
+  --sh-banner:        drop-shadow(0 20px 44px rgba(0, 0, 0, .50));
+  --sh-splash-text:   0 2px 8px rgba(0, 0, 0, .60);
+
+  /* --------------------------------------------------------------- MESURES */
+  --h-titlebar:       46px;
+  --h-bottombar:      96px;
+  --w-social-rail:    60px;
+  --w-news-card:      620px;
+  --w-settings-nav:   206px;
+  --w-donation-card:  392px;
+  --w-play-btn:       212px;
+  --h-play-btn:       62px;
+  --pad-screen:       26px 28px;
+
+  /* --------------------------------------------------------------- DURÉES */
+  --t-fast:           .15s;
+  --t-nav:            .16s;
+  --t-panel:          .28s;
+  --t-fade:           .45s;
+}
+
+/* ============================================================================
+   ANIMATIONS — reprises telles quelles de la maquette
+   ========================================================================== */
+@keyframes opmPulse   { 0%, 100% { opacity: 1; transform: scale(1); }
+                        50%      { opacity: .4; transform: scale(.82); } }
+@keyframes opmShimmer { 0%   { transform: translateX(-110%); }
+                        100% { transform: translateX(320%); } }
+@keyframes opmFloat   { 0%, 100% { transform: translateY(0); }
+                        50%      { transform: translateY(-10px); } }
+@keyframes opmRise    { from { opacity: 0; transform: translateY(10px); }
+                        to   { opacity: 1; transform: translateY(0); } }
+@keyframes opmSpin    { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+}

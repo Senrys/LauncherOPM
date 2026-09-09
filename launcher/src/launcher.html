@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https:; media-src 'self'; connect-src 'self' https:">
+  <title>One Piece Minecraft — Launcher</title>
+
+  <!-- Ordre de chargement imposé : tokens → fonts → reset → layout → components → panels.
+       Aucun style n'est écrit hors de ces fichiers. -->
+  <link rel="stylesheet" href="assets/css/base/tokens.css">
+  <link rel="stylesheet" href="assets/css/base/fonts.css">
+  <link rel="stylesheet" href="assets/css/base/reset.css">
+
+  <link rel="stylesheet" href="assets/css/layout/shell.css">
+  <link rel="stylesheet" href="assets/css/layout/titlebar.css">
+  <link rel="stylesheet" href="assets/css/layout/rail.css">
+  <link rel="stylesheet" href="assets/css/layout/bottombar.css">
+  <link rel="stylesheet" href="assets/css/layout/splash.css">
+
+  <link rel="stylesheet" href="assets/css/components/buttons.css">
+  <link rel="stylesheet" href="assets/css/components/forms.css">
+  <link rel="stylesheet" href="assets/css/components/switch.css">
+  <link rel="stylesheet" href="assets/css/components/card.css">
+  <link rel="stylesheet" href="assets/css/components/overlay.css">
+  <link rel="stylesheet" href="assets/css/components/feedback.css">
+
+  <link rel="stylesheet" href="assets/css/panels/home.css">
+  <link rel="stylesheet" href="assets/css/panels/settings.css">
+  <link rel="stylesheet" href="assets/css/panels/donation.css">
+  <link rel="stylesheet" href="assets/css/panels/login.css">
+</head>
+
+<!--
+  COUPLAGE HTML ↔ JS
+  Le JS ne sélectionne jamais par classe : les classes sont réservées au style.
+  Points d'accroche : data-el (ancrage), data-screen (phase splash|login|app),
+  data-tab (onglet principal), data-sub (sous-écran des paramètres),
+  data-view (vue de l'écran de connexion), data-action (clic), data-bind (texte).
+
+  Le splash et l'écran de connexion sont commutés par l'attribut `hidden` ; la
+  coque, elle, reste dans le flux et se dévoile en retirant `opm-shell--hidden`,
+  afin que son fondu d'entrée (opacity .45s) puisse jouer derrière le splash.
+  Aucune valeur affichée n'est écrite en dur : tous les emplacements data-bind
+  partent vides et sont remplis par les données réelles.
+-->
+<body class="opm-app">
+
+  <!-- ======================================================================
+       FOND — vidéo, repli dégradé, puis les deux voiles (valeurs en CSS)
+       ================================================================== -->
+  <div class="opm-bg" aria-hidden="true">
+    <video class="opm-bg__video" data-el="bg-video"
+           src="assets/videos/opmback2.mp4"
+           muted loop autoplay playsinline preload="auto"
+           disablepictureinpicture tabindex="-1"></video>
+    <div class="opm-bg__fallback" data-el="bg-fallback"></div>
+    <div class="opm-bg__veil-a"></div>
+    <div class="opm-bg__veil-b"></div>
+  </div>
+
+
+  <!-- ======================================================================
+       SPLASH — suit la progression réelle du démarrage, ne simule rien
+       ================================================================== -->
+  <!-- Toute la surface est cliquable (délégation sur data-action), mais c'est la
+       mention du bas qui porte le vrai bouton accessible au clavier. -->
+  <div class="opm-splash" data-screen="splash" data-action="skip-splash">
+
+    <img class="opm-splash__banner" src="assets/images/bandeau-opm.png"
+         alt="One Piece Minecraft">
+
+    <p class="opm-splash__label">CONNEXION AU SERVEUR D'AUTHENTIFICATION</p>
+
+    <div class="opm-splash__track" data-el="splash-track"
+         role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"
+         aria-label="Progression du démarrage">
+      <div class="opm-splash__fill" data-el="splash-fill"></div>
+    </div>
+
+    <button type="button" class="opm-splash__hint"
+            data-action="skip-splash">CLIQUEZ POUR PASSER</button>
+  </div>
+
+
+  <!-- ======================================================================
+       COQUE — barre de titre, rail, panneaux, popovers, barre du bas
+       ================================================================== -->
+  <div class="opm-shell opm-shell--hidden" data-screen="app">
+
+    <!-- ------------------------------------------------------ BARRE DE TITRE -->
+    <header class="opm-titlebar">
+
+      <div class="opm-titlebar__brand">
+        <img class="opm-titlebar__logo" src="assets/images/logo-opm.png"
+             alt="" width="28" height="28">
+        <span class="opm-titlebar__name">ONE PIECE MINECRAFT</span>
+        <span class="opm-titlebar__badge">LAUNCHER</span>
+      </div>
+
+      <nav class="opm-titlebar__tabs" role="tablist" aria-label="Sections du launcher">
+        <button type="button" class="opm-titlebar__tab opm-titlebar__tab--active"
+                id="opm-tab-home" role="tab" data-tab="home"
+                aria-selected="true" aria-controls="opm-panel-host">
+          ACCUEIL
+          <span class="opm-titlebar__tab-bar" aria-hidden="true"></span>
+        </button>
+        <button type="button" class="opm-titlebar__tab"
+                id="opm-tab-settings" role="tab" data-tab="settings"
+                aria-selected="false" aria-controls="opm-panel-host">
+          PARAMÈTRES
+          <span class="opm-titlebar__tab-bar" aria-hidden="true"></span>
+        </button>
+        <button type="button" class="opm-titlebar__tab"
+                id="opm-tab-donation" role="tab" data-tab="donation"
+                aria-selected="false" aria-controls="opm-panel-host">
+          DONATION
+          <span class="opm-titlebar__tab-bar" aria-hidden="true"></span>
+        </button>
+      </nav>
+
+      <div class="opm-titlebar__spacer"></div>
+
+      <p class="opm-titlebar__version">
+        <span class="opm-titlebar__dot" aria-hidden="true"></span>
+        <span data-bind="app-version"></span>
+      </p>
+
+      <div class="opm-titlebar__win">
+        <button type="button" class="opm-titlebar__winbtn opm-titlebar__winbtn--min"
+                data-action="window-min" aria-label="Réduire la fenêtre">
+          <svg width="11" height="11" viewBox="0 0 11 11" aria-hidden="true" focusable="false">
+            <path d="M1 5.5h9" stroke="currentColor" stroke-width="1.4"></path>
+          </svg>
+        </button>
+        <button type="button" class="opm-titlebar__winbtn opm-titlebar__winbtn--max"
+                data-el="btn-max" data-action="window-max"
+                aria-label="Agrandir la fenêtre" aria-pressed="false">
+          <svg width="11" height="11" viewBox="0 0 11 11" aria-hidden="true" focusable="false">
+            <rect x="1.2" y="1.2" width="8.6" height="8.6" fill="none"
+                  stroke="currentColor" stroke-width="1.4"></rect>
+          </svg>
+        </button>
+        <button type="button" class="opm-titlebar__winbtn opm-titlebar__winbtn--close"
+                data-action="window-close" aria-label="Fermer le launcher">
+          <svg width="11" height="11" viewBox="0 0 11 11" aria-hidden="true" focusable="false">
+            <path d="M1.4 1.4l8.2 8.2M9.6 1.4L1.4 9.6" stroke="currentColor" stroke-width="1.4"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- --------------------------------------------------- RAIL + PANNEAUX -->
+    <main>
+
+      <nav class="opm-rail" aria-label="Liens de la communauté">
+        <button type="button" class="opm-rail__link" data-el="link-discord"
+                data-action="open-link" title="Discord" aria-label="Rejoindre le Discord">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
+            <path d="M20 17.5c1.6-3.2 1.4-7.6-.6-11-1.2-.9-2.7-1.5-4.3-1.7l-.7 1.5c-1.6-.3-3.2-.3-4.8 0L8.9 4.8C7.3 5 5.8 5.6 4.6 6.5c-2 3.4-2.2 7.8-.6 11 1.4 1.1 3.1 1.8 4.9 2l.9-1.7"
+                  stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"></path>
+            <path d="M15.2 17.8l.9 1.7" stroke="currentColor" stroke-width="1.5"></path>
+            <circle cx="9.3" cy="12.6" r="1.5" fill="currentColor"></circle>
+            <circle cx="14.7" cy="12.6" r="1.5" fill="currentColor"></circle>
+          </svg>
+        </button>
+
+        <button type="button" class="opm-rail__link" data-el="link-twitch"
+                data-action="open-link" title="Twitch" aria-label="Suivre la chaîne Twitch">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
+            <path d="M4 3.5h16v10.2l-4.2 4.2h-3.1L9.6 21H7.4v-3.1H4z"
+                  stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"></path>
+            <path d="M10.4 7.6v4.6M14.9 7.6v4.6" stroke="currentColor" stroke-width="1.7"></path>
+          </svg>
+        </button>
+
+        <button type="button" class="opm-rail__link" data-el="link-youtube"
+                data-action="open-link" title="YouTube" aria-label="Voir la chaîne YouTube">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
+            <rect x="2.5" y="5.5" width="19" height="13" rx="3.4"
+                  stroke="currentColor" stroke-width="1.5"></rect>
+            <path d="M10.4 9.4l5 2.6-5 2.6z" fill="currentColor"></path>
+          </svg>
+        </button>
+
+        <div class="opm-rail__sep" aria-hidden="true"></div>
+
+        <button type="button" class="opm-rail__link" data-el="link-website"
+                data-action="open-link" title="onepieceminecraft.fr"
+                aria-label="Ouvrir le site du serveur">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
+            <circle cx="12" cy="12" r="8.6" stroke="currentColor" stroke-width="1.5"></circle>
+            <path d="M3.6 12h16.8M12 3.4c2.4 2.3 3.6 5.2 3.6 8.6s-1.2 6.3-3.6 8.6c-2.4-2.3-3.6-5.2-3.6-8.6S9.6 5.7 12 3.4z"
+                  stroke="currentColor" stroke-width="1.4"></path>
+          </svg>
+        </button>
+      </nav>
+
+      <!-- Les panneaux (accueil, paramètres, donation) sont injectés ici :
+           chacun apporte sa propre racine .opm-screen. -->
+      <div id="opm-panel-host" data-el="panel-host"
+           role="tabpanel" aria-labelledby="opm-tab-home"></div>
+    </main>
+
+    <!-- ------------------------------------------------------- POPOVER COMPTES -->
+    <div class="opm-popover opm-popover--accounts"
+         id="opm-popover-accounts" data-el="popover-accounts"
+         role="menu" aria-label="Changer de compte" hidden>
+
+      <p class="opm-popover__title">CHANGER DE COMPTE</p>
+
+      <div data-el="account-list"></div>
+
+      <template data-el="tpl-account-item">
+        <button type="button" class="opm-popover__item opm-account"
+                role="menuitem" data-action="select-account">
+          <span class="opm-account__avatar"><img alt="" data-el="account-head"></span>
+          <span class="opm-account__name" data-bind="account-name"></span>
+          <span class="opm-account__meta" data-bind="account-meta"></span>
+        </button>
+      </template>
+
+      <div class="opm-popover__sep" aria-hidden="true"></div>
+
+      <button type="button" class="opm-popover__action"
+              role="menuitem" data-action="add-account">+ AJOUTER UN COMPTE</button>
+      <button type="button" class="opm-popover__action"
+              role="menuitem" data-action="logout">SE DÉCONNECTER</button>
+    </div>
+
+    <!-- ------------------------------------------------------- POPOVER CONSOLE -->
+    <div class="opm-popover opm-popover--console"
+         id="opm-popover-console" data-el="popover-console"
+         role="log" aria-label="Console de mise à jour" hidden>
+
+      <p class="opm-popover__title opm-kicker">
+        <span class="opm-kicker__dot" aria-hidden="true"></span>CONSOLE DE MISE À JOUR
+      </p>
+      <pre data-el="console"></pre>
+    </div>
+
+    <!-- ----------------------------------------------------- BARRE DU BAS -->
+    <footer class="opm-bottom">
+
+      <button type="button" class="opm-bottom__account"
+              data-el="account-button" data-action="toggle-accounts"
+              aria-haspopup="menu" aria-expanded="false"
+              aria-controls="opm-popover-accounts">
+        <span class="opm-bottom__avatar">
+          <img data-el="account-avatar" src="assets/images/steve.png" alt="">
+        </span>
+        <span class="opm-bottom__name" data-bind="player-name"></span>
+        <span class="opm-bottom__sub" data-bind="player-status"></span>
+        <span class="opm-bottom__chevron" aria-hidden="true">▲</span>
+      </button>
+
+      <div class="opm-bottom__status">
+        <p class="opm-bottom__kicker" id="opm-status-kicker" data-bind="status-kicker"></p>
+
+        <button type="button" class="opm-bottom__details"
+                data-el="details-button" data-action="toggle-log"
+                aria-expanded="false" aria-controls="opm-popover-console">
+          DÉTAILS <span aria-hidden="true" data-bind="log-chevron">▾</span>
+        </button>
+
+        <div class="opm-bottom__bar" data-el="progress"
+             role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"
+             aria-labelledby="opm-status-kicker">
+          <div class="opm-bottom__fill" data-el="progress-fill">
+            <span class="opm-bottom__shimmer" aria-hidden="true"></span>
+          </div>
+        </div>
+
+        <p class="opm-bottom__pct" data-bind="progress-pct"></p>
+        <p class="opm-bottom__line" data-bind="status-line"></p>
+      </div>
+
+      <label class="opm-bottom__auto">
+        <input type="checkbox" data-el="auto-launch" data-action="toggle-auto">
+        <span class="opm-bottom__auto-box" aria-hidden="true"></span>
+        LANCEMENT AUTO
+      </label>
+
+      <!-- Annulation d'un téléchargement en cours (game.cancel()). Le bouton n'existe
+           que pendant la préparation des fichiers : hors de cette phase il est `hidden`,
+           donc absent du flux, et la barre retrouve exactement sa mise en page d'origine.
+           Il emprunte l'habillage du bouton DÉTAILS, seul gabarit de petit bouton prévu
+           pour le fond sombre de cette barre. -->
+      <button type="button" class="opm-bottom__details"
+              data-el="cancel-launch" data-action="cancel-launch"
+              aria-label="Annuler la préparation des fichiers" hidden>ANNULER</button>
+
+      <button type="button" class="opm-bottom__play opm-bottom__play--busy"
+              data-el="play" data-action="play" data-bind="play-label"
+              disabled>PATIENTEZ</button>
+    </footer>
+  </div>
+
+
+  <!-- ======================================================================
+       CONNEXION — carte à gauche, personnage à droite, cinq vues
+       ================================================================== -->
+  <section class="opm-login" data-screen="login" hidden>
+
+    <!-- Barre de titre réduite : marque + boutons fenêtre, sans onglets. -->
+    <header class="opm-titlebar">
+      <div class="opm-titlebar__brand">
+        <img class="opm-titlebar__logo" src="assets/images/logo-opm.png"
+             alt="" width="28" height="28">
+        <span class="opm-titlebar__name">ONE PIECE MINECRAFT</span>
+        <span class="opm-titlebar__badge">LAUNCHER</span>
+      </div>
+
+      <div class="opm-titlebar__spacer"></div>
+
+      <div class="opm-titlebar__win">
+        <button type="button" class="opm-titlebar__winbtn opm-titlebar__winbtn--min"
+                data-action="window-min" aria-label="Réduire la fenêtre">
+          <svg width="11" height="11" viewBox="0 0 11 11" aria-hidden="true" focusable="false">
+            <path d="M1 5.5h9" stroke="currentColor" stroke-width="1.4"></path>
+          </svg>
+        </button>
+        <button type="button" class="opm-titlebar__winbtn opm-titlebar__winbtn--max"
+                data-action="window-max" aria-label="Agrandir la fenêtre" aria-pressed="false">
+          <svg width="11" height="11" viewBox="0 0 11 11" aria-hidden="true" focusable="false">
+            <rect x="1.2" y="1.2" width="8.6" height="8.6" fill="none"
+                  stroke="currentColor" stroke-width="1.4"></rect>
+          </svg>
+        </button>
+        <button type="button" class="opm-titlebar__winbtn opm-titlebar__winbtn--close"
+                data-action="window-close" aria-label="Fermer le launcher">
+          <svg width="11" height="11" viewBox="0 0 11 11" aria-hidden="true" focusable="false">
+            <path d="M1.4 1.4l8.2 8.2M9.6 1.4L1.4 9.6" stroke="currentColor" stroke-width="1.4"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Personnage : même traitement que sur l'Accueil. -->
+    <div class="opm-scene" aria-hidden="true">
+      <div class="opm-scene__halo"></div>
+      <img class="opm-scene__char" data-el="login-char"
+           src="assets/images/melodia.webp" alt="">
+    </div>
+
+    <div class="opm-login__card">
+
+      <!-- ------------------------------------------------ VUE : CONNEXION -->
+      <form class="opm-login__view" data-view="login" data-el="form-login" novalidate>
+        <p class="opm-kicker"><span class="opm-kicker__dot" aria-hidden="true"></span>ÉQUIPAGE</p>
+
+        <h1 class="opm-login__title">PRENEZ LA MER<br><span>AVEC VOTRE ÉQUIPAGE</span></h1>
+
+        <p class="opm-login__lead">
+          Connectez-vous avec votre compte One Piece Minecraft : c'est lui, et lui seul,
+          qui délivre votre session de jeu.
+        </p>
+
+        <p class="opm-note--warn" data-el="login-error" role="alert" hidden></p>
+
+        <div class="opm-field">
+          <label class="opm-field__label" for="opm-login-email">Adresse e-mail</label>
+          <input class="opm-field__input" id="opm-login-email" data-el="login-email"
+                 type="email" name="email" autocomplete="username"
+                 inputmode="email" spellcheck="false" autocapitalize="off"
+                 required placeholder="vous@exemple.fr">
+          <p class="opm-field__error" data-el="login-email-error" hidden></p>
+        </div>
+
+        <div class="opm-field">
+          <label class="opm-field__label" for="opm-login-password">Mot de passe</label>
+          <input class="opm-field__input" id="opm-login-password" data-el="login-password"
+                 type="password" name="password" autocomplete="current-password" required>
+          <button type="button" class="opm-field__eye"
+                  data-action="toggle-password" aria-controls="opm-login-password"
+                  aria-pressed="false" aria-label="Afficher le mot de passe">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
+                 data-el="eye-open" aria-hidden="true" focusable="false">
+              <path d="M2.6 12S6.4 5.9 12 5.9 21.4 12 21.4 12 17.6 18.1 12 18.1 2.6 12 2.6 12z"
+                    stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"></path>
+              <circle cx="12" cy="12" r="3.1" stroke="currentColor" stroke-width="1.5"></circle>
+            </svg>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
+                 data-el="eye-closed" aria-hidden="true" focusable="false" hidden>
+              <path d="M2.6 12S6.4 5.9 12 5.9 21.4 12 21.4 12 17.6 18.1 12 18.1 2.6 12 2.6 12z"
+                    stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"></path>
+              <path d="M4.2 4.2l15.6 15.6" stroke="currentColor" stroke-width="1.5"></path>
+            </svg>
+          </button>
+          <p class="opm-field__error" data-el="login-password-error" hidden></p>
+        </div>
+
+        <button type="button" class="opm-login__link opm-login__forgot"
+                data-action="view-forgot">Mot de passe oublié ?</button>
+
+        <button type="submit" class="opm-btn opm-btn--ink opm-btn--block opm-btn--lg">
+          SE CONNECTER
+        </button>
+
+        <p class="opm-login__sep"><span>ou</span></p>
+
+        <!-- L'invitation entière disparaît quand le serveur a fermé les inscriptions
+             (bootstrap.auth.registration_open) : proposer le lien pour n'échouer qu'après
+             saisie complète du formulaire serait une promesse en l'air. -->
+        <p class="opm-login__alt" data-el="register-invite">
+          Pas encore de compte ?
+          <button type="button" class="opm-login__link"
+                  data-action="view-register">Créer un compte</button>
+        </p>
+      </form>
+
+      <!-- ------------------------------------- VUE : CODE DE SÉCURITÉ (2FA) -->
+      <form class="opm-login__view" data-view="totp" data-el="form-totp" novalidate hidden>
+        <p class="opm-kicker"><span class="opm-kicker__dot" aria-hidden="true"></span>SÉCURITÉ</p>
+
+        <h2 class="opm-login__title">CODE DE VÉRIFICATION</h2>
+
+        <p class="opm-login__lead">
+          Saisissez le code à six chiffres affiché par votre application
+          d'authentification.
+        </p>
+
+        <p class="opm-note--warn" data-el="totp-error" role="alert" hidden></p>
+
+        <div class="opm-otp" data-el="otp" role="group"
+             aria-label="Code de vérification à six chiffres">
+          <input class="opm-otp__box" data-el="otp-box" data-index="0" aria-label="Chiffre 1"
+                 type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1"
+                 autocomplete="one-time-code" spellcheck="false">
+          <input class="opm-otp__box" data-el="otp-box" data-index="1" aria-label="Chiffre 2"
+                 type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" spellcheck="false">
+          <input class="opm-otp__box" data-el="otp-box" data-index="2" aria-label="Chiffre 3"
+                 type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" spellcheck="false">
+          <input class="opm-otp__box" data-el="otp-box" data-index="3" aria-label="Chiffre 4"
+                 type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" spellcheck="false">
+          <input class="opm-otp__box" data-el="otp-box" data-index="4" aria-label="Chiffre 5"
+                 type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" spellcheck="false">
+          <input class="opm-otp__box" data-el="otp-box" data-index="5" aria-label="Chiffre 6"
+                 type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" spellcheck="false">
+        </div>
+
+        <div class="opm-field" data-el="recovery-field" hidden>
+          <label class="opm-field__label" for="opm-totp-recovery">Code de secours</label>
+          <input class="opm-field__input" id="opm-totp-recovery" data-el="totp-recovery"
+                 type="text" name="recovery" autocomplete="off" spellcheck="false"
+                 autocapitalize="characters">
+        </div>
+
+        <button type="button" class="opm-login__link"
+                data-action="use-recovery-code">Utiliser un code de secours</button>
+
+        <button type="submit" class="opm-btn opm-btn--ink opm-btn--block opm-btn--lg">
+          VALIDER
+        </button>
+
+        <p class="opm-login__alt">
+          <button type="button" class="opm-login__link"
+                  data-action="view-login">Revenir à la connexion</button>
+        </p>
+      </form>
+
+      <!-- -------------------------------------------- VUE : CRÉER UN COMPTE -->
+      <form class="opm-login__view" data-view="register" data-el="form-register" novalidate hidden>
+        <p class="opm-kicker"><span class="opm-kicker__dot" aria-hidden="true"></span>NOUVEL ÉQUIPAGE</p>
+
+        <h1 class="opm-login__title">HISSEZ<br><span>VOTRE PAVILLON</span></h1>
+
+        <p class="opm-login__lead">
+          Votre compte One Piece Minecraft vous suit sur le serveur, le site et le Discord.
+        </p>
+
+        <p class="opm-note--warn" data-el="register-error" role="alert" hidden></p>
+
+        <div class="opm-field">
+          <label class="opm-field__label" for="opm-register-username">Pseudo d'équipage</label>
+          <input class="opm-field__input" id="opm-register-username" data-el="register-username"
+                 type="text" name="username" autocomplete="nickname"
+                 spellcheck="false" autocapitalize="off"
+                 minlength="3" maxlength="16" pattern="[A-Za-z0-9_]{3,16}" required>
+          <p class="opm-field__error" data-el="register-username-error" hidden></p>
+        </div>
+
+        <div class="opm-field">
+          <label class="opm-field__label" for="opm-register-email">Adresse e-mail</label>
+          <input class="opm-field__input" id="opm-register-email" data-el="register-email"
+                 type="email" name="email" autocomplete="email"
+                 inputmode="email" spellcheck="false" autocapitalize="off"
+                 required placeholder="vous@exemple.fr">
+          <p class="opm-field__error" data-el="register-email-error" hidden></p>
+        </div>
+
+        <div class="opm-field">
+          <label class="opm-field__label" for="opm-register-password">Mot de passe</label>
+          <input class="opm-field__input" id="opm-register-password" data-el="register-password"
+                 type="password" name="new-password" autocomplete="new-password"
+                 minlength="10" required>
+          <button type="button" class="opm-field__eye"
+                  data-action="toggle-password" aria-controls="opm-register-password"
+                  aria-pressed="false" aria-label="Afficher le mot de passe">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
+                 data-el="eye-open" aria-hidden="true" focusable="false">
+              <path d="M2.6 12S6.4 5.9 12 5.9 21.4 12 21.4 12 17.6 18.1 12 18.1 2.6 12 2.6 12z"
+                    stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"></path>
+              <circle cx="12" cy="12" r="3.1" stroke="currentColor" stroke-width="1.5"></circle>
+            </svg>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
+                 data-el="eye-closed" aria-hidden="true" focusable="false" hidden>
+              <path d="M2.6 12S6.4 5.9 12 5.9 21.4 12 21.4 12 17.6 18.1 12 18.1 2.6 12 2.6 12z"
+                    stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"></path>
+              <path d="M4.2 4.2l15.6 15.6" stroke="currentColor" stroke-width="1.5"></path>
+            </svg>
+          </button>
+          <p class="opm-field__error" data-el="register-password-error" hidden></p>
+        </div>
+
+        <div class="opm-field">
+          <label class="opm-field__label" for="opm-register-confirm">Confirmer le mot de passe</label>
+          <input class="opm-field__input" id="opm-register-confirm" data-el="register-confirm"
+                 type="password" name="confirm-password" autocomplete="new-password"
+                 minlength="10" required>
+          <p class="opm-field__error" data-el="register-confirm-error" hidden></p>
+        </div>
+
+        <p class="opm-login__lead">
+          Un compte Microsoft possédant Minecraft vous sera demandé juste après :
+          il sert uniquement à confirmer que vous possédez le jeu.
+        </p>
+
+        <button type="submit" class="opm-btn opm-btn--ink opm-btn--block opm-btn--lg">
+          CRÉER MON COMPTE
+        </button>
+
+        <p class="opm-login__alt">
+          Déjà un compte ?
+          <button type="button" class="opm-login__link"
+                  data-action="view-login">Se connecter</button>
+        </p>
+      </form>
+
+      <!-- --------------------------------------- VUE : MOT DE PASSE OUBLIÉ -->
+      <form class="opm-login__view" data-view="forgot" data-el="form-forgot" novalidate hidden>
+        <p class="opm-kicker"><span class="opm-kicker__dot" aria-hidden="true"></span>ACCÈS PERDU</p>
+
+        <h2 class="opm-login__title">RÉINITIALISER LE MOT DE PASSE</h2>
+
+        <p class="opm-login__lead">
+          Indiquez l'adresse e-mail de votre compte. Si elle nous est connue, un lien
+          de réinitialisation y sera envoyé dans les minutes qui suivent.
+        </p>
+
+        <p class="opm-note--warn" data-el="forgot-error" role="alert" hidden></p>
+        <p class="opm-login__lead" data-el="forgot-sent" role="status" hidden></p>
+
+        <div class="opm-field">
+          <label class="opm-field__label" for="opm-forgot-email">Adresse e-mail</label>
+          <input class="opm-field__input" id="opm-forgot-email" data-el="forgot-email"
+                 type="email" name="email" autocomplete="email"
+                 inputmode="email" spellcheck="false" autocapitalize="off"
+                 required placeholder="vous@exemple.fr">
+          <p class="opm-field__error" data-el="forgot-email-error" hidden></p>
+        </div>
+
+        <button type="submit" class="opm-btn opm-btn--ink opm-btn--block opm-btn--lg">
+          ENVOYER LE LIEN
+        </button>
+
+        <p class="opm-login__alt">
+          <button type="button" class="opm-login__link"
+                  data-action="view-login">Revenir à la connexion</button>
+        </p>
+      </form>
+
+      <!-- ----------------------------------- VUE : RATTACHEMENT MICROSOFT -->
+      <section class="opm-login__view" data-view="link" data-el="view-link" hidden>
+        <p class="opm-kicker"><span class="opm-kicker__dot" aria-hidden="true"></span>POSSESSION DU JEU</p>
+
+        <h2 class="opm-login__title">RATTACHEZ VOTRE COMPTE MINECRAFT</h2>
+
+        <p class="opm-login__lead">
+          One Piece Minecraft délivre lui-même votre session de jeu. Nous demandons une
+          seule fois à Microsoft de confirmer que vous possédez Minecraft : votre mot de
+          passe Microsoft ne transite jamais par le launcher, et aucun jeton Microsoft
+          n'est envoyé au jeu.
+        </p>
+
+        <p class="opm-note--warn" data-el="link-error" role="alert" hidden></p>
+
+        <button type="button" class="opm-btn opm-btn--aqua opm-btn--block opm-btn--lg"
+                data-el="link-button" data-action="link-microsoft">
+          <span class="opm-spinner" data-el="link-spinner" aria-hidden="true" hidden></span>
+          <span data-bind="link-label">RATTACHER MON COMPTE MINECRAFT</span>
+        </button>
+
+        <!-- Repli « device code » : affiché uniquement si bootstrap.auth.flow = device.
+             ANNULER interrompt la scrutation côté processus principal (auth.cancelLink) :
+             sans lui, le verrou « linking » interdirait toute nouvelle tentative pendant
+             un quart d'heure. -->
+        <div class="opm-link-ms" data-el="link-device" hidden>
+          <p class="opm-login__lead">
+            Saisissez ce code sur la page Microsoft qui vient de s'ouvrir. Il reste
+            valable quelques minutes.
+          </p>
+          <p class="opm-link-ms__code" data-bind="ms-user-code"></p>
+          <button type="button" class="opm-btn opm-btn--outline"
+                  data-action="copy-code">COPIER</button>
+          <button type="button" class="opm-login__link"
+                  data-action="open-ms-link">Ouvrir microsoft.com/link</button>
+          <button type="button" class="opm-btn opm-btn--ghost"
+                  data-el="link-cancel" data-action="cancel-link">ANNULER</button>
+        </div>
+
+        <!-- Confirmation : tête de skin, pseudo Minecraft, validité de la vérification. -->
+        <div class="opm-account opm-account--primary" data-el="link-result" hidden>
+          <span class="opm-account__avatar"><img data-el="link-head" alt=""></span>
+          <span class="opm-account__name" data-bind="ms-name"></span>
+          <span class="opm-account__meta" data-bind="ms-meta"></span>
+        </div>
+
+        <button type="button" class="opm-btn opm-btn--ink opm-btn--block opm-btn--lg"
+                data-el="link-continue" data-action="link-continue" hidden>
+          EMBARQUER
+        </button>
+
+        <p class="opm-login__alt">
+          <button type="button" class="opm-login__link"
+                  data-action="logout">Utiliser un autre compte One Piece Minecraft</button>
+        </p>
+      </section>
+    </div>
+  </section>
+
+
+  <!-- ======================================================================
+       SURCOUCHES — notifications et modales, remplies au runtime
+       ================================================================== -->
+  <div class="opm-toasts" data-el="toasts" role="status" aria-live="polite"></div>
+  <div data-el="modal-root"></div>
+
+  <script type="module" src="assets/js/renderer.js"></script>
+</body>
+</html>

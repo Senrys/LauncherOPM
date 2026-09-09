@@ -1,0 +1,36 @@
+# ── Dépendances et sorties de compilation ───────────────────────────────────
+node_modules/
+launcher/dist/
+launcher/.stage/
+launcher/data/
+
+# ── Python ──────────────────────────────────────────────────────────────────
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# ── Secrets : ne doivent JAMAIS être versionnés ─────────────────────────────
+# .env contient les clés de signature des jetons et le mot de passe SMTP.
+# keys/ contient les paires Ed25519 et RSA-4096 : les perdre coûte un
+# redémarrage du serveur Minecraft, les publier coûte bien plus.
+.env
+.env.*
+!.env.example
+auth-server/keys/
+auth-server/data/
+*.pem
+*.pfx
+*.p12
+
+# ── Bases de développement ──────────────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+
+# ── Système ─────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db

@@ -1,0 +1,129 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+# ---------------------------------------------------------------------------
+# Projet : serveur d'authentification et API du launcher One Piece Minecraft.
+# Il expose trois surfaces :
+#   * /api/v1     -> API du launcher (comptes OPM, rattachement Microsoft, contenu)
+#   * /yggdrasil  -> protocole Mojang attendu par authlib-injector
+#   * /textures   -> skins et capes servis en contenu adressable
+# ---------------------------------------------------------------------------
+[project]
+name = "opm-auth"
+version = "1.0.0"
+description = "Serveur d'authentification souverain (Yggdrasil maison) et API du launcher One Piece Minecraft"
+requires-python = ">=3.11"
+license = { text = "Proprietary" }
+authors = [{ name = "One Piece Minecraft" }]
+keywords = ["minecraft", "yggdrasil", "authlib-injector", "fastapi", "launcher"]
+classifiers = [
+    "Private :: Do Not Upload",
+    "Framework :: FastAPI",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    # Socle web
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.34.0",
+    "python-multipart>=0.0.20",       # formulaires multipart (téléversement de skin)
+    # Base de données
+    "sqlalchemy[asyncio]>=2.0.36",
+    "aiosqlite>=0.20.0",              # pilote asynchrone SQLite (développement)
+    "asyncpg>=0.30.0",                # pilote asynchrone PostgreSQL (production)
+    "alembic>=1.14.0",                # migrations de schéma
+    # Validation et configuration
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.7.0",
+    "email-validator>=2.2.0",
+    # Cryptographie et authentification
+    #
+    # Pas de bibliothèque de hachage de mots de passe : les empreintes sont au
+    # format Werkzeug (« pbkdf2:sha256:<itérations>$sel$hex »), produites et
+    # vérifiées avec hashlib seul, dans opm_auth/security/passwords.py. C'est
+    # une contrainte d'interopérabilité, pas un raccourci : le site Flask doit
+    # continuer de vérifier les mots de passe de la même table users
+    # (docs/DATA.md §3). N'ajoutez PAS argon2-cffi « pour faire mieux » : le jour
+    # où une empreinte Argon2id est écrite dans users.password_hash, le joueur
+    # concerné perd l'accès à onepieceminecraft.fr.
+    "pyjwt[crypto]>=2.10.1",          # JWT EdDSA (access token + session Yggdrasil)
+    "cryptography>=44.0.0",           # Ed25519, AES-256-GCM du coffre Microsoft
+    "pyotp>=2.9.0",                   # TOTP (2FA)
+    # Divers
+    "httpx>=0.28.0",                  # appels sortants (Microsoft, XBL, XSTS, ping serveur)
+    "pillow>=11.1.0",                 # validation et normalisation des skins PNG
+]
+
+[project.optional-dependencies]
+# Limitation de débit partagée entre plusieurs processus. Le code fonctionne sans
+# (compteurs en mémoire, security/ratelimit.py) et n'importe « redis » que si
+# OPM_RATE_LIMIT_STORAGE_URI commence par redis:// — d'où un extra, pas une
+# dépendance obligatoire. Un déploiement à plusieurs workers en a besoin.
+redis = ["redis>=5.2.0"]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.25.0",
+    "httpx>=0.28.0",
+    "ruff>=0.9.0",
+    "mypy>=1.14.0",
+]
+
+[project.urls]
+Homepage = "https://onepieceminecraft.fr"
+
+[tool.hatch.build.targets.wheel]
+packages = ["opm_auth"]
+
+# ---------------------------------------------------------------------------
+# Outillage
+# ---------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["opm_auth", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle
+    "F",    # pyflakes
+    "I",    # isort
+    "UP",   # pyupgrade
+    "B",    # bugbear
+    "C4",   # comprehensions
+    "SIM",  # simplifications
+    "RUF",  # règles ruff
+]
+ignore = [
+    "B008",  # Depends(...) en valeur par défaut : idiome FastAPI
+    "RUF001", # caractères Unicode ambigus : nos textes sont en français
+    "RUF002",
+    "RUF003",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.11"
+plugins = ["pydantic.mypy"]
+strict = true
+warn_unreachable = true
+disallow_untyped_defs = true
+no_implicit_optional = true
+show_error_codes = true
+exclude = ["^tests/"]
+
+[[tool.mypy.overrides]]
+module = ["pyotp.*", "redis.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+filterwarnings = ["error::DeprecationWarning:opm_auth.*"]

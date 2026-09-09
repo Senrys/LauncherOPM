@@ -1,0 +1,216 @@
+/* ============================================================================
+   OPM LAUNCHER — COMPOSANT « CHAMP DE SAISIE »
+
+   .opm-field           conteneur : libellé + champ (+ œil) + message d'erreur
+   .opm-field__label    libellé, Space Grotesk 600 11.5 px
+   .opm-field__input    champ clair, bordure --line, rayon 7 px
+   .opm-field__eye      bouton « afficher le mot de passe », calé sur le champ
+   .opm-field__error    message d'erreur, masqué par l'attribut hidden
+   .opm-otp             grille des six cases du code de vérification
+   .opm-otp__box        une case, un chiffre
+
+   Géométrie verrouillée pour que l'œil se superpose exactement au champ :
+     libellé 14 px + marge 6 px = 20 px, puis champ 12 + 18 + 12 + 2 = 44 px.
+
+   Les curseurs `input[type=range]` sont traités dans base/reset.css : ils ne
+   passent pas par .opm-field et ne sont donc pas repris ici.
+   ========================================================================== */
+
+/* ---------------------------------------------------------------- CONTENEUR */
+
+.opm-field {
+  position: relative;             /* référence de placement de .opm-field__eye */
+}
+
+.opm-field + .opm-field {
+  margin-top: 14px;
+}
+
+/* ------------------------------------------------------------------ LIBELLÉ */
+
+.opm-field__label {
+  display: block;
+  margin: 0 0 6px;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: var(--fs-small);
+  line-height: 14px;
+  color: var(--text-dark);
+}
+
+/* -------------------------------------------------------------------- CHAMP */
+
+.opm-field__input {
+  display: block;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--white);
+  color: var(--text-dark);
+  font-family: var(--font-ui);
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 18px;
+  transition: border-color var(--t-fast), box-shadow var(--t-fast);
+}
+
+.opm-field__input::placeholder {
+  color: var(--muted-2);
+}
+
+.opm-field__input:focus {
+  outline: none;
+  border-color: var(--aqua);
+  box-shadow: var(--sh-focus);
+}
+
+.opm-field__input:disabled {
+  opacity: .6;
+  cursor: not-allowed;
+}
+
+/* Le remplissage automatique de Chromium impose son propre fond : on le repeint
+   avec l'ombre interne, seule technique acceptée par le moteur. */
+.opm-field__input:-webkit-autofill,
+.opm-field__input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 100px var(--white) inset;
+  -webkit-text-fill-color: var(--text-dark);
+}
+
+/* Champs numériques (largeur / hauteur de la fenêtre de jeu) : fond légèrement
+   teinté, chiffres plus lourds, flèches natives retirées. */
+.opm-field__input[type="number"] {
+  background: var(--paper-2);
+  font-weight: 600;
+  font-size: var(--fs-body);
+}
+
+.opm-field__input[type="number"]::-webkit-outer-spin-button,
+.opm-field__input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Un champ accompagné de l'œil réserve la place du bouton. */
+.opm-field:has(.opm-field__eye) .opm-field__input {
+  padding-right: 44px;
+}
+
+/* ------------------------------------------------------------ ŒIL / RÉVÉLER */
+
+.opm-field__eye {
+  position: absolute;
+  top: 20px;                      /* hauteur du libellé + sa marge */
+  right: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 44px;                   /* hauteur exacte du champ */
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color var(--t-fast);
+}
+
+.opm-field__eye:hover,
+.opm-field__eye[aria-pressed="true"] {
+  color: var(--teal);
+}
+
+.opm-field__eye:focus-visible {
+  outline: none;
+  border-radius: var(--r-sm);
+  box-shadow: var(--sh-focus);
+}
+
+/* ------------------------------------------------------------------ ERREUR */
+
+.opm-field__error {
+  display: block;
+  margin: 6px 0 0;
+  font-family: var(--font-ui);
+  font-weight: 500;
+  font-size: var(--fs-meta);
+  line-height: 1.45;
+  color: var(--danger);
+}
+
+.opm-field__error[hidden] {
+  display: none;
+}
+
+/* Tant qu'un message d'erreur est affiché, le champ du même bloc se souligne
+   de rouge : le JS ne fait que retirer l'attribut hidden. */
+.opm-field:has(.opm-field__error:not([hidden])) .opm-field__input {
+  border-color: var(--danger);
+}
+
+/* ------------------------------------------------------ VARIANTE FOND SOMBRE */
+/* L'inventaire ne prévoit pas de modificateur --dark pour le champ : c'est le
+   contexte (carte sombre, popover) qui bascule la palette. */
+
+.opm-card--dark .opm-field__label,
+.opm-popover .opm-field__label {
+  color: var(--text-light);
+}
+
+.opm-card--dark .opm-field__input,
+.opm-popover .opm-field__input {
+  border-color: var(--line-dark);
+  background: var(--deep);
+  color: var(--text-light);
+}
+
+.opm-card--dark .opm-field__input::placeholder,
+.opm-popover .opm-field__input::placeholder {
+  color: var(--text-light-50);
+}
+
+.opm-card--dark .opm-field__eye,
+.opm-popover .opm-field__eye {
+  color: var(--text-light-60);
+}
+
+.opm-card--dark .opm-field__eye:hover,
+.opm-card--dark .opm-field__eye[aria-pressed="true"],
+.opm-popover .opm-field__eye:hover,
+.opm-popover .opm-field__eye[aria-pressed="true"] {
+  color: var(--aqua);
+}
+
+/* ------------------------------------------------- CODE DE VÉRIFICATION (2FA) */
+
+.opm-otp {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.opm-otp__box {
+  width: 100%;
+  height: 56px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--paper-2);
+  color: var(--text-dark);
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 22px;
+  line-height: 56px;
+  text-align: center;
+  transition: border-color var(--t-fast), box-shadow var(--t-fast),
+              background var(--t-fast);
+}
+
+.opm-otp__box:focus {
+  outline: none;
+  border-color: var(--aqua);
+  background: var(--white);
+  box-shadow: var(--sh-focus);
+}

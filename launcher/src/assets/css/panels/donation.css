@@ -1,0 +1,452 @@
+/* ============================================================================
+   ÉCRAN DONATION — panels/donation.html
+   Traduction fidèle de DesignMaquette/Launcher OPM.dc.html (bloc « Donation »).
+
+   Rappels de découpage :
+   - layout/shell.css possède .opm-screen (flex:1, min-width:0, padding 26/28).
+   - components/*.css possèdent .opm-kicker, .opm-btn et .opm-skeleton : ce
+     fichier ne fait que les accorder aux trois fonds (aqua, papier, voile).
+   ========================================================================== */
+
+/* ------------------------------------------------------------------ GABARIT
+   Deux colonnes (392 px / reste), deux rangées : la carte « don » occupe toute
+   la hauteur de la première colonne, l'objectif et les donateurs se partagent
+   la seconde. Aucun conteneur intermédiaire dans le balisage. */
+
+.opm-donation {
+  display: grid;
+  grid-template-columns: var(--w-donation-card) 1fr;
+  grid-template-rows: auto 1fr;
+  gap: 16px 22px;
+}
+
+.opm-donation[hidden] { display: none; }
+
+.opm-give   { grid-column: 1; grid-row: 1 / span 2; }
+.opm-goal   { grid-column: 2; grid-row: 1; }
+.opm-donors { grid-column: 2; grid-row: 2; min-height: 0; }
+
+
+/* ============================================================================
+   CARTE « DON » — fond aqua, toute la typographie bascule en encres profondes
+   ========================================================================== */
+
+.opm-give {
+  display: flex;
+  flex-direction: column;
+  padding: 26px 26px 22px;
+  border-radius: var(--r-xl);
+  background: var(--aqua);
+  box-shadow: var(--sh-card);
+}
+
+.opm-give .opm-kicker {
+  margin: 0;
+  color: var(--ink-4);
+}
+
+.opm-give .opm-kicker__dot { background: var(--ink); }
+
+/* Kicker « CHOISIR UN MONTANT » : plus petit, sans pastille, il ouvre le choix. */
+.opm-give .opm-kicker:has(+ .opm-give__amounts) {
+  margin-top: 20px;
+  font-size: 9.5px;
+  letter-spacing: var(--ls-kicker-sm);
+}
+
+.opm-give h2 {
+  margin: 14px 0 0;
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 400;
+  line-height: .98;
+  color: var(--ink);
+}
+
+.opm-give h2 span { color: var(--ink-2); }
+
+/* Le paragraphe de présentation est le seul <p> sans classe de la carte :
+   le viser ainsi évite d'écraser la typographie des kickers, qui sont des <p>
+   eux aussi et perdraient contre un sélecteur d'élément. */
+.opm-give > p:not([class]) {
+  margin: 13px 0 0;
+  font: 400 var(--fs-body)/1.55 var(--font-ui);
+  color: var(--ink-3);
+  text-wrap: pretty;
+}
+
+/* ------------------------------------------------------------ les montants */
+
+.opm-give__amounts {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.opm-amount {
+  flex: 1;
+  min-width: 0;
+  padding: 14px 0;
+  border: 1px solid color-mix(in srgb, var(--ink) 22%, transparent);
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--white) 55%, transparent);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 400;
+  line-height: 1;
+  text-align: center;
+  cursor: pointer;
+  transition: background var(--t-fast) ease,
+              color var(--t-fast) ease,
+              border-color var(--t-fast) ease;
+}
+
+.opm-amount:hover { border-color: var(--ink); }
+
+.opm-amount--active {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--aqua);
+}
+
+.opm-amount:focus-visible { outline: none; box-shadow: var(--sh-focus); }
+
+/* Projection recalculée à chaque changement de montant. */
+.opm-give__proj {
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--ink) 90%, transparent);
+  font: 500 12px/1.45 var(--font-ui);
+  color: var(--aqua);
+}
+
+/* -------------------------------------------------------------- les actions */
+
+.opm-give__actions {
+  display: flex;
+  gap: 10px;
+  margin-top: auto;      /* colle le bloc d'action au bas de la carte */
+  padding-top: 18px;
+}
+
+/* Les deux boutons du pied de carte sont les seuls du launcher à porter le
+   rayon de 8 px (maquette l. 402-403) ; leur hauteur commune vient du `stretch`
+   du conteneur, pas d'une mesure écrite deux fois. */
+.opm-give__actions .opm-btn { border-radius: var(--r-lg-alt); }
+
+.opm-give__actions .opm-btn--lg { flex: 1; }
+
+/* Sur fond aqua, le bouton fantôme s'encre au lieu de rester teal. */
+.opm-give__actions .opm-btn--outline {
+  flex: none;
+  padding-inline: 18px;
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.opm-give__actions .opm-btn--outline:hover {
+  background: var(--ink);
+  color: var(--aqua);
+}
+
+.opm-give footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  font: 500 10.5px/1.4 var(--font-ui);
+  color: var(--ink-3);
+}
+
+.opm-give footer .opm-kicker__dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  background: var(--ink);
+}
+
+
+/* ============================================================================
+   CARTE « OBJECTIF »
+   ========================================================================== */
+
+.opm-goal {
+  padding: 22px 24px;
+  background: var(--paper);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-xl);
+  box-shadow: var(--sh-card);
+}
+
+.opm-goal .opm-kicker {
+  margin: 0;
+  font-size: 9.5px;
+  letter-spacing: var(--ls-kicker-sm);
+  color: var(--teal);
+}
+
+.opm-goal__head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.opm-goal__head > div:last-child { text-align: right; }
+
+.opm-goal__collected {
+  margin: 6px 0 0;
+  font-family: var(--font-display);
+  font-size: 42px;
+  font-weight: 400;
+  line-height: 1;
+  color: var(--text-dark);
+}
+
+/* « / N € » : retour à la police d'interface sur la même ligne de base. */
+.opm-goal__collected > span:last-child {
+  margin-left: 8px;
+  font: 500 14px/1 var(--font-ui);
+  color: var(--muted);
+}
+
+.opm-goal__pct {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 38px;
+  font-weight: 400;
+  line-height: 1;
+  color: var(--teal);
+}
+
+.opm-goal__head > div:last-child > p:last-child {
+  margin: 4px 0 0;
+  font: 500 var(--fs-meta)/1.3 var(--font-ui);
+  color: var(--muted);
+}
+
+/* ------------------------------------------------------------------ jauge */
+
+.opm-goal__bar {
+  position: relative;
+  height: 14px;
+  margin-top: 18px;
+  overflow: hidden;
+  border-radius: var(--r-pill);
+  background: var(--foam);
+}
+
+/* La largeur des deux barres est la seule valeur posée au runtime. */
+.opm-goal__fill,
+.opm-goal__ghost {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: var(--r-pill);
+  transition: width .25s ease;
+}
+
+.opm-goal__fill  { background: var(--aqua); }
+
+/* Barre fantôme : la projection se superpose au collecté réel. */
+.opm-goal__ghost { background: color-mix(in srgb, var(--teal) 35%, transparent); }
+
+.opm-goal__mark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--paper);
+}
+
+.opm-goal__mark:nth-of-type(1) { left: 25%; }
+.opm-goal__mark:nth-of-type(2) { left: 50%; }
+.opm-goal__mark:nth-of-type(3) { left: 75%; }
+
+/* ----------------------------------------------------------- les paliers */
+
+.opm-tiers {
+  display: flex;
+  gap: 11px;
+  margin-top: 16px;
+}
+
+.opm-tier {
+  flex: 1;
+  min-width: 0;
+  padding: 13px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg-alt);
+  background: var(--white);
+}
+
+/* VERROUILLÉ (défaut) · À PORTÉE · DÉBLOQUÉ */
+.opm-tier--locked   { border-color: var(--line);   background: var(--white); }
+.opm-tier--near     { border-color: var(--line-4); background: var(--paper-2); }
+.opm-tier--unlocked { border-color: var(--aqua);   background: var(--foam); }
+
+.opm-tier .opm-kicker {
+  margin: 0;
+  font-size: var(--fs-kicker-sm);
+  letter-spacing: var(--ls-tag);
+  color: var(--muted-2);
+}
+
+.opm-tier--unlocked .opm-kicker { color: var(--teal); }
+
+.opm-tier h4 {
+  margin: 7px 0 0;
+  font: 700 var(--fs-body)/1.25 var(--font-ui);
+  color: var(--text-dark);
+}
+
+.opm-tier p {
+  margin: 4px 0 0;
+  font: 400 var(--fs-meta)/1.4 var(--font-ui);
+  color: var(--muted);
+}
+
+
+/* ============================================================================
+   CARTE « DONATEURS » — seule carte sombre de l'écran
+   ========================================================================== */
+
+.opm-donors {
+  display: flex;
+  flex-direction: column;
+  padding: 20px 22px;
+  background: var(--veil-86);
+  border: 1px solid var(--line-dark);
+  border-radius: var(--r-xl);
+}
+
+.opm-donors header {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.opm-donors .opm-kicker {
+  margin: 0;
+  color: var(--aqua);
+}
+
+.opm-donors header p:last-child {
+  margin: 0 0 0 auto;
+  font: 500 10.5px/1 var(--font-ui);
+  color: var(--text-light-50);
+  white-space: nowrap;
+}
+
+.opm-donors ol {
+  min-height: 0;
+  margin: 4px 0 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.opm-donor {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line-dark-hair);
+}
+
+.opm-donor:last-child { border-bottom: none; }
+
+/* ÉTAT VIDE — la partie paiement du site n'expose pas encore de classement
+   (docs/DATA.md § 2 : il n'existe aucune table de dons). panels/donation.js pose
+   alors une ligne unique SANS rang ; c'est cette absence de rang qui la
+   distingue, et non une classe d'état à maintenir des deux côtés. La ligne
+   perd donc les attributs d'un podium — graisse, blancheur, filet — pour
+   prendre le ton d'une mention, centrée sur la hauteur restante. */
+.opm-donors .opm-donor:not(:has(.opm-donor__rank)) {
+  justify-content: center;
+  padding: 22px 0;
+  border-bottom: none;
+}
+
+.opm-donors .opm-donor:not(:has(.opm-donor__rank)) .opm-donor__name {
+  flex: 0 1 auto;
+  overflow: visible;
+  white-space: normal;
+  font: 400 var(--fs-small)/1.5 var(--font-ui);
+  color: var(--text-light-50);
+  text-align: center;
+}
+
+.opm-donor__rank {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--aqua) 25%, transparent);
+  color: var(--aqua);
+  font-family: var(--font-display);
+  font-size: var(--fs-body);
+  line-height: 1;
+}
+
+/* Le premier donateur du mois prend l'aqua plein. */
+.opm-donor:first-child .opm-donor__rank {
+  background: var(--aqua);
+  color: var(--ink);
+}
+
+.opm-donor__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 600 var(--fs-body-lg)/1.3 var(--font-ui);
+  color: var(--text-light);
+}
+
+.opm-donor__tier {
+  flex: none;
+  font: 500 var(--fs-meta)/1 var(--font-ui);
+  color: var(--text-light-50);
+}
+
+.opm-donor__amount {
+  flex: none;
+  font-family: var(--font-display);
+  font-size: 17px;
+  line-height: 1;
+  color: var(--aqua);
+}
+
+.opm-donors footer {
+  margin-top: auto;
+  padding-top: 14px;
+  font: 400 var(--fs-meta)/1.45 var(--font-ui);
+  color: var(--text-light-50);
+}
+
+
+/* ============================================================================
+   SQUELETTES DE CHARGEMENT
+   ========================================================================== */
+
+.opm-give__proj.opm-skeleton        { min-height: 41px; }
+.opm-goal__head .opm-skeleton       { min-height: 11px; }
+.opm-goal__collected .opm-skeleton  { display: inline-block; min-width: 78px; min-height: 34px; }
+.opm-goal__collected > span:last-child.opm-skeleton { min-width: 52px; min-height: 13px; }
+.opm-goal__pct.opm-skeleton         { min-width: 74px; min-height: 30px; }
+.opm-tier .opm-kicker.opm-skeleton  { display: block; min-width: 86px; min-height: 10px; }
+.opm-tier h4.opm-skeleton           { min-height: 15px; }
+.opm-tier p.opm-skeleton            { min-height: 28px; }
+.opm-donors header p:last-child.opm-skeleton { display: inline-block; min-width: 110px; min-height: 11px; }
+.opm-donor__rank.opm-skeleton       { border-radius: var(--r-sm); }
+.opm-donor__name.opm-skeleton       { min-height: 14px; }
+.opm-donor__tier.opm-skeleton       { min-width: 92px; min-height: 11px; }
+.opm-donor__amount.opm-skeleton     { min-width: 44px; min-height: 15px; }

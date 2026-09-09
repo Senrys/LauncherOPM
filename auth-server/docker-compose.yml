@@ -1,0 +1,118 @@
+# ---------------------------------------------------------------------------
+# Serveur d'authentification One Piece Minecraft — déploiement Docker.
+#
+#   docker compose up -d --build      démarre
+#   docker compose logs -f api        suit le journal
+#   docker compose exec api python -m opm_auth.cli link-status --email …
+#
+# IL N'Y A PAS DE SERVICE POSTGRESQL, et c'est volontaire : la base est celle du
+# SITE. On s'y connecte par OPM_DATABASE_URL. Créer une seconde base ici
+# donnerait deux fichiers de comptes, deux journaux de bord, deux vérités — soit
+# exactement ce que docs/DATA.md interdit. Un service « postgres » de
+# développement est proposé en commentaire tout en bas.
+# ---------------------------------------------------------------------------
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: opm-auth:1.0.0
+    container_name: opm-auth
+    restart: unless-stopped
+
+    # Toute la configuration vient du fichier .env (copié depuis .env.example).
+    # Aucun secret n'est écrit dans ce fichier-ci : il est versionné.
+    env_file:
+      - .env
+
+    environment:
+      # Ces trois valeurs sont imposées par la forme du conteneur et ne doivent
+      # pas dépendre du .env ; le reste (base, clés, Microsoft, SMTP…) en vient.
+      OPM_HOST: 0.0.0.0
+      OPM_PORT: "8000"
+      # Le conteneur est derrière nginx : sans cela, tous les joueurs
+      # partageraient l'adresse du répartiteur, et donc ses quotas.
+      OPM_TRUST_PROXY_HEADERS: "true"
+
+    # Publié sur la boucle locale UNIQUEMENT. nginx (sur l'hôte) écoute en
+    # façade pour auth.onepieceminecraft.fr et relaie ici. Exposer ce port sur
+    # Internet contournerait à la fois TLS et la confiance accordée à
+    # X-Forwarded-For (voir le commentaire du Dockerfile).
+    ports:
+      - "127.0.0.1:8000:8000"
+
+    volumes:
+      # Les clés privées vivent hors de l'image : elles survivent à un
+      # « docker compose build » et ne partent jamais dans un registre.
+      - opm-keys:/app/keys
+      # Skins et capes, adressés par leur SHA-256. À sauvegarder : ce sont les
+      # apparences importées depuis Mojang, elles ne se retéléchargent pas.
+      - opm-textures:/app/data
+
+    # La base est sur l'hôte (ou sur un autre serveur) : sur Linux, cette entrée
+    # rend « host.docker.internal » utilisable dans OPM_DATABASE_URL.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import sys,urllib.request;sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health',timeout=4).status==200 else 1)"
+      interval: 30s
+      timeout: 5s
+      start_period: 40s
+      retries: 3
+
+    # Journal borné : sans cela, un serveur bavard finit par remplir le disque
+    # du VPS, ce qui arrête aussi PostgreSQL — donc le site.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  opm-keys:
+  opm-textures:
+
+# ---------------------------------------------------------------------------
+# PostgreSQL de développement — À NE PAS ACTIVER EN PRODUCTION
+#
+# Utile pour éprouver la migration Alembic et l'écriture atomique de la
+# fréquentation (GREATEST, que SQLite ne connaît pas) sans toucher à la base du
+# site. Décommentez, puis :
+#
+#   docker compose up -d postgres
+#   psql -h 127.0.0.1 -U opm -d opmdb -f reference/opm-site-schema.sql   # les 11 tables du site
+#   OPM_DATABASE_URL=postgresql://opm:opm@127.0.0.1:5433/opmdb alembic upgrade head
+#
+# Le port est 5433 pour ne pas entrer en conflit avec le PostgreSQL réel de
+# l'hôte, celui du site.
+#
+#   postgres:
+#     image: postgres:17-alpine
+#     container_name: opm-postgres-dev
+#     restart: unless-stopped
+#     environment:
+#       POSTGRES_USER: opm
+#       POSTGRES_PASSWORD: opm
+#       POSTGRES_DB: opmdb
+#     ports:
+#       - "127.0.0.1:5433:5432"
+#     volumes:
+#       - opm-postgres-dev:/var/lib/postgresql/data
+#     healthcheck:
+#       test: ["CMD-SHELL", "pg_isready -U opm -d opmdb"]
+#       interval: 10s
+#       timeout: 5s
+#       retries: 5
+#
+# volumes:
+#   opm-postgres-dev:
+# ---------------------------------------------------------------------------

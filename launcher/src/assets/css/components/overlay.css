@@ -1,0 +1,364 @@
+/* ============================================================================
+   OPM LAUNCHER — SURCOUCHES : POPOVERS, MODALES, NOTIFICATIONS
+
+   .opm-popover (+ --accounts, --console)  panneaux flottants de la barre du bas
+   .opm-modal   (+ __veil, __card, __actions)  confirmations bloquantes
+   .opm-toasts / .opm-toast (+ --info, --error, --success)  notifications
+
+   Les popovers sont commutés par l'attribut `hidden` : la règle [hidden] de ce
+   fichier doit l'emporter sur leur display, sans quoi l'animation opmRise les
+   afficherait malgré l'attribut.
+
+   Étages : splash 80 (layout/splash.css) < notifications 85 < modale 90.
+   ========================================================================== */
+
+/* ----------------------------------------------------------------- POPOVER */
+
+.opm-popover {
+  position: absolute;
+  z-index: 30;
+  /* Un panneau flottant se détache d'un cran de plus que les cartes posées
+     à plat : .22 dans la maquette (l. 470, 484), pas .20. */
+  border: 1px solid var(--line-dark-22);
+  border-radius: var(--r-lg);
+  background: var(--deep);
+  box-shadow: var(--sh-pop);
+  animation: opmRise .22s ease both;
+}
+
+.opm-popover[hidden] {
+  display: none;
+}
+
+/* Les deux ancrages de la maquette, calés sur la barre du bas (96 px). */
+.opm-popover--accounts {
+  left: 26px;
+  bottom: 100px;
+  width: 272px;
+  padding: 8px;
+}
+
+.opm-popover--console {
+  left: 322px;
+  bottom: 100px;
+  width: 600px;
+  max-width: calc(100% - 348px);  /* la console ne déborde jamais de la fenêtre */
+  padding: 14px 16px;
+}
+
+.opm-popover__title {
+  margin: 0;
+  padding: 9px 10px 7px;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: var(--fs-kicker-sm);
+  line-height: 1.2;
+  letter-spacing: var(--ls-kicker-sm);
+  color: var(--aqua);
+}
+
+/* Dans la console, le titre est un kicker à pastille, collé au flux du panneau. */
+.opm-popover--console .opm-popover__title {
+  padding: 0;
+  margin-bottom: 9px;
+}
+
+.opm-popover--console .opm-kicker__dot {
+  width: 7px;
+  height: 7px;
+}
+
+/* Lignes de journal envoyées par services/logger.js. */
+.opm-popover--console pre {
+  margin: 0;
+  max-height: 214px;
+  overflow: auto;
+  font: 400 var(--fs-meta)/1.75 var(--font-mono);
+  color: var(--text-light-72);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Entrée de menu. La sélection est renforcée (0-2-0) pour rester maîtresse des
+   éléments qui portent aussi .opm-account, dont la carte de Paramètres est
+   définie dans panels/settings.css.
+
+   Grille de la maquette (l. 495-499), sur un balisage plat de trois enfants
+   (launcher.html:215-220) :
+     [ vignette 32 ] [ pseudo         ] [ pastille 7 ]
+     [   (2 rangs)  ] [ sous-titre    ] [  (2 rangs) ]
+   La colonne de droite est toujours réservée pour que les lignes s'alignent,
+   que le compte soit le compte courant ou non ; seule la pastille s'allume. */
+.opm-popover .opm-popover__item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0 11px;                    /* 11 px entre colonnes, rien entre les deux lignes */
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: var(--r-md);
+  background: none;
+  color: var(--text-light);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--t-nav);
+}
+
+/* Pastille du compte courant : bottombar.js pose aria-current="true" sur
+   l'entrée sélectionnée (panels/bottombar.js:830). Purement décorative —
+   l'information est déjà portée par l'attribut lui-même. */
+.opm-popover .opm-popover__item::after {
+  content: "";
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.opm-popover .opm-popover__item[aria-current="true"]::after {
+  background: var(--aqua);
+}
+
+.opm-popover .opm-popover__item:hover {
+  /* Teinte aqua translucide du survol sombre de la maquette. */
+  background: var(--line-dark-soft);
+}
+
+.opm-popover .opm-popover__item:focus-visible {
+  outline: none;
+  box-shadow: var(--sh-focus);
+}
+
+/* Compte listé dans le popover : format réduit (32 px) face aux cartes 56 px
+   des Paramètres. La vignette tient les deux rangs de la grille. */
+.opm-popover .opm-account__avatar {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  display: block;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-sm-alt);
+  overflow: hidden;
+  background: var(--slot);
+}
+
+.opm-popover .opm-account__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: pixelated;
+}
+
+/* display:block annule le flex hérité de panels/settings.css:229, sans quoi
+   l'ellipse d'un pseudo trop long resterait sans effet. */
+.opm-popover .opm-account__name {
+  grid-column: 2;
+  grid-row: 1;
+  display: block;
+  min-width: 0;
+  margin: 0;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 12.5px;
+  line-height: 1.25;
+  color: var(--text-light);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Le sous-titre s'empile SOUS le pseudo (« Compte principal », « Session valide
+   6 j »), il ne part pas au bord droit du popover. */
+.opm-popover .opm-account__meta {
+  grid-column: 2;
+  grid-row: 2;
+  display: block;
+  min-width: 0;
+  margin: 0;
+  font-family: var(--font-ui);
+  font-weight: 400;
+  font-size: 10px;
+  line-height: 1.25;
+  color: var(--text-light-50);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.opm-popover__sep {
+  height: 1px;
+  margin: 6px 10px;
+  background: var(--line-dark-soft);
+}
+
+.opm-popover__action {
+  display: block;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: var(--r-md);
+  background: none;
+  color: var(--aqua);
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 10.5px;
+  line-height: 1.3;
+  letter-spacing: var(--ls-btn);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--t-nav), color var(--t-nav);
+}
+
+.opm-popover__action:hover {
+  background: var(--line-dark-soft);
+}
+
+.opm-popover__action:focus-visible {
+  outline: none;
+  box-shadow: var(--sh-focus);
+}
+
+/* La dernière action du menu est la sortie (SE DÉCONNECTER) : ton retenu, et un
+   survol blanc translucide au lieu de l'aqua des actions positives (l. 507). */
+.opm-popover__action:last-child {
+  color: var(--text-light-55);
+}
+
+.opm-popover__action:last-child:hover {
+  background: color-mix(in srgb, var(--white) 7%, transparent);
+  color: var(--text-light);
+}
+
+/* ------------------------------------------------------------------ MODALE */
+
+.opm-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+/* Voile propre à la modale (UI-SPEC §5) : --veil-72, ajouté à la famille des
+   voiles de base/tokens.css. */
+.opm-modal__veil {
+  position: absolute;
+  inset: 0;
+  background: var(--veil-72);
+}
+
+.opm-modal__card {
+  position: relative;             /* au-dessus du voile */
+  width: 420px;
+  max-width: 100%;
+  max-height: 100%;
+  overflow: auto;
+  padding: 24px 26px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-xl);
+  background: var(--paper);
+  box-shadow: var(--sh-card);
+  color: var(--text-body);
+  animation: opmRise .22s ease both;
+}
+
+.opm-modal__card h1,
+.opm-modal__card h2,
+.opm-modal__card h3 {
+  margin: 0 0 10px;
+  color: var(--text-dark);
+}
+
+.opm-modal__card p {
+  margin: 0;
+}
+
+.opm-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+/* ----------------------------------------------------------- NOTIFICATIONS */
+
+/* Pile ancrée en bas à droite, au-dessus de la barre du bas. Le conteneur ne
+   capte pas la souris : seules les notifications elles-mêmes sont cliquables. */
+.opm-toasts {
+  position: fixed;
+  right: 26px;
+  bottom: calc(var(--h-bottombar) + 14px);
+  z-index: 85;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.opm-toast {
+  --toast-accent: var(--text-light-72);
+
+  pointer-events: auto;
+  width: 320px;
+  max-width: calc(100vw - 52px);
+  padding: 12px 14px;
+  border: 1px solid var(--line-dark);
+  border-left: 3px solid var(--toast-accent);
+  border-radius: var(--r-lg);
+  background: var(--deep);
+  box-shadow: var(--sh-pop);
+  animation: opmRise .22s ease both;
+}
+
+/* Contrat avec components/toast.js : le premier enfant porte le titre, les
+   suivants le message. Aucune classe intermédiaire n'est imposée. */
+.opm-toast > :first-child {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: var(--fs-small);
+  line-height: 1.35;
+  color: var(--toast-accent);
+}
+
+.opm-toast > :first-child ~ * {
+  margin: 4px 0 0;
+  font-family: var(--font-ui);
+  font-weight: 400;
+  font-size: var(--fs-small);
+  line-height: 1.5;
+  color: var(--text-light-72);
+}
+
+/* Trois tons : neutre pour l'information, aqua pour la réussite (seule teinte
+   claire lisible sur --deep), rouge pour l'échec. */
+.opm-toast--info {
+  --toast-accent: var(--text-light-72);
+}
+
+.opm-toast--success {
+  --toast-accent: var(--aqua);
+}
+
+.opm-toast--error {
+  --toast-accent: var(--danger);
+}
+
+/* Sortie : le JS pose l'attribut data-leaving le temps de l'animation avant de
+   retirer l'élément du DOM. */
+.opm-toast[data-leaving] {
+  animation: opmToastLeave .18s ease both;
+}
+
+@keyframes opmToastLeave {
+  to {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}

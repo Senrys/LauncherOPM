@@ -1,0 +1,346 @@
+/* ============================================================================
+   OPM LAUNCHER — BARRE DU BAS (96 px)
+   Compte · progression · lancement automatique · bouton JOUER.
+
+   Le balisage est plat (une suite de <span> et de <p>) là où la maquette
+   imbriquait des boîtes : la mise en grille rétablit les deux lignes du bloc
+   compte et les trois du bloc d'état, sans div de mise en page superflue.
+
+   Les deux popovers (comptes, console) sont des frères de cette barre, ancrés
+   par components/overlay.css ; ils ne dépendent d'aucune règle d'ici.
+   ========================================================================== */
+
+.opm-bottom {
+  position: relative;
+  z-index: 20;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 26px;
+  height: var(--h-bottombar);
+  padding: 0 26px;
+  background-color: var(--veil-95);
+  border-top: 1px solid var(--line-dark-soft);
+}
+
+/* ============================================================================
+   1. BOUTON DE COMPTE
+   Deux lignes de texte entre l'avatar et le chevron : grille 3 × 2, l'avatar
+   et le chevron occupant les deux rangées.
+   ========================================================================== */
+
+.opm-bottom__account {
+  flex: none;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas:
+    "avatar name    chevron"
+    "avatar sub     chevron";
+  align-items: center;
+  column-gap: 13px;
+  padding: 9px 14px 9px 9px;
+  border: 1px solid color-mix(in srgb, var(--aqua) 18%, transparent);
+  border-radius: var(--r-lg);
+  transition: background-color var(--t-nav) ease, border-color var(--t-nav) ease;
+}
+
+.opm-bottom__account:hover {
+  background-color: color-mix(in srgb, var(--aqua) 12%, transparent);
+}
+
+/* Le rendu de tête (utils/skin.js) est une image de 8 × 8 pixels agrandie :
+   sans `pixelated`, elle arriverait floue. Le fond sombre couvre le temps de
+   chargement du skin : c'est --slot, l'encre verte des vignettes d'avatar
+   (maquette l. 512), et non --ink, qui se noierait dans le voile de la barre. */
+.opm-bottom__avatar {
+  grid-area: avatar;
+  width: 46px;
+  height: 46px;
+  overflow: hidden;
+  border: 1px solid var(--line-dark-strong);
+  border-radius: var(--r-lg-alt);
+  background-color: var(--slot);
+}
+
+.opm-bottom__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: pixelated;
+}
+
+.opm-bottom__name {
+  grid-area: name;
+  /* 15 px : même échelon que --fs-nav, ici en Space Grotesk. */
+  font-size: var(--fs-nav);
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--text-light);
+  text-align: left;
+}
+
+.opm-bottom__sub {
+  grid-area: sub;
+  margin-top: 3px;
+  /* 10,5 px : échelon intermédiaire absent de l'échelle de tokens.css. */
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: .06em;
+  color: var(--aqua);
+  text-align: left;
+}
+
+.opm-bottom__chevron {
+  grid-area: chevron;
+  margin-left: 4px;
+  font-size: var(--fs-kicker-sm);
+  color: var(--text-light-55);
+}
+
+/* ============================================================================
+   2. BLOC D'ÉTAT
+   Trois rangées : kicker + DÉTAILS, jauge + pourcentage, ligne de détail.
+   Les écarts verticaux sont portés par les éléments (9 px puis 7 px), un
+   `row-gap` unique ne saurait pas les distinguer.
+   ========================================================================== */
+
+.opm-bottom__status {
+  flex: 1;
+  min-width: 0;
+  max-width: 520px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    "kicker details"
+    "bar    pct"
+    "line   line";
+  align-items: center;
+  column-gap: 14px;
+}
+
+.opm-bottom__kicker {
+  grid-area: kicker;
+  font-size: var(--fs-kicker);
+  font-weight: 700;
+  letter-spacing: .2em;
+  color: var(--aqua);
+}
+
+.opm-bottom__details {
+  grid-area: details;
+  /* Le bouton épouse son libellé : sans cela, il s'étirerait à la largeur de
+     la colonne que le pourcentage partage avec lui. */
+  justify-self: end;
+  /* 9,5 px : échelon intermédiaire absent de l'échelle de tokens.css. */
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: var(--ls-tag);
+  color: var(--text-light-60);
+  padding: 4px 8px;
+  border: 1px solid var(--line-dark);
+  border-radius: var(--r-sm);
+  transition: color var(--t-nav) ease, border-color var(--t-nav) ease;
+}
+
+.opm-bottom__details:hover:not(:disabled) {
+  color: var(--text-light);
+  border-color: var(--aqua);
+}
+
+/* ANNULER partage ce style et se désactive pendant une vérification des fichiers,
+   qui ne s'interrompt pas. Sans état visible, le bouton paraissait actif et donnait
+   l'impression d'un clic sans effet. */
+.opm-bottom__details:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+  border-color: var(--line-dark-faint);
+}
+
+/* ------------------------------------------------------------------- JAUGE */
+.opm-bottom__bar {
+  grid-area: bar;
+  position: relative;
+  height: 9px;
+  margin-top: 9px;
+  overflow: hidden;
+  border-radius: var(--r-pill);
+  background-color: color-mix(in srgb, var(--white) 12%, transparent);
+}
+
+/* La largeur est la seule valeur écrite au runtime (style inline) : elle vient
+   de la progression réelle du téléchargement. */
+.opm-bottom__fill {
+  position: relative;
+  width: 0;
+  height: 100%;
+  overflow: hidden;
+  border-radius: var(--r-pill);
+  background-color: var(--aqua);
+  transition: width var(--t-panel) linear, background-color var(--t-nav) ease;
+}
+
+.opm-bottom__shimmer {
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background: linear-gradient(90deg,
+              transparent,
+              color-mix(in srgb, var(--white) 55%, transparent),
+              transparent);
+  animation: opmShimmer 1.8s linear infinite;
+}
+
+/* Couleur de jauge et bande lumineuse suivent l'état du bouton JOUER, qui est
+   l'unique porteur de l'état de la barre : téléchargement en cours (aqua +
+   bande), jeu à jour (--success), maintenance (--idle). */
+.opm-bottom:has(.opm-bottom__play--ready) .opm-bottom__fill { background-color: var(--success); }
+.opm-bottom:has(.opm-bottom__play--maint) .opm-bottom__fill { background-color: var(--idle); }
+
+.opm-bottom:has(.opm-bottom__play--ready) .opm-bottom__shimmer,
+.opm-bottom:has(.opm-bottom__play--maint) .opm-bottom__shimmer { opacity: 0; }
+
+/* --------------------------------------------------- POURCENTAGE ET DÉTAIL */
+.opm-bottom__pct {
+  grid-area: pct;
+  margin-top: 9px;
+  min-width: 46px;
+  font-family: var(--font-display);
+  /* 16 px : échelon Anton propre à cette jauge. */
+  font-size: 16px;
+  color: var(--text-light);
+  text-align: right;
+}
+
+.opm-bottom__line {
+  grid-area: line;
+  margin-top: 7px;
+  font-size: var(--fs-meta);
+  font-weight: 500;
+  color: var(--text-light-60);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ============================================================================
+   3. LANCEMENT AUTOMATIQUE
+   Case à cocher native rendue invisible mais toujours focalisable : elle
+   conserve le clavier, l'état coché et le libellé du <label>.
+   ========================================================================== */
+
+.opm-bottom__auto {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  /* 10,5 px : échelon intermédiaire absent de l'échelle de tokens.css. */
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: var(--ls-btn);
+  color: var(--text-light-72);
+  cursor: pointer;
+}
+
+.opm-bottom__auto input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.opm-bottom__auto-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid var(--aqua);
+  border-radius: var(--r-xs-alt);
+  font-size: var(--fs-meta);
+  line-height: 1;
+  color: var(--ink);
+  background-color: transparent;
+  transition: background-color var(--t-nav) ease;
+}
+
+.opm-bottom__auto input:checked + .opm-bottom__auto-box { background-color: var(--aqua); }
+
+/* La coche appartient au style, pas aux données : elle est dessinée ici et
+   non écrite dans le balisage. */
+.opm-bottom__auto input:checked + .opm-bottom__auto-box::after { content: "\2713"; }
+
+.opm-bottom__auto input:focus-visible + .opm-bottom__auto-box { box-shadow: var(--sh-focus); }
+
+/* ============================================================================
+   4. BOUTON JOUER (212 × 62)
+   Quatre états, tous portés par une classe d'état posée par le renderer :
+   prêt, occupé (défaut), maintenance, et lancement en cours — ce dernier
+   étant l'état « prêt » rendu inactif le temps que Minecraft s'ouvre.
+   ========================================================================== */
+
+.opm-bottom__play {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--w-play-btn);
+  height: var(--h-play-btn);
+  border-radius: var(--r-lg);
+  font-family: var(--font-display);
+  /* 27 px : échelon Anton propre au bouton de lancement. */
+  font-size: 27px;
+  letter-spacing: .05em;
+  /* Rattrapage optique des capitales Anton. */
+  padding-top: 3px;
+  /* On transitionne `background-color`, jamais la propriété raccourcie
+     `background` : Chromium n'en recalcule pas la couleur de façon fiable. */
+  transition: transform var(--t-fast) ease,
+              box-shadow var(--t-fast) ease,
+              background-color var(--t-fast) ease,
+              color var(--t-fast) ease,
+              opacity var(--t-fast) ease;
+}
+
+/* Occupé — également l'apparence par défaut si aucune classe d'état n'est
+   encore posée (vérification des fichiers au démarrage). */
+.opm-bottom__play,
+.opm-bottom__play--busy {
+  background-color: color-mix(in srgb, var(--aqua) 18%, transparent);
+  color: var(--text-light-60);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+/* Prêt — le seul état cliquable. */
+.opm-bottom__play--ready {
+  background-color: var(--aqua);
+  color: var(--ink);
+  box-shadow: var(--sh-play);
+  cursor: pointer;
+}
+
+.opm-bottom__play--ready:not(:disabled):hover { transform: translateY(-2px); }
+
+.opm-bottom__play--ready:not(:disabled):active { transform: translateY(0); }
+
+/* L'anneau de focus complète l'ombre du bouton au lieu de la remplacer. */
+.opm-bottom__play--ready:focus-visible { box-shadow: var(--sh-play), var(--sh-focus); }
+
+/* Lancement en cours — mêmes couleurs que « prêt », mais le bouton est rendu
+   inactif et se retire d'un cran le temps de l'ouverture du jeu. */
+.opm-bottom__play--ready:disabled {
+  opacity: .75;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Maintenance — le serveur refuse les connexions. */
+.opm-bottom__play--maint {
+  background-color: color-mix(in srgb, var(--white) 8%, transparent);
+  color: var(--text-light-55);
+  box-shadow: none;
+  cursor: not-allowed;
+}
