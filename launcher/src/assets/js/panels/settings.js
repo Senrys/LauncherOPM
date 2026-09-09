@@ -414,6 +414,7 @@ export default class SettingsPanel {
       'clear-cache': (target) => this.clearCache(target),
       'verify-files': (target) => this.verifyFiles(target),
       'download-launcher': () => this.downloadLauncher(),
+      'open-link': (target) => this.openLink(target),
     };
 
     for (const [name, handler] of Object.entries(actions)) {
@@ -1718,6 +1719,20 @@ export default class SettingsPanel {
   /** Ouvre l'adresse de téléchargement publiée par le serveur. */
   downloadLauncher() {
     const url = trimmed(this.ctx.store.get().bootstrap?.launcher?.download_url);
+    if (url) this.ctx.openExternal(url);
+  }
+
+  /**
+   * Ouvre dans le navigateur du système le lien porté par `data-url`.
+   *
+   * Sert les mentions légales du bas de panneau. L'URL passe par l'IPC, qui
+   * n'accepte que http(s) : un `data-url` malformé n'ouvre rien plutôt que de
+   * lancer un protocole arbitraire.
+   *
+   * @param {HTMLElement} target élément cliqué
+   */
+  openLink(target) {
+    const url = trimmed(target?.dataset?.url);
     if (url) this.ctx.openExternal(url);
   }
 
