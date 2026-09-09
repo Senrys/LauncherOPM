@@ -28,7 +28,7 @@ WorkingDirectory=/opt/opm-auth/auth-server
 # 4 fois le quota. Passez à plusieurs workers seulement après avoir activé Redis
 # (extra « redis » de pyproject.toml).
 ExecStart=/opt/opm-auth/auth-server/.venv/bin/uvicorn opm_auth.main:app \
-          --host 127.0.0.1 --port 8000 --workers 1 --proxy-headers \
+          --host 127.0.0.1 --port 8121 --workers 1 --proxy-headers \
           --forwarded-allow-ips 127.0.0.1
 
 # N'écoute que sur la boucle locale : c'est nginx qui expose le service.
