@@ -120,7 +120,9 @@ DEFAULT_DEVICE_SCOPE: Final = "XboxLive.signin offline_access"
 
 #: Préfixe du ticket RPS envoyé à XBL. Les jetons délivrés par le point d'entrée
 #: v2.0 exigent ``d=`` ; certains tickets hérités doivent être envoyés bruts.
-#: Surchargeable par ``OPM_MSA_RPS_PREFIX`` (valeur vide acceptée).
+#: Surchargeable par ``OPM_MSA_RPS_PREFIX`` (valeur vide acceptée), mais Xbox
+#: Live exige ``d=`` quel que soit le flux et quelle que soit l'application
+#: Azure : le vider fait répondre 400 à ``user.auth.xboxlive.com``.
 DEFAULT_RPS_PREFIX: Final = "d="
 
 #: Durée de validité du ``state`` signé remis au launcher (docs/API.md §1.3).
