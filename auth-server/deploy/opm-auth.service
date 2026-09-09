@@ -28,6 +28,13 @@ WorkingDirectory=/opt/opm-auth/auth-server
 # qui échoue le fait en silence.
 Environment=PYTHONUNBUFFERED=1
 
+# asyncpg cherche une clé cliente TLS dans « ~/.postgresql/postgresql.key »
+# et se contente d'un .exists(). Sans HOME explicite, il vise
+# /home/opmauth : sous ProtectHome, le stat() répond « permission refusée »
+# et non « inexistant » — asyncpg ne rattrape pas ce cas et le démarrage
+# échoue sur un trompeur « base de données injoignable ».
+Environment=HOME=/opt/opm-auth/auth-server
+
 # UN SEUL worker. La limitation de débit (5 connexions/minute par IP, etc.) est
 # tenue en mémoire dans chaque processus : avec 4 workers, un attaquant obtient
 # 4 fois le quota. Passez à plusieurs workers seulement après avoir activé Redis
@@ -47,7 +54,10 @@ KillSignal=SIGINT
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
-ProtectHome=true
+# « tmpfs » plutôt que « true » : /home devient un dossier VIDE au lieu d'un
+# dossier INTERDIT. Les répertoires personnels restent invisibles au service,
+# mais un stat() sous /home répond « n'existe pas » au lieu de « refusé ».
+ProtectHome=tmpfs
 ReadWritePaths=/opt/opm-auth/auth-server/keys /opt/opm-auth/auth-server/data
 ProtectKernelTunables=true
 ProtectKernelModules=true
