@@ -3,7 +3,7 @@
     {
       "name": "opm-main",
       "display_name": "Grand Line",
-      "url": "https://onepieceminecraft.fr/launcher/files.json",
+      "url": "https://auth.onepieceminecraft.fr/launcher/files.json",
       "version": "1.21.1",
       "loader_type": "neoforge",
       "loader_version": "latest",
