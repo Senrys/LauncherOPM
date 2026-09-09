@@ -18,7 +18,7 @@ Group=www-data
 Environment=PYTHONUNBUFFERED=1
 ExecStart=/usr/bin/python3 /opt/opm-auth/scripts/build-files-json.py \
           /var/www/opm-launcher \
-          https://onepieceminecraft.fr/launcher
+          https://auth.onepieceminecraft.fr/launcher
 
 # Le script n'écrit que dans le dossier du modpack.
 NoNewPrivileges=true
