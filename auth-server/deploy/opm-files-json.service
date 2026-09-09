@@ -13,8 +13,20 @@ After=network.target
 
 [Service]
 Type=oneshot
-User=www-data
-Group=www-data
+
+# Le compte qui DÉPOSE les fichiers, pas celui de nginx.
+#
+# Les fichiers arrivent par scp sous votre compte, en 644 : nginx (www-data) les
+# LIT sans difficulté grâce au bit « autres ». Le générateur, lui, doit ÉCRIRE
+# files.json — s'il tourne en www-data, il se heurte à un fichier appartenant à
+# votre compte et échoue sur « Permission denied », à chaque téléversement.
+#
+# Faire tourner le générateur sous le compte déposant supprime le problème à la
+# racine, au lieu de rejouer un « chown -R » après chaque envoi.
+#
+# À ADAPTER si vous déposez sous un autre compte que « debian ».
+User=debian
+Group=debian
 Environment=PYTHONUNBUFFERED=1
 ExecStart=/usr/bin/python3 /opt/opm-auth/scripts/build-files-json.py \
           /var/www/opm-launcher \
