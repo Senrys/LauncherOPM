@@ -155,8 +155,20 @@ def main() -> int:
 
     entrees = construire(args.dossier, args.base_url)
     if not entrees:
-        print(f"ÉCHEC  Aucun fichier trouvé dans {args.dossier}", file=sys.stderr)
-        return 1
+        # On n'écrit JAMAIS un manifeste vide : le launcher supprime tout ce qui
+        # n'y figure pas. Un dossier momentanément vide — modpack pas encore
+        # déposé, téléversement en cours, montage réseau tombé — effacerait le
+        # jeu de tous les joueurs au lancement suivant.
+        #
+        # Code de retour 0 malgré tout : appelé par un minuteur, un échec ici
+        # remplirait le journal d'erreurs toutes les deux minutes alors que la
+        # situation est normale tant que le modpack n'est pas déposé.
+        print(
+            f"NOTE  Aucun fichier dans {args.dossier} : le manifeste existant "
+            "est conservé tel quel (un manifeste vide ferait tout supprimer "
+            "chez les joueurs)."
+        )
+        return 0
 
     sortie = args.sortie or (args.dossier / "files.json")
     sortie.write_text(
