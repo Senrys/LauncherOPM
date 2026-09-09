@@ -1,0 +1,55 @@
+{
+  "name": "opm-launcher",
+  "productName": "OPM Launcher",
+  "version": "2.0.0",
+  "description": "Le launcher officiel de One Piece Minecraft — authentification souveraine OPM",
+  "main": "src/app.js",
+  "author": {
+    "name": "One Piece Minecraft",
+    "email": "contact@onepieceminecraft.fr",
+    "url": "https://onepieceminecraft.fr"
+  },
+  "license": "CC-BY-NC-4.0",
+  "private": true,
+  "engines": {
+    "node": ">=18.17"
+  },
+  "scripts": {
+    "start": "cross-env NODE_ENV=development electron .",
+    "dev": "cross-env NODE_ENV=development DEV_TOOL=open nodemon --exec electron .",
+    "fonts": "node scripts/fetch-fonts.js",
+    "icon": "node scripts/make-icons.js",
+    "build": "node build.js --obf=false --build=platform",
+    "build:obf": "node build.js --obf=true --build=platform",
+    "build:dir": "node build.js --obf=false --dir"
+  },
+  "nodemonConfig": {
+    "ext": "js,html,css",
+    "watch": [
+      "src"
+    ],
+    "ignore": [
+      "src/assets/videos",
+      ".stage",
+      "dist"
+    ]
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9",
+    "minecraft-java-core": "^4.2.3"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "electron": "^32.2.7",
+    "electron-builder": "^25.1.8",
+    "javascript-obfuscator": "^4.1.1",
+    "jimp": "^0.22.12",
+    "nodemon": "^3.1.7",
+    "png2icons": "^2.0.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Senrys/LauncherOPM.git"
+  },
+  "homepage": "https://onepieceminecraft.fr"
+}

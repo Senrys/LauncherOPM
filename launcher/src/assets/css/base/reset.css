@@ -1,0 +1,208 @@
+/* ============================================================================
+   OPM LAUNCHER — RESET
+   Remise à zéro minimale, calquée sur l'entête de la maquette
+   (DesignMaquette/Launcher OPM.dc.html, lignes 15 à 25).
+
+   Trois principes :
+   1. On ne neutralise que ce qui gêne — le reste des styles vit dans layout/,
+      components/ et panels/.
+   2. Les sélecteurs génériques sont enveloppés dans `:where()` : leur
+      spécificité tombe à zéro, aucun fichier suivant n'a donc à lutter contre
+      le reset pour reprendre la main.
+   3. Aucune couleur, ombre ni police en dur : tout vient de tokens.css.
+      Les rares valeurs littérales sont des mesures d'interface (8 px de
+      barre de défilement, 18 px de pouce de slider) reprises de la maquette.
+   ========================================================================== */
+
+/* ------------------------------------------------------------------- BOÎTE */
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+/* ------------------------------------------------------------------ RACINE
+   La fenêtre est sans cadre et ne défile jamais : c'est le contenu interne
+   (carte des paramètres, console) qui porte ses propres zones de défilement. */
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  margin: 0;
+  background: var(--abyss);
+  color: var(--text-light);
+  font-family: var(--font-ui);
+  font-size: var(--fs-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  cursor: default;
+
+  /* Le launcher est une application, pas un document : le texte ne se
+     sélectionne pas, sauf dans les champs et les zones de texte (plus bas). */
+  user-select: none;
+}
+
+/* --------------------------------------------------------------- RYTHME
+   Les marges d'origine du navigateur fausseraient tous les écarts de la
+   maquette, qui sont posés au pixel par les fichiers de mise en page. */
+:where(h1, h2, h3, h4, h5, h6, p, figure, blockquote, dl, dd, pre) { margin: 0; }
+
+:where(ul, ol) {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+:where(h1, h2, h3, h4, h5, h6) {
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+/* ------------------------------------------------------------------ MÉDIAS
+   `display: block` évite la ligne de base fantôme sous les images ; le
+   glissement natif est coupé, il n'a aucun sens dans une fenêtre applicative. */
+:where(img, svg, video, canvas) {
+  display: block;
+  max-width: 100%;
+}
+
+:where(img, video) {
+  -webkit-user-drag: none;
+}
+
+/* ---------------------------------------------------------------- CONTRÔLES
+   Les éléments de formulaire n'héritent ni de la police ni de la couleur :
+   on le leur impose, puis on dénude le bouton — components/buttons.css le
+   rhabille entièrement. */
+:where(button, input, select, textarea) {
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+}
+
+:where(button) {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: inherit;
+  cursor: pointer;
+}
+
+:where(button:disabled) { cursor: not-allowed; }
+
+:where(input, textarea) {
+  margin: 0;
+  background: none;
+}
+
+/* Le texte se sélectionne là où c'est utile : saisies, console de mise à jour,
+   codes à copier. */
+:where(input, textarea, select, pre, code, kbd, samp, [contenteditable="true"]) {
+  user-select: text;
+}
+
+/* --------------------------------------------------------------------- LIENS */
+:where(a) {
+  color: var(--teal);
+  text-decoration: none;
+}
+
+:where(a:hover) { color: var(--text-dark); }
+
+/* ------------------------------------------------------------------- MASQUAGE
+   Seule règle du projet autorisée à porter `!important` : `hidden` est la
+   commutation canonique du renderer, elle doit gagner contre tout `display`
+   posé par un composant. */
+[hidden] { display: none !important; }
+
+/* --------------------------------------------------------------------- FOCUS
+   Le contour natif est remplacé par l'anneau du système de design. Il n'est
+   montré qu'au clavier : `:focus-visible`, jamais `:focus`. */
+:focus { outline: none; }
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--sh-focus);
+}
+
+/* ----------------------------------------------------------------- SÉLECTION */
+::selection {
+  background: var(--aqua);
+  color: var(--ink);
+}
+
+/* --------------------------------------------------------- BARRES DE DÉFILEMENT
+   Fines, sans piste visible : elles ne doivent pas peser dans les cartes
+   claires des panneaux. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--teal) 32%, transparent) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track { background: transparent; }
+
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--teal) 32%, transparent);
+  border-radius: var(--r-pill);
+}
+
+/* -------------------------------------------------------------- CURSEURS RAM
+   Les deux sliders de « JAVA & MÉMOIRE ». Chromium ne peint la piste et le
+   pouce que via les pseudo-éléments préfixés ; les équivalents Firefox sont
+   déclarés à l'identique pour que la feuille reste valable hors Electron.
+   Mesures issues de la maquette : piste 6 px, pouce 18 px bordé de 3 px. */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 20px;
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: var(--foam-2);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  box-sizing: border-box;
+  width: 18px;
+  height: 18px;
+  /* Recentre le pouce sur une piste de 6 px : (18 − 6) / 2. */
+  margin-top: -6px;
+  border: 3px solid var(--aqua);
+  border-radius: 50%;
+  background: var(--ink);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--ink) 35%, transparent);
+}
+
+input[type="range"]::-moz-range-track {
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: var(--foam-2);
+}
+
+input[type="range"]::-moz-range-thumb {
+  box-sizing: border-box;
+  width: 18px;
+  height: 18px;
+  border: 3px solid var(--aqua);
+  border-radius: 50%;
+  background: var(--ink);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--ink) 35%, transparent);
+}
+
+/* Firefox dessine un liseré de focus à l'intérieur du pouce : on le retire,
+   l'anneau `:focus-visible` du champ suffit. */
+input[type="range"]::-moz-focus-outer { border: 0; }

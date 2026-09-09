@@ -1,0 +1,178 @@
+/* ============================================================================
+   OPM LAUNCHER — COMPOSANT « BOUTON »
+
+   Une seule classe de base, .opm-btn, complétée par :
+     - une variante de couleur : --aqua, --ink, --outline, --ghost, --danger
+     - un gabarit             : --block (pleine largeur), --lg (Anton 19 px)
+
+   Toutes les valeurs proviennent de base/tokens.css : aucune couleur, ombre,
+   rayon ni police en dur. Les classes ne servent qu'au style — le JS accroche
+   ces boutons par data-action / data-el, jamais par leur classe.
+
+   Hauteur commune : 12 px de marge verticale + 1 px de bordure + 18 px de
+   ligne = 44 px, identique pour les variantes pleines et les variantes bordées
+   (la bordure transparente de la base réserve la place).
+   ========================================================================== */
+
+/* --------------------------------------------------------------------- BASE */
+
+.opm-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;                        /* écart libellé ↔ .opm-spinner d'attente */
+  padding: 12px 20px;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--text-dark);
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: var(--fs-small);
+  line-height: 18px;
+  letter-spacing: var(--ls-btn);
+  text-align: center;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+  transition: background var(--t-fast), color var(--t-fast),
+              border-color var(--t-fast), box-shadow var(--t-fast),
+              transform var(--t-fast);
+}
+
+/* Focus visible partout (UI-SPEC §1.7) : l'anneau l'emporte sur l'ombre de
+   survol puisqu'il est déclaré après elle dans la cascade de ce fichier. */
+.opm-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--sh-focus);
+}
+
+/* ----------------------------------------------------------------- VARIANTES */
+
+/* Aqua — action principale sur fond clair (CHANGER, RATTACHER MON COMPTE). */
+.opm-btn--aqua {
+  background: var(--aqua);
+  color: var(--ink);
+}
+
+/* Encre — action affirmée sur fond clair ou aqua (SE CONNECTER, FAIRE UN DON). */
+.opm-btn--ink {
+  background: var(--ink);
+  color: var(--aqua);
+}
+
+/* Les boutons pleins se soulèvent d'UN pixel au survol (maquette l. 249, 297,
+   395) ; seul le grand bouton d'appel du pied de carte en prend deux (l. 402),
+   plus bas dans ce fichier. Aucun d'eux ne gagne d'ombre au passage : --sh-play
+   n'appartient qu'au bouton JOUER de la barre du bas. */
+.opm-btn--aqua:not(:disabled):hover,
+.opm-btn--ink:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+/* Contour teal — action secondaire : le remplissage arrive au survol. */
+.opm-btn--outline {
+  border-color: var(--teal);
+  color: var(--teal);
+}
+.opm-btn--outline:not(:disabled):hover {
+  background: var(--teal);
+  color: var(--paper);
+}
+
+/* Fantôme — action discrète, sans fond ni bordure au repos. */
+.opm-btn--ghost {
+  color: var(--muted);
+}
+.opm-btn--ghost:not(:disabled):hover {
+  background: var(--mist-2);
+  color: var(--text-dark);
+}
+
+/* Le même bouton fantôme posé sur une surface sombre (carte sombre, popover,
+   notification) : l'inventaire ne prévoit pas de modificateur dédié, la teinte
+   se décide donc par le contexte. */
+.opm-card--dark .opm-btn--ghost,
+.opm-popover .opm-btn--ghost,
+.opm-toast .opm-btn--ghost {
+  color: var(--text-light-72);
+}
+.opm-card--dark .opm-btn--ghost:not(:disabled):hover,
+.opm-popover .opm-btn--ghost:not(:disabled):hover,
+.opm-toast .opm-btn--ghost:not(:disabled):hover {
+  background: var(--line-dark-soft);
+  color: var(--text-light);
+}
+
+/* Danger — confirmations destructrices des modales (suppression de compte,
+   dissociation Microsoft, réinitialisation). */
+.opm-btn--danger {
+  background: var(--danger);
+  color: var(--paper);
+}
+.opm-btn--danger:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+/* ------------------------------------------------------------- GABARITS */
+
+.opm-btn--block {
+  display: flex;
+  width: 100%;
+}
+
+/* Bouton de tête d'écran : Anton 19 px, calé un peu plus haut que bas car la
+   fonte Anton porte peu de jambage. C'est le seul à se soulever de deux pixels
+   au survol — il porte l'action principale de son écran. */
+.opm-btn--lg {
+  padding: 17px 22px 15px;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 19px;
+  letter-spacing: .06em;
+}
+
+.opm-btn--lg:not(:disabled):hover {
+  transform: translateY(-2px);
+}
+
+/* ---------------------------------------------------------------- ÉTATS */
+
+.opm-btn:disabled,
+.opm-btn[aria-disabled="true"] {
+  opacity: .5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Attente : le bouton reste lisible mais n'accepte plus le clic. */
+.opm-btn[aria-busy="true"] {
+  cursor: progress;
+  pointer-events: none;
+}
+
+/* Anneau d'attente automatique — seulement si le balisage ne fournit pas déjà
+   son propre .opm-spinner (cas du bouton « RATTACHER MON COMPTE MINECRAFT »). */
+.opm-btn[aria-busy="true"]:not(:has(.opm-spinner))::before {
+  content: "";
+  flex: none;
+  width: 15px;
+  height: 15px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: opmSpin .7s linear infinite;
+}
+
+/* Spinner fourni par le balisage : il emprunte la couleur du texte du bouton,
+   sans quoi l'anneau aqua de components/feedback.css serait invisible sur la
+   variante --aqua. */
+.opm-btn .opm-spinner {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  border-color: currentColor;
+  border-top-color: transparent;
+}

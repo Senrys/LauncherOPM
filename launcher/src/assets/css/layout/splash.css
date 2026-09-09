@@ -1,0 +1,76 @@
+/* ============================================================================
+   OPM LAUNCHER — SPLASH
+   Plein écran, au-dessus de tout le reste, le temps de la séquence réelle de
+   démarrage (config locale → bootstrap → session → instances → prêt).
+   La jauge suit cette progression : elle ne simule rien.
+
+   Toute la surface est cliquable pour passer l'écran ; la mention du bas est
+   le bouton réellement atteignable au clavier.
+   ========================================================================== */
+
+.opm-splash {
+  position: absolute;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  /* L'encre des voiles vient de base/tokens.css : le splash assombrit le bas de
+     l'image sans jamais couvrir le haut du bandeau. */
+  background: linear-gradient(180deg,
+              rgb(var(--veil-ink) / 0) 0%,
+              rgb(var(--veil-ink) / .22) 55%,
+              rgb(var(--veil-ink) / .72) 100%);
+  cursor: pointer;
+}
+
+/* Le bandeau occupe 860 px, mais ne dépasse jamais 80 % de la fenêtre : il
+   reste entier même à la largeur minimale (1100 px). */
+.opm-splash__banner {
+  width: 860px;
+  max-width: 80%;
+  filter: var(--sh-banner);
+}
+
+/* Bloc de progression : 38 px sous le bandeau, puis 15 px entre chaque ligne.
+   Les écarts sont portés par les éléments, le conteneur n'a pas de `gap` —
+   les trois lignes sont des frères directs du splash. */
+.opm-splash__label {
+  margin-top: 38px;
+  /* 10,5 px : échelon intermédiaire absent de l'échelle de tokens.css. */
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .24em;
+  color: var(--text-light);
+  text-shadow: var(--sh-splash-text);
+}
+
+.opm-splash__track {
+  width: 340px;
+  height: 5px;
+  margin-top: 15px;
+  overflow: hidden;
+  border-radius: var(--r-pill);
+  background-color: color-mix(in srgb, var(--white) 22%, transparent);
+}
+
+/* Largeur écrite au runtime par le renderer, au rythme des étapes réelles. */
+.opm-splash__fill {
+  width: 0;
+  height: 100%;
+  background-color: var(--aqua);
+  transition: width var(--t-fast) linear;
+}
+
+.opm-splash__hint {
+  margin-top: 15px;
+  font-size: var(--fs-kicker);
+  font-weight: 500;
+  letter-spacing: .16em;
+  color: var(--text-light-66);
+  transition: color var(--t-nav) ease;
+}
+
+.opm-splash__hint:hover { color: var(--text-light); }

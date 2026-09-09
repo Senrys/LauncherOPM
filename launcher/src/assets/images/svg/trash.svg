@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" role="img" aria-label="Supprimer">
+  <title>Supprimer</title>
+  <path d="M3.6 6.4h16.8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+  <path d="M9.2 6.4V4.8a1.4 1.4 0 0 1 1.4-1.4h2.8a1.4 1.4 0 0 1 1.4 1.4v1.6" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M5.8 6.4l.9 12a2 2 0 0 0 2 1.9h6.6a2 2 0 0 0 2-1.9l.9-12" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M10.4 10.2v6.2M13.6 10.2v6.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+</svg>

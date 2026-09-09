@@ -1,0 +1,187 @@
+/* ============================================================================
+   OPM LAUNCHER — BARRE DE TITRE (46 px)
+   Marque · onglets · version · boutons de fenêtre.
+
+   La fenêtre est sans cadre (`frame: false`) : cette barre EST la barre de
+   titre du système. Toute sa surface déplace la fenêtre, sauf les éléments
+   cliquables qui repassent en `no-drag`.
+
+   Le même bloc sert deux fois : complet dans la coque, et réduit (marque +
+   boutons, sans onglets ni version) sur l'écran de connexion. L'espaceur
+   absorbe la différence, aucune variante n'est nécessaire.
+   ========================================================================== */
+
+.opm-titlebar {
+  position: relative;
+  z-index: 20;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  height: var(--h-titlebar);
+  padding: 0 4px 0 14px;
+  background-color: var(--veil-90);
+  border-bottom: 1px solid var(--line-dark-soft);
+  -webkit-app-region: drag;
+}
+
+/* ------------------------------------------------------------------- MARQUE */
+.opm-titlebar__brand {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.opm-titlebar__logo {
+  width: 28px;
+  height: 28px;
+}
+
+/* Anton pose ses capitales haut dans la boîte : les 2 px de décalage
+   rattrapent l'alignement optique avec le logo et le badge. */
+.opm-titlebar__name {
+  font-family: var(--font-display);
+  font-size: var(--fs-nav);
+  letter-spacing: .06em;
+  line-height: 1;
+  color: var(--text-light);
+  padding-top: 2px;
+}
+
+.opm-titlebar__badge {
+  font-size: var(--fs-kicker-sm);
+  font-weight: 700;
+  letter-spacing: .2em;
+  line-height: 1;
+  color: var(--ink);
+  background-color: var(--aqua);
+  padding: 4px 7px;
+  border-radius: var(--r-xs);
+}
+
+/* ------------------------------------------------------------------ ONGLETS */
+.opm-titlebar__tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  height: 100%;
+  margin-left: 22px;
+  -webkit-app-region: no-drag;
+}
+
+.opm-titlebar__tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  /* Le 2 px du haut est un rattrapage optique : Anton pose ses capitales
+     haut dans la boîte. */
+  padding: 2px 20px 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-nav);
+  letter-spacing: var(--ls-nav);
+  color: var(--text-light-62);
+  background-color: transparent;
+  transition: background-color var(--t-nav) ease, color var(--t-nav) ease;
+}
+
+.opm-titlebar__tab:hover {
+  background-color: color-mix(in srgb, var(--aqua) 14%, transparent);
+  color: var(--text-light);
+}
+
+.opm-titlebar__tab--active,
+.opm-titlebar__tab--active:hover {
+  background-color: color-mix(in srgb, var(--aqua) 16%, transparent);
+  color: var(--white);
+}
+
+/* Le trait aqua est toujours présent : seule son opacité bascule, ce qui
+   évite un saut de mise en page au changement d'onglet. */
+.opm-titlebar__tab-bar {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 0;
+  height: 3px;
+  border-radius: var(--r-xs) var(--r-xs) 0 0;
+  background-color: var(--aqua);
+  opacity: 0;
+  transition: opacity var(--t-nav) ease;
+}
+
+.opm-titlebar__tab--active .opm-titlebar__tab-bar { opacity: 1; }
+
+/* ----------------------------------------------------------------- ESPACEUR */
+.opm-titlebar__spacer { flex: 1; }
+
+/* ------------------------------------------------------------------ VERSION
+   Numéro fourni par window.opm.app.version() — jamais écrit dans le balisage. */
+.opm-titlebar__version {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* 10,5 px : échelon intermédiaire absent de l'échelle de tokens.css. */
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: var(--ls-tag);
+  color: var(--text-light-50);
+}
+
+.opm-titlebar__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--aqua);
+  animation: opmPulse 2.4s ease-in-out infinite;
+}
+
+/* -------------------------------------------------------- BOUTONS DE FENÊTRE */
+.opm-titlebar__win {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 14px;
+  -webkit-app-region: no-drag;
+}
+
+.opm-titlebar__winbtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 44px;
+  color: var(--text-light-60);
+  transition: background-color var(--t-nav) ease, color var(--t-nav) ease;
+}
+
+.opm-titlebar__winbtn:hover {
+  background-color: color-mix(in srgb, var(--white) 8%, transparent);
+  color: var(--text-light);
+}
+
+/* Onglets et boutons de fenêtre sont à fleur des bords : un anneau posé à
+   l'extérieur serait rogné par la fenêtre ou déborderait sur le panneau.
+   Le repère de focus rentre donc à l'intérieur de la surface cliquable. */
+.opm-titlebar__tab:focus-visible,
+.opm-titlebar__winbtn:focus-visible {
+  box-shadow: none;
+  outline: 2px solid var(--aqua);
+  outline-offset: -4px;
+}
+
+/* Le bouton de fermeture est plus large et épouse le coin haut-droit de la
+   fenêtre : son rayon est celui du cadre (--r-2xl) moins la bordure, d'où
+   --r-xl-alt. L'arrondi ne se voit qu'une fois le fond rouge peint. */
+.opm-titlebar__winbtn--close {
+  width: 44px;
+  height: 44px;
+  border-radius: 0 var(--r-xl-alt) 0 0;
+}
+
+.opm-titlebar__winbtn--close:hover {
+  background-color: var(--danger);
+  color: var(--white);
+}

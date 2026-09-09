@@ -1,0 +1,291 @@
+/* ============================================================================
+   ÉCRAN CONNEXION — section [data-screen="login"] de launcher.html
+   Absent de la maquette : conçu dans son langage exact (UI-SPEC §6).
+   Carte papier de 470 px calée à gauche, personnage à droite, cinq vues
+   (connexion, code de sécurité, création, mot de passe oublié, rattachement).
+
+   Rappels de découpage :
+   - layout/titlebar.css possède .opm-titlebar, réutilisée ici en version
+     réduite (marque + boutons fenêtre, sans onglets).
+   - panels/home.css possède .opm-scene, .opm-scene__halo et .opm-scene__char :
+     ce fichier ne fait que replacer la scène dans le gabarit de connexion.
+   - panels/settings.css possède .opm-account, .opm-link-ms et .opm-note--warn.
+   ========================================================================== */
+
+/* ------------------------------------------------------------------ GABARIT */
+
+.opm-login {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.opm-login[hidden] { display: none; }
+
+/* Scène décorative : elle occupe la moitié droite, sous la carte. */
+.opm-login > .opm-scene {
+  position: absolute;
+  top: var(--h-titlebar);
+  right: 0;
+  bottom: 0;
+  left: auto;
+  width: 52%;
+  min-width: 420px;
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* --------------------------------------------------------------- la carte */
+
+.opm-login__card {
+  position: relative;
+  z-index: 2;
+  flex: 0 1 auto;
+  width: 470px;
+  margin: auto auto auto 88px;
+  max-height: calc(100vh - var(--h-titlebar) - 48px);
+  overflow: hidden auto;
+  padding: 30px 34px 28px;
+  background: var(--paper);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-xl);
+  box-shadow: var(--sh-card);
+}
+
+/* Fenêtre courte : la carte reprend toute la hauteur utile et défile. */
+@media (max-height: 720px) {
+  .opm-login__card { margin-top: 16px; margin-bottom: 16px; }
+}
+
+
+/* ============================================================================
+   LES VUES — une seule visible, chacune entre en opmRise
+   ========================================================================== */
+
+.opm-login__view {
+  display: flex;
+  flex-direction: column;
+  animation: opmRise var(--t-panel) ease both;
+}
+
+.opm-login__view[hidden] { display: none; }
+
+.opm-login .opm-kicker { margin: 0; }
+
+.opm-login__title {
+  margin: 14px 0 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-h1);
+  font-weight: 400;
+  line-height: .96;
+  letter-spacing: .005em;
+  color: var(--text-dark);
+  text-wrap: balance;
+}
+
+.opm-login__title span { color: var(--teal); }
+
+/* Les vues secondaires portent un h2 : même famille, un cran plus bas. */
+h2.opm-login__title {
+  font-size: var(--fs-h2);
+  line-height: 1;
+}
+
+.opm-login__lead {
+  margin: 12px 0 0;
+  font: 400 var(--fs-body-lg)/1.55 var(--font-ui);
+  color: var(--text-body);
+  text-wrap: pretty;
+}
+
+/* Bandeau d'erreur : le style vient de .opm-note--warn (settings.css). */
+.opm-login__view .opm-note--warn { margin: 16px 0 0; }
+
+
+/* ============================================================================
+   CHAMPS, LIENS ET BOUTONS DE LA CARTE
+   ========================================================================== */
+
+.opm-login__view .opm-field { margin-top: 16px; }
+.opm-login__view .opm-field[hidden] { display: none; }
+
+.opm-login__view .opm-btn--block { margin-top: 18px; }
+.opm-login__view .opm-btn--block[hidden] { display: none; }
+
+/* Lien de texte : teal, souligné d'aqua au survol. */
+.opm-login__link {
+  padding: 0;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  color: var(--teal);
+  font: 600 12px/1.4 var(--font-ui);
+  cursor: pointer;
+  transition: color var(--t-fast) ease, border-color var(--t-fast) ease;
+}
+
+.opm-login__link:hover {
+  color: var(--text-dark);
+  border-bottom-color: var(--aqua);
+}
+
+.opm-login__link:focus-visible {
+  outline: none;
+  border-radius: var(--r-xs);
+  box-shadow: var(--sh-focus);
+}
+
+/* Lien isolé dans une vue : il ne prend que la largeur de son texte, pour que
+   le soulignement de survol ne traverse pas toute la carte. */
+.opm-login__view > .opm-login__link {
+  align-self: flex-start;
+  margin-top: 12px;
+}
+
+/* « Mot de passe oublié ? » se range à droite, sous le champ. */
+.opm-login__view > .opm-login__forgot {
+  align-self: flex-end;
+  margin-top: 10px;
+}
+
+/* Séparateur « ou » : un filet de chaque côté du mot. */
+.opm-login__sep {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 18px 0 0;
+  font: 500 10.5px/1 var(--font-ui);
+  letter-spacing: var(--ls-kicker-sm);
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+.opm-login__sep::before,
+.opm-login__sep::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+.opm-login__alt {
+  margin: 14px 0 0;
+  font: 400 12px/1.5 var(--font-ui);
+  color: var(--muted);
+  text-align: center;
+}
+
+.opm-login__alt .opm-login__link { margin-left: 4px; }
+
+
+/* ============================================================================
+   CODE DE SÉCURITÉ — six cases d'un chiffre
+   ========================================================================== */
+
+.opm-otp {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.opm-otp__box {
+  width: 100%;
+  height: 58px;
+  padding: 0;
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg-alt);
+  outline: none;
+  font: 700 22px/1 var(--font-ui);
+  color: var(--text-dark);
+  text-align: center;
+  caret-color: var(--teal);
+  transition: border-color var(--t-fast) ease, box-shadow var(--t-fast) ease;
+}
+
+.opm-otp__box:focus {
+  border-color: var(--aqua);
+  box-shadow: var(--sh-focus);
+}
+
+
+/* ============================================================================
+   RATTACHEMENT MICROSOFT — repli « device code » et confirmation
+   ========================================================================== */
+
+/* Encart pointillé : la consigne occupe une ligne pleine, le code aussi,
+   puis le bouton COPIER et le lien Microsoft se partagent la dernière. */
+.opm-login .opm-link-ms {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 18px;
+  padding: 16px 18px;
+  background: var(--mist);
+  border: 1.5px dashed var(--line-4);
+  border-radius: var(--r-xl);
+}
+
+.opm-login .opm-link-ms[hidden] { display: none; }
+
+.opm-login .opm-link-ms > .opm-login__lead {
+  flex: 1 1 100%;
+  margin: 0;
+  font-size: var(--fs-body);
+}
+
+.opm-link-ms__code {
+  flex: 1 1 100%;
+  margin: 0;
+  padding: 12px 18px;
+  background: var(--white);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-lg-alt);
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 400;
+  line-height: 1.15;
+  letter-spacing: .12em;
+  color: var(--text-dark);
+  text-align: center;
+  user-select: all;
+}
+
+.opm-login .opm-link-ms .opm-btn { flex: none; }
+
+/* Carte de confirmation : tête de skin à gauche, identité sur deux lignes. */
+.opm-login .opm-account {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 14px;
+  align-items: center;
+  margin-top: 18px;
+}
+
+.opm-login .opm-account[hidden] { display: none; }
+
+.opm-login .opm-account__avatar {
+  grid-row: 1 / span 2;
+  width: 48px;
+  height: 48px;
+}
+
+.opm-login .opm-account__name { grid-column: 2; }
+.opm-login .opm-account__meta { grid-column: 2; white-space: normal; }
+
+
+/* ============================================================================
+   ADAPTATION AUX PETITES FENÊTRES (min 1100 × 700)
+   Sous 1180 px, la carte se rapproche du bord et la scène s'efface pour ne
+   jamais passer derrière le texte.
+   ========================================================================== */
+
+@media (max-width: 1180px) {
+  .opm-login__card { margin-left: 48px; }
+  .opm-login > .opm-scene { opacity: .55; }
+}

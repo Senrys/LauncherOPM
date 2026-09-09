@@ -1,0 +1,169 @@
+/* ============================================================================
+   OPM LAUNCHER — RETOURS D'ÉTAT
+
+   .opm-progress            jauge générique (piste + remplissage)
+   .opm-spinner             anneau d'attente
+   .opm-skeleton            squelette de chargement, jamais une fausse valeur
+   .opm-note / --warn       encart de note contextuelle
+
+   Les animations opmSpin et opmShimmer viennent de base/tokens.css.
+   ========================================================================== */
+
+/* ------------------------------------------------------------------- JAUGE */
+/* Le premier enfant fait office de remplissage : sa largeur est la seule valeur
+   posée au runtime (UI-SPEC §1.5). La piste se règle par --progress-track, que
+   la liste des surfaces sombres (plus bas) bascule d'un coup. */
+
+.opm-progress {
+  overflow: hidden;
+  height: 9px;
+  border-radius: var(--r-pill);
+  background: var(--progress-track, var(--foam));
+}
+
+.opm-progress > * {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--aqua);
+  transition: width .3s linear;
+}
+
+/* ----------------------------------------------------------------- SPINNER */
+
+.opm-spinner {
+  display: inline-block;
+  vertical-align: -3px;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--line-dark);
+  border-top-color: var(--aqua);
+  border-radius: 50%;
+  animation: opmSpin .7s linear infinite;
+}
+
+.opm-spinner[hidden] {
+  display: none;
+}
+
+/* ---------------------------------------------------------------- SQUELETTE */
+/* Posé sur un emplacement de donnée encore vide ; le JS retire la classe dès
+   qu'il écrit la valeur réelle. Un panneau qui a besoin d'un squelette de bloc
+   (chapô pleine largeur) redéfinit son display : sa feuille est chargée après
+   celle-ci.
+
+   PALETTE — deux jeux de valeurs, jamais posés sur le squelette lui-même mais
+   sur la SURFACE qui le porte, et hérités par tous ses descendants :
+     .opm-skeleton { background: var(--skeleton-bg, <clair>) }
+   Une surface claire n'a rien à déclarer : le repli est la palette claire.
+   Une surface sombre déclare les deux variables (liste ci-dessous), ou porte
+   .opm-skeleton--dark si c'est le squelette lui-même qui est isolé sur du
+   sombre. Le repli — et non une déclaration locale — est ce qui rend
+   l'héritage possible : une valeur déclarée sur l'élément l'emporterait
+   toujours sur celle de son conteneur. */
+
+.opm-skeleton {
+  position: relative;
+  display: inline-block;
+  overflow: hidden;
+  min-width: 4.5em;
+  min-height: 1em;
+  border-radius: var(--r-sm);
+  background: var(--skeleton-bg, var(--foam));
+  color: transparent;             /* filet de sécurité si la valeur arrive avant */
+}
+
+.opm-skeleton::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 40%;
+  background: linear-gradient(90deg,
+              transparent, var(--skeleton-band, var(--shine)), transparent);
+  animation: opmShimmer 1.8s linear infinite;
+}
+
+/* ------------------------------------------------- surfaces sombres du launcher
+   Toutes celles qui portent au moins un squelette (ou une jauge). Sans cette
+   liste, un pavé vert pâle et sa bande blanche clignotent sur fond quasi noir
+   au démarrage et à chaque ouverture d'un onglet.
+
+     .opm-card--dark        carte sombre générique (components/card.css)
+     .opm-popover           menu des comptes et console (components/overlay.css)
+     .opm-donors            classement des donateurs, --veil-86
+     .opm-give__proj        projection de don, encart --ink sur la carte aqua
+                            (c'est le squelette LUI-MÊME : la variable est alors
+                            déclarée sur l'élément, ce qui marche aussi)
+     .opm-scene__status     badge d'état du serveur, --veil-84
+     .opm-scene__id         identité du personnage, posée à même la vidéo
+     .opm-tile--dark        tuile « prochain événement RP », aplat --ink
+     .opm-settings__files   encart d'état des fichiers, --veil-60
+     .opm-skeleton--dark    échappatoire pour toute nouvelle surface sombre
+
+   Une carte claire posée à l'intérieur d'une de ces surfaces devrait remettre
+   --skeleton-bg / --skeleton-band à leur valeur claire ; aucun écran n'est dans
+   ce cas aujourd'hui. */
+
+.opm-card--dark,
+.opm-popover,
+.opm-donors,
+.opm-give__proj,
+.opm-scene__status,
+.opm-scene__id,
+.opm-tile--dark,
+.opm-settings__files,
+.opm-skeleton--dark {
+  --skeleton-bg: var(--veil-skeleton);
+  --skeleton-band: var(--line-dark);
+  --progress-track: var(--line-dark-soft);
+}
+
+/* ------------------------------------------------------ surfaces aqua pleines
+   Troisième cas, ni clair ni sombre : la tuile des votes et la carte d'appel au
+   don. Le vert pâle de la palette claire (--foam) y disparaît presque, et sa
+   bande blanche encore plus — on repasse donc sur l'encre, qui est déjà la
+   couleur du texte de ces surfaces. */
+
+.opm-card--aqua,
+.opm-give,
+.opm-tile--aqua {
+  --skeleton-bg: color-mix(in srgb, var(--ink) 14%, transparent);
+  --skeleton-band: color-mix(in srgb, var(--white) 45%, transparent);
+  --progress-track: color-mix(in srgb, var(--ink) 14%, transparent);
+}
+
+/* …sauf l'encart de projection, qui est un aplat d'encre POSÉ sur cette carte
+   aqua : il reprend la palette sombre malgré son parent. */
+.opm-give .opm-give__proj {
+  --skeleton-bg: var(--veil-skeleton);
+  --skeleton-band: var(--line-dark);
+}
+
+/* -------------------------------------------------------------------- NOTE */
+/* .opm-note--warn s'emploie seul (bandeau d'erreur de l'écran de connexion) ou
+   ajouté à un encart existant (note de mémoire des Paramètres) : il porte donc
+   lui aussi la boîte complète. */
+
+.opm-note,
+.opm-note--warn {
+  display: block;
+  margin: 0;
+  padding: 11px 13px;
+  border-radius: var(--r-md);
+  background: var(--mist);
+  font-family: var(--font-ui);
+  font-weight: 500;
+  font-size: var(--fs-small);
+  line-height: 1.5;
+  color: var(--teal);
+}
+
+.opm-note--warn {
+  color: var(--warn);
+}
+
+.opm-note[hidden],
+.opm-note--warn[hidden] {
+  display: none;
+}

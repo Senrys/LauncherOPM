@@ -1,0 +1,99 @@
+# Compilation des trois cibles du launcher OPM — docs/BUILD.md §5.
+#
+# Trois machines en parallèle, une par système : un `.dmg` signé ou non ne peut
+# être fabriqué que sur un vrai macOS, et un installeur NSIS hors Windows exige
+# Wine. Le plus simple est donc de donner à chaque cible sa machine.
+#
+# Déclenchement : un tag `v*` (par exemple `v2.0.0`), ou à la main depuis
+# l'onglet Actions.
+#
+# Résultat : une release GitHub **en brouillon** contenant les trois paquets,
+# leurs `latest*.yml` (indispensables à la mise à jour automatique) et les
+# empreintes SHA-256. Vous la relisez, puis vous cliquez sur « Publish release ».
+# Tant qu'elle est en brouillon, aucun joueur ne la voit et electron-updater ne
+# la propose pas.
+#
+# Aucun certificat n'est configuré : les binaires sortent NON SIGNÉS. C'est
+# assumé (docs/BUILD.md §4). Le jour où vous en achetez un, il suffit de
+# déposer les secrets correspondants dans Settings → Secrets and variables →
+# Actions et de les déclarer dans le bloc `env` de l'étape « Compiler » —
+# `build.js` les détecte tout seul, il n'y a pas une ligne à réécrire.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+# Nécessaire pour que GITHUB_TOKEN puisse créer la release et y téléverser.
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      # Une machine qui échoue ne doit pas annuler les deux autres : on veut
+      # savoir si le défaut est propre à un système ou commun aux trois.
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: win
+            label: "Windows — OPMLauncher-win-x64.exe"
+          - os: macos-latest
+            target: mac
+            label: "macOS — OPMLauncher-mac-universal.dmg"
+          - os: ubuntu-latest
+            target: linux
+            label: "Linux — OPMLauncher-linux-x64.AppImage"
+
+    defaults:
+      run:
+        working-directory: launcher
+
+    steps:
+      - name: Récupérer les sources
+        uses: actions/checkout@v4
+
+      - name: Installer Node
+        uses: actions/setup-node@v4
+        with:
+          # Le launcher exige >= 18.17 (package.json). 20 est la version LTS
+          # sur laquelle Electron 32 est testé.
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: launcher/package-lock.json
+
+      - name: Installer les dépendances
+        # `npm ci` et non `npm install` : il installe exactement le
+        # package-lock.json versionné, donc les trois machines compilent avec
+        # les mêmes dépendances, à l'octet près.
+        run: npm ci
+
+      - name: Compiler et publier
+        # Les polices et les icônes sont versionnées (src/assets/fonts,
+        # src/assets/images) : ni `npm run fonts` ni `npm run icon` n'ont à
+        # tourner ici.
+        run: node build.js --obf=false --build=${{ matrix.target }} --publish=always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Conserver les paquets
+        # Filet de sécurité : même si la publication échoue, les binaires
+        # restent téléchargeables depuis la page du workflow pendant 30 jours.
+        uses: actions/upload-artifact@v4
+        with:
+          name: OPMLauncher-${{ matrix.target }}
+          path: |
+            launcher/dist/*.exe
+            launcher/dist/*.dmg
+            launcher/dist/*.zip
+            launcher/dist/*.AppImage
+            launcher/dist/*.yml
+            launcher/dist/SHA256SUMS
+          if-no-files-found: ignore

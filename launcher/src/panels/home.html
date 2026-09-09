@@ -1,0 +1,174 @@
+<!-- ============================================================================
+     ACCUEIL — fragment injecté par le renderer dans [data-el="panel-host"].
+     Aucun <html>/<head>/<body> : ce fichier est un fragment, servi par
+     window.opm.app.panel('home'). Les chemins relatifs sont résolus depuis le
+     document hôte src/launcher.html — voisin de panels/, et non son parent —
+     d'où le préfixe « assets/ » sans « ../ ».
+
+     CONVENTIONS
+     - Les classes servent EXCLUSIVEMENT au style ; le JS n'utilise que data-*.
+     - Un élément vide portant .opm-skeleton affiche un squelette de chargement ;
+       le JS retire la classe juste après avoir écrit la valeur réelle.
+     - Aucune valeur de démonstration : tout emplacement de donnée est vide.
+
+     POINTS D'ANCRAGE (contrat avec panels/home.js)
+       data-el   : stale-notice, news-list, news-item-tpl, online-segments,
+                   server-status, character
+       data-action : open-featured, open-news-archive, open-news, vote
+       data-bind : news-meta, news-title-1, news-title-2, news-lead,
+                   players-online, event-countdown, event-name,
+                   votes-count, votes-goal, votes-reward,
+                   server-state, server-detail, player-name, player-sub
+                   (dans news-item-tpl : item-tag, item-title, item-date)
+
+     REPÈRES POUR panels/home.css
+     - .opm-home : deux colonnes, gap 24px. .opm-news fait 620px (flex:none),
+       .opm-scene prend le reste (flex:1; min-width:0).
+     - .opm-news est une colonne flex : chaque enfant porte lui-même sa marge
+       horizontale de 28px ; .opm-tiles est poussée en bas par margin-top:auto.
+     - .opm-scene__status > span.opm-kicker__dot devient une pastille RONDE de
+       8px animée en opmPulse 2s (contrairement au carré 9px des kickers).
+     ========================================================================== -->
+
+<section class="opm-screen opm-home" data-tab="home" role="tabpanel" aria-label="Accueil">
+
+  <!-- ======================================================= JOURNAL DE BORD -->
+  <article class="opm-news">
+
+    <div class="opm-news__head">
+      <p class="opm-kicker"><span class="opm-kicker__dot" aria-hidden="true"></span>JOURNAL DE BORD</p>
+      <!-- Date / version de la dernière mise à jour du journal -->
+      <p class="opm-news__meta opm-skeleton" data-bind="news-meta"></p>
+    </div>
+
+    <!-- Bandeau de fraîcheur. Le processus principal peut servir une réponse
+         depuis un cache périmé quand le réseau a échoué : elle porte alors
+         stale:true et fetched_at (docs/DATA.md §5). Le JS écrit ici
+         « Données hors ligne · relevées … » et retire l'attribut hidden, qu'il
+         repose dès qu'une réponse fraîche prend le relais. Le bandeau part donc
+         vide et masqué : ce n'est pas un squelette de chargement, c'est un
+         emplacement qui ne sert que dans ce cas précis. -->
+    <p class="opm-note opm-note--offline" data-el="stale-notice" role="status" hidden></p>
+
+    <!-- Titre de l'article mis en avant, coupé en deux lignes par le JS.
+         La seconde ligne est affichée en --teal. -->
+    <h1 class="opm-news__title">
+      <span class="opm-skeleton" data-bind="news-title-1"></span><br>
+      <span class="opm-skeleton" data-bind="news-title-2"></span>
+    </h1>
+
+    <p class="opm-news__lead opm-skeleton" data-bind="news-lead"></p>
+
+    <!-- Deux liens : le premier ouvre l'article mis en avant (--teal, souligné
+         2px --aqua), le second le journal complet (--muted). Ce sont des
+         <button> car l'ouverture passe par window.opm.app.openExternal(). -->
+    <div class="opm-news__links">
+      <button type="button" data-action="open-featured">LIRE LES NOTES DE VERSION →</button>
+      <button type="button" data-action="open-news-archive">Voir le journal complet</button>
+    </div>
+
+    <div class="opm-news__sep" role="presentation"></div>
+
+    <!-- Liste des dernières actualités. Le contenu ci-dessous n'est qu'un
+         squelette de chargement : le JS vide le conteneur puis y clone
+         news-item-tpl une fois par article reçu. -->
+    <div class="opm-news__list" data-el="news-list">
+      <div class="opm-news-item">
+        <span class="opm-news-item__tag opm-skeleton"></span>
+        <span class="opm-news-item__label opm-skeleton"></span>
+        <span class="opm-news-item__date opm-skeleton"></span>
+      </div>
+      <div class="opm-news-item">
+        <span class="opm-news-item__tag opm-skeleton"></span>
+        <span class="opm-news-item__label opm-skeleton"></span>
+        <span class="opm-news-item__date opm-skeleton"></span>
+      </div>
+      <div class="opm-news-item">
+        <span class="opm-news-item__tag opm-skeleton"></span>
+        <span class="opm-news-item__label opm-skeleton"></span>
+        <span class="opm-news-item__date opm-skeleton"></span>
+      </div>
+    </div>
+
+    <!-- ------------------------------------------------------------ TUILES -->
+    <div class="opm-tiles">
+
+      <!-- Fréquentation : les 8 segments sont générés par le JS dans
+           [data-el="online-segments"] (span.opm-tile__seg + modificateur
+           --on / --mid / --off selon le ratio joueurs / capacité). -->
+      <div class="opm-tile opm-tile--light">
+        <p class="opm-tile__label">EN LIGNE MAINTENANT</p>
+        <p class="opm-tile__value">
+          <span class="opm-skeleton" data-bind="players-online"></span>
+          <span class="opm-tile__unit">joueurs</span>
+        </p>
+        <div class="opm-tile__segments" data-el="online-segments" aria-hidden="true"></div>
+      </div>
+
+      <!-- Prochain événement RP : compte à rebours rafraîchi chaque seconde.
+           Ici .opm-tile__unit est un bloc placé SOUS la valeur (nom de l'événement). -->
+      <div class="opm-tile opm-tile--dark">
+        <p class="opm-tile__label">PROCHAIN ÉVÉNEMENT RP</p>
+        <p class="opm-tile__value">
+          <span class="opm-skeleton" data-bind="event-countdown"></span>
+        </p>
+        <p class="opm-tile__unit opm-skeleton" data-bind="event-name"></p>
+      </div>
+
+      <!-- Votes du mois : la récompense du palier est fournie par l'API. -->
+      <div class="opm-tile opm-tile--aqua">
+        <p class="opm-tile__label">VOTES DU MOIS</p>
+        <p class="opm-tile__value">
+          <span class="opm-skeleton" data-bind="votes-count"></span>
+          <span class="opm-tile__unit"><span class="opm-skeleton" data-bind="votes-goal"></span></span>
+        </p>
+        <!-- Le séparateur du libellé est posé en CSS et n'apparaît qu'une fois
+             la récompense du palier connue : sans cela, le bouton afficherait
+             « VOTER · » suivi du vide pendant tout le chargement. -->
+        <button type="button" class="opm-tile__cta" data-action="vote">VOTER<span data-bind="votes-reward"></span></button>
+      </div>
+
+    </div>
+  </article>
+
+  <!-- ==================================================== SCÈNE DU PERSONNAGE -->
+  <div class="opm-scene">
+
+    <!-- Badge d'état du serveur, ancré en haut à droite (z-index au-dessus du
+         personnage). Masqué par le JS tant que l'état n'est pas connu. -->
+    <div class="opm-scene__status" data-el="server-status">
+      <span class="opm-kicker__dot" aria-hidden="true"></span>
+      <div>
+        <p class="opm-scene__kicker" data-bind="server-state"></p>
+        <p class="opm-scene__sub opm-skeleton" data-bind="server-detail"></p>
+      </div>
+    </div>
+
+    <div class="opm-scene__halo" aria-hidden="true"></div>
+
+    <!-- Silhouette neutre par défaut ; le JS remplace la source par le rendu EN
+         PIED du skin du compte sélectionné dès qu'il est disponible. -->
+    <img class="opm-scene__char" data-el="character"
+         src="assets/images/silhouette.png" alt="Votre personnage">
+
+    <div class="opm-scene__id">
+      <p class="opm-scene__kicker">VOTRE PERSONNAGE</p>
+      <p class="opm-scene__name opm-skeleton" data-bind="player-name"></p>
+      <p class="opm-scene__sub opm-skeleton" data-bind="player-sub"></p>
+    </div>
+
+  </div>
+
+  <!-- ===================================================== GABARIT D'ACTUALITÉ
+       Cloné par le JS pour chaque article. Le JS ajoute au tag le modificateur
+       .opm-news-item__tag--news / --event / --update selon news.kind, et pose
+       l'URL de l'article dans l'attribut data-url du bouton. -->
+  <template data-el="news-item-tpl">
+    <button type="button" class="opm-news-item" data-action="open-news">
+      <span class="opm-news-item__tag" data-bind="item-tag"></span>
+      <span class="opm-news-item__label" data-bind="item-title"></span>
+      <span class="opm-news-item__date" data-bind="item-date"></span>
+    </button>
+  </template>
+
+</section>

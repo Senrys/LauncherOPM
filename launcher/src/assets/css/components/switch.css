@@ -1,0 +1,77 @@
+/* ============================================================================
+   OPM LAUNCHER — COMPOSANT « INTERRUPTEUR »
+
+   Balisage attendu (voir panels/settings.html) :
+     <button class="opm-switch" role="switch" aria-checked="false" data-el="switch"
+             data-key="…"><span class="opm-switch__knob"></span></button>
+
+   L'état visuel est piloté par aria-checked : le JS bascule l'attribut, le style
+   suit. La classe .opm-switch--on de l'inventaire reste acceptée pour les
+   contextes où l'interrupteur n'est pas un `role="switch"`.
+
+   Piste 46 × 26, rayon complet, curseur 20 px : de 3 px à 23 px (46 − 20 − 3).
+   ========================================================================== */
+
+.opm-switch {
+  position: relative;
+  flex: none;
+  width: 46px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--line-6);
+  cursor: pointer;
+  transition: background .18s;
+}
+
+.opm-switch__knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--white);
+  box-shadow: var(--sh-knob);
+  transition: left .18s;
+}
+
+/* ---------------------------------------------------------------- ALLUMÉ */
+
+.opm-switch[aria-checked="true"],
+.opm-switch--on {
+  background: var(--teal);
+}
+
+.opm-switch[aria-checked="true"] .opm-switch__knob,
+.opm-switch--on .opm-switch__knob {
+  left: 23px;
+}
+
+/* ---------------------------------------------------------------- ÉTATS */
+
+.opm-switch:focus-visible {
+  outline: none;
+  box-shadow: var(--sh-focus);
+}
+
+.opm-switch:disabled,
+.opm-switch[aria-disabled="true"] {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+/* Sur une surface sombre, la piste éteinte doit rester visible : le teal profond
+   y disparaîtrait, on reprend donc la bordure claire du système. */
+.opm-card--dark .opm-switch,
+.opm-popover .opm-switch {
+  background: var(--line-dark-strong);
+}
+
+.opm-card--dark .opm-switch[aria-checked="true"],
+.opm-card--dark .opm-switch--on,
+.opm-popover .opm-switch[aria-checked="true"],
+.opm-popover .opm-switch--on {
+  background: var(--aqua);
+}

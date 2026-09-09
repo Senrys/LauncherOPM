@@ -1,0 +1,159 @@
+/* ============================================================================
+   OPM LAUNCHER — SURFACES ET TYPOGRAPHIE DE CONTENU
+
+   .opm-card (+ --light, --dark, --aqua)  les trois surfaces du launcher
+   .opm-kicker (+ __dot)                  sur-titre carré + libellé espacé
+   .opm-chip                              étiquette compacte
+   h1 / h2 / h3 et p                      échelle typographique commune
+
+   Les titres et les paragraphes sont posés au niveau des éléments parce que le
+   balisage des sous-écrans de Paramètres et de Donation utilise des <h2> et des
+   <p> nus. La couleur, elle, reste héritée : chaque surface (claire, sombre,
+   aqua) l'impose à ses enfants, et les panneaux — chargés après ce fichier —
+   gardent la main sur leurs propres blocs.
+   ========================================================================== */
+
+/* ------------------------------------------------------------- TYPOGRAPHIE */
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  color: inherit;
+}
+
+h1 {
+  font-size: var(--fs-h1);        /* 37 px */
+  line-height: .96;
+}
+
+h2 {
+  font-size: var(--fs-h2);        /* 29 px */
+  line-height: 1;
+}
+
+h3 {
+  font-size: var(--fs-nav);
+  line-height: 1.1;
+}
+
+/* Paragraphe courant. Les chapôs des cartes (13.5 px) reprennent la même
+   interligne via --fs-body-lg dans leur propre feuille (.opm-news__lead,
+   .opm-login__lead). */
+p {
+  font-family: var(--font-ui);
+  font-weight: 400;
+  font-size: var(--fs-body);
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+/* -------------------------------------------------------------------- CARTE */
+
+.opm-card {
+  padding: 20px 22px;
+  border: 1px solid transparent;
+  border-radius: var(--r-xl);
+}
+
+/* Carte claire — surface flottante posée sur la vidéo (journal de bord,
+   objectif de collecte). Les cartes imbriquées dans un panneau déjà clair
+   retirent l'ombre dans leur propre feuille. */
+.opm-card--light {
+  border-color: var(--line-2);
+  background: var(--paper);
+  box-shadow: var(--sh-card);
+  color: var(--text-body);
+}
+
+.opm-card--light h1,
+.opm-card--light h2,
+.opm-card--light h3 {
+  color: var(--text-dark);
+}
+
+/* Carte sombre — voile posé sur la vidéo (classement des donateurs). */
+.opm-card--dark {
+  border-color: var(--line-dark);
+  background: var(--veil-86);
+  box-shadow: var(--sh-card);
+  color: var(--text-light-72);
+}
+
+.opm-card--dark h1,
+.opm-card--dark h2,
+.opm-card--dark h3 {
+  color: var(--text-light);
+}
+
+/* Carte aqua — la signature OPM (appel au don). */
+.opm-card--aqua {
+  background: var(--aqua);
+  box-shadow: var(--sh-card);
+  color: var(--ink-3);
+}
+
+.opm-card--aqua h1,
+.opm-card--aqua h2,
+.opm-card--aqua h3 {
+  color: var(--ink);
+}
+
+/* ------------------------------------------------------------------ KICKER */
+
+.opm-kicker {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: var(--fs-kicker);
+  line-height: 1;
+  letter-spacing: var(--ls-kicker);
+  color: var(--teal);
+}
+
+.opm-kicker__dot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  background: var(--aqua);
+}
+
+/* Sur fond sombre, le kicker passe en aqua ; sur l'aqua, en teal profond. */
+.opm-card--dark .opm-kicker,
+.opm-popover .opm-kicker {
+  color: var(--aqua);
+}
+
+.opm-card--aqua .opm-kicker {
+  color: var(--ink-4);
+}
+
+.opm-card--aqua .opm-kicker__dot {
+  background: var(--ink);
+}
+
+/* -------------------------------------------------------------------- CHIP */
+
+.opm-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 7px;
+  border-radius: var(--r-xs);
+  background: var(--chip);
+  color: var(--teal);
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: var(--fs-kicker-sm);
+  line-height: 1.2;
+  letter-spacing: var(--ls-tag);
+  white-space: nowrap;
+}
+
+.opm-card--dark .opm-chip,
+.opm-popover .opm-chip {
+  background: var(--aqua);
+  color: var(--ink);
+}

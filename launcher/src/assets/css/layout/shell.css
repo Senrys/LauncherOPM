@@ -1,0 +1,180 @@
+/* ============================================================================
+   OPM LAUNCHER — COQUE
+   Fenêtre, fond animé, voiles, empilement des écrans.
+
+   Ordre d'empilement (z-index), du fond vers la surface :
+      0  .opm-bg          vidéo + repli + les deux voiles
+     10  .opm-shell       barre de titre, rail, panneaux, barre du bas
+     20  .opm-titlebar / .opm-bottom   (posés dans leurs fichiers respectifs)
+     30  .opm-popover     comptes et console       (components/overlay.css)
+     40  .opm-login       écran de connexion       (panels/login.css)
+     80  .opm-splash      démarrage                (layout/splash.css)
+   ========================================================================== */
+
+/* ============================================================================
+   1. FENÊTRE
+   ========================================================================== */
+
+.opm-app {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+
+  /* Cadre de la maquette (l. 34) : c'est ce rayon qui donne son sens au coin
+     haut-droit du bouton de fermeture (--r-xl-alt, layout/titlebar.css). La
+     fenêtre Electron n'étant pas transparente (windows/mainWindow.js), la
+     découpe laisse voir sa couleur de fond dans les quatre coins — un liseré
+     sombre sur du sombre, jamais un trou. */
+  border-radius: var(--r-2xl);
+}
+
+/* ============================================================================
+   2. FOND — vidéo, repli, voiles
+   ========================================================================== */
+
+.opm-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+}
+
+/* Les quatre couches sont empilées explicitement. Le repli est placé APRÈS la
+   vidéo dans le balisage : sans ordre imposé il la couvrirait. On le renvoie
+   donc au fond, où il tient lieu d'image de secours — pendant le chargement de
+   la vidéo, si sa lecture échoue, ou quand la configuration désactive le fond
+   animé (le renderer pose alors `hidden` sur la vidéo). Aucun état à gérer :
+   la vidéo se contente de le recouvrir tant qu'elle est là. */
+.opm-bg__fallback {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(180deg,
+              var(--sky-high) 0%,
+              var(--sky-low) 45%,
+              var(--sea) 100%);
+}
+
+.opm-bg__video {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Voile A — assombrit la gauche de l'image pour asseoir les cartes claires,
+   et laisse respirer la zone du personnage à droite. */
+.opm-bg__veil-a {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: linear-gradient(102deg,
+              rgb(var(--veil-ink) / .88) 0%,
+              rgb(var(--veil-ink) / .66) 42%,
+              rgb(var(--veil-ink) / .18) 70%,
+              rgb(var(--veil-ink) / .50) 100%);
+}
+
+/* Voile B — ancre la barre de titre en haut et la barre du bas en bas. */
+.opm-bg__veil-b {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: linear-gradient(180deg,
+              rgb(var(--veil-ink) / .45) 0%,
+              rgb(var(--veil-ink) / 0) 20%,
+              rgb(var(--veil-ink) / 0) 60%,
+              rgb(var(--veil-ink) / .86) 100%);
+}
+
+/* ============================================================================
+   3. COQUE APPLICATIVE
+   Trois bandes empilées : barre de titre (46 px), contenu (flex:1),
+   barre du bas (96 px). Elle reste dans le flux même masquée, pour que son
+   fondu d'entrée puisse jouer derrière le splash.
+   ========================================================================== */
+
+.opm-shell {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  opacity: 1;
+  transition: opacity var(--t-fade) ease;
+}
+
+.opm-shell--hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Bande centrale : rail social à gauche, écran actif à droite.
+   `min-height: 0` autorise les panneaux à faire défiler leur propre contenu
+   au lieu de pousser la barre du bas hors de la fenêtre. */
+.opm-shell > main {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ============================================================================
+   4. ÉCRANS
+   Le renderer injecte un panneau à la fois dans l'hôte, qui n'a pas de classe
+   (c'est un pur point d'ancrage) : on le vise donc par son attribut data-el.
+   ========================================================================== */
+
+[data-el="panel-host"] {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.opm-screen {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  padding: var(--pad-screen);
+}
+
+/* Entrée de l'écran actif. Le `display` de chaque panneau (flex pour l'accueil
+   et les paramètres, grid pour la donation) reste défini dans son propre
+   fichier : la coque ne l'impose pas. */
+.opm-screen--active {
+  animation: opmRise var(--t-panel) ease both;
+}
+
+/* Filet de sécurité : si le renderer monte plusieurs panneaux et se contente
+   de déplacer la classe d'état, ceux qui ne la portent pas sortent du flux.
+   La règle est volontairement plus spécifique que le `display` d'un panneau,
+   pour gagner sans `!important` ; le cas d'un panneau unique injecté sans
+   classe d'état reste, lui, parfaitement visible. */
+.opm-screen:not(.opm-screen--active):not(:only-child) { display: none; }
+
+/* ============================================================================
+   5. ADAPTATION
+   La fenêtre descend jusqu'à 1100 × 700 (docs/UI-SPEC.md § 1.8). Les deux
+   hauteurs fixes ne bougent pas ; c'est la zone centrale qui cède.
+   ========================================================================== */
+
+/* Sous 1240 px, le journal de bord abandonne sa largeur fixe de 620 px et
+   partage l'espace avec la scène du personnage. Le sélecteur descend d'un
+   cran (0,2,0) pour l'emporter sur `.opm-news` de panels/home.css, chargé
+   après ce fichier. */
+@media (max-width: 1240px) {
+  .opm-home > .opm-news {
+    flex: 1 1 480px;
+    min-width: 420px;
+  }
+}
+
+/* Sous 1150 px, on récupère 20 px de large et 12 px de haut sur les marges
+   intérieures de l'écran actif. */
+@media (max-width: 1150px) {
+  .opm-screen { padding: 20px 18px; }
+}

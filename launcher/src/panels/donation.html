@@ -1,0 +1,189 @@
+<!-- ============================================================================
+     DONATION — fragment injecté par le renderer dans [data-el="panel-host"].
+     Aucun <html>/<head>/<body> : ce fichier est un fragment, servi par
+     window.opm.app.panel('donation').
+
+     CONVENTIONS
+     - Les classes servent EXCLUSIVEMENT au style ; le JS n'utilise que data-*.
+     - Un élément vide portant .opm-skeleton affiche un squelette de chargement ;
+       le JS retire la classe juste après avoir écrit la valeur réelle.
+     - Aucune valeur de démonstration : montants collectés, paliers et donateurs
+       viennent de window.opm.content.donations().
+     - Les montants proposés sont exprimés en CENTIMES dans data-amount, format
+       attendu par window.opm.content.donate(amountCents).
+
+     POINTS D'ANCRAGE (contrat avec panels/donation.js)
+       data-el   : goal-bar, goal-fill, goal-ghost, tiers, tier-tpl,
+                   donors, donor-tpl
+       data-action : pick-amount, donate, open-perks
+       data-bind : donation-projection, donation-collected, donation-goal,
+                   donation-percent, donation-remaining, donors-count
+                   (dans tier-tpl  : tier-tag, tier-title, tier-desc)
+                   (dans donor-tpl : donor-rank, donor-name, donor-tier, donor-amount)
+
+     REPÈRES POUR panels/donation.css
+     - .opm-donation est une grille à 2 colonnes (392px / 1fr), 2 rangées
+       (auto / 1fr), gap 16px 22px : .opm-give occupe la colonne 1 sur les deux
+       rangées, .opm-goal la case haut-droite, .opm-donors la case bas-droite.
+       Aucun conteneur intermédiaire, tous les enfants sont classés.
+     - .opm-goal__bar : .opm-goal__ghost (projection, rgba(29,92,81,.35)) se
+       superpose à .opm-goal__fill ; les trois .opm-goal__mark sont positionnés
+       à 25 / 50 / 75 % via :nth-of-type(1|2|3).
+     ========================================================================== -->
+
+<section class="opm-screen opm-donation" data-tab="donation" role="tabpanel" aria-label="Donation">
+
+  <!-- ========================================================== CARTE « DON » -->
+  <article class="opm-give">
+
+    <p class="opm-kicker"><span class="opm-kicker__dot" aria-hidden="true"></span>SOUTENIR LE SERVEUR</p>
+
+    <h2>OBJECTIF DU MOIS :<br><span>GARDER LE NAVIRE À FLOT</span></h2>
+
+    <p>Les dons couvrent l'hébergement, la modération et le développement de la map.
+       Chaque palier atteint débloque une récompense pour tout le serveur, pas
+       seulement pour les donateurs.</p>
+
+    <p class="opm-kicker">CHOISIR UN MONTANT</p>
+
+    <!-- Montants fixes de l'interface (5 / 10 / 20 / 50 €), exprimés en centimes.
+         Le JS déplace .opm-amount--active et aria-pressed à chaque choix ;
+         10 € est la sélection initiale. -->
+    <div class="opm-give__amounts" role="group" aria-label="Montant du don">
+      <button type="button" class="opm-amount" data-action="pick-amount" data-amount="500" aria-pressed="false">5 €</button>
+      <button type="button" class="opm-amount opm-amount--active" data-action="pick-amount" data-amount="1000" aria-pressed="true">10 €</button>
+      <button type="button" class="opm-amount" data-action="pick-amount" data-amount="2000" aria-pressed="false">20 €</button>
+      <button type="button" class="opm-amount" data-action="pick-amount" data-amount="5000" aria-pressed="false">50 €</button>
+    </div>
+
+    <!-- Projection : « ce don porterait la collecte à X % » — recalculée par le
+         JS à chaque changement de montant, d'où aria-live. -->
+    <p class="opm-give__proj opm-skeleton" data-bind="donation-projection" aria-live="polite"></p>
+
+    <div class="opm-give__actions">
+      <button type="button" class="opm-btn opm-btn--ink opm-btn--lg" data-action="donate">FAIRE UN DON</button>
+      <button type="button" class="opm-btn opm-btn--outline" data-action="open-perks">AVANTAGES</button>
+    </div>
+
+    <footer>
+      <span class="opm-kicker__dot" aria-hidden="true"></span>
+      <span>Aucun avantage PvP à l'achat — cosmétiques et confort uniquement.</span>
+    </footer>
+
+  </article>
+
+  <!-- ================================================== CARTE « OBJECTIF » -->
+  <article class="opm-goal">
+
+    <div class="opm-goal__head">
+      <div>
+        <p class="opm-kicker">COLLECTÉ CE MOIS-CI</p>
+        <p class="opm-goal__collected">
+          <span class="opm-skeleton" data-bind="donation-collected"></span>
+          <span class="opm-skeleton" data-bind="donation-goal"></span>
+        </p>
+      </div>
+      <div>
+        <p class="opm-goal__pct opm-skeleton" data-bind="donation-percent"></p>
+        <p class="opm-skeleton" data-bind="donation-remaining"></p>
+      </div>
+    </div>
+
+    <!-- Jauge : la largeur de .opm-goal__fill et de .opm-goal__ghost est la
+         seule valeur calculée au runtime, d'où les style= en ligne. -->
+    <div class="opm-goal__bar" data-el="goal-bar" role="progressbar"
+         aria-label="Progression de la collecte" aria-valuemin="0" aria-valuemax="100">
+      <div class="opm-goal__fill" data-el="goal-fill" style="width:0%"></div>
+      <div class="opm-goal__ghost" data-el="goal-ghost" style="width:0%"></div>
+      <span class="opm-goal__mark" aria-hidden="true"></span>
+      <span class="opm-goal__mark" aria-hidden="true"></span>
+      <span class="opm-goal__mark" aria-hidden="true"></span>
+    </div>
+
+    <!-- Paliers de la collecte. Squelette de chargement remplacé par le JS,
+         qui vide le conteneur puis clone tier-tpl une fois par palier. -->
+    <div class="opm-tiers" data-el="tiers">
+      <article class="opm-tier">
+        <p class="opm-kicker opm-skeleton"></p>
+        <h4 class="opm-skeleton"></h4>
+        <p class="opm-skeleton"></p>
+      </article>
+      <article class="opm-tier">
+        <p class="opm-kicker opm-skeleton"></p>
+        <h4 class="opm-skeleton"></h4>
+        <p class="opm-skeleton"></p>
+      </article>
+      <article class="opm-tier">
+        <p class="opm-kicker opm-skeleton"></p>
+        <h4 class="opm-skeleton"></h4>
+        <p class="opm-skeleton"></p>
+      </article>
+      <article class="opm-tier">
+        <p class="opm-kicker opm-skeleton"></p>
+        <h4 class="opm-skeleton"></h4>
+        <p class="opm-skeleton"></p>
+      </article>
+    </div>
+
+  </article>
+
+  <!-- ================================================= CARTE « DONATEURS » -->
+  <article class="opm-donors">
+
+    <header>
+      <p class="opm-kicker"><span class="opm-kicker__dot" aria-hidden="true"></span>MERCI À L'ÉQUIPAGE</p>
+      <p class="opm-skeleton" data-bind="donors-count"></p>
+    </header>
+
+    <!-- Classement des donateurs du mois. Squelette remplacé par le JS, qui vide
+         la liste puis clone donor-tpl une fois par donateur. La liste défile
+         verticalement si elle dépasse la hauteur de la carte. -->
+    <ol data-el="donors">
+      <li class="opm-donor">
+        <span class="opm-donor__rank opm-skeleton"></span>
+        <span class="opm-donor__name opm-skeleton"></span>
+        <span class="opm-donor__tier opm-skeleton"></span>
+        <span class="opm-donor__amount opm-skeleton"></span>
+      </li>
+      <li class="opm-donor">
+        <span class="opm-donor__rank opm-skeleton"></span>
+        <span class="opm-donor__name opm-skeleton"></span>
+        <span class="opm-donor__tier opm-skeleton"></span>
+        <span class="opm-donor__amount opm-skeleton"></span>
+      </li>
+      <li class="opm-donor">
+        <span class="opm-donor__rank opm-skeleton"></span>
+        <span class="opm-donor__name opm-skeleton"></span>
+        <span class="opm-donor__tier opm-skeleton"></span>
+        <span class="opm-donor__amount opm-skeleton"></span>
+      </li>
+    </ol>
+
+    <footer>Paiement sécurisé · Les reçus sont envoyés par message privé Discord.
+      Un don n'accorde jamais d'avantage en combat.</footer>
+
+  </article>
+
+  <!-- ========================================================= GABARIT PALIER
+       Cloné par le JS pour chaque palier. Le JS ajoute le modificateur
+       .opm-tier--locked / --near / --unlocked selon l'état renvoyé par l'API. -->
+  <template data-el="tier-tpl">
+    <article class="opm-tier">
+      <p class="opm-kicker" data-bind="tier-tag"></p>
+      <h4 data-bind="tier-title"></h4>
+      <p data-bind="tier-desc"></p>
+    </article>
+  </template>
+
+  <!-- ====================================================== GABARIT DONATEUR
+       Le rang 1 se distingue en CSS via .opm-donor:first-child .opm-donor__rank. -->
+  <template data-el="donor-tpl">
+    <li class="opm-donor">
+      <span class="opm-donor__rank" data-bind="donor-rank"></span>
+      <span class="opm-donor__name" data-bind="donor-name"></span>
+      <span class="opm-donor__tier" data-bind="donor-tier"></span>
+      <span class="opm-donor__amount" data-bind="donor-amount"></span>
+    </li>
+  </template>
+
+</section>

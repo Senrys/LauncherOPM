@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Entitlements macOS du launcher OPM.
+
+  Le « hardened runtime » (docs/BUILD.md § 4.2) est obligatoire pour la notarisation :
+  Apple refuse de tamponner une application qui ne l'active pas. Mais il interdit par
+  défaut exactement ce dont Electron a besoin pour fonctionner. Les quatre dérogations
+  ci-dessous sont le strict minimum, et chacune a une raison précise.
+
+  Aucune autre n'est demandée : ni accès réseau entrant, ni caméra, ni micro, ni
+  géolocalisation, ni carnet d'adresses. Le launcher n'en a pas l'usage, et chaque
+  entitlement superflu est une question de plus lors d'une revue Apple.
+-->
+<plist version="1.0">
+<dict>
+    <!--
+      V8 compile le JavaScript en code machine à l'exécution (JIT). Sans cette
+      dérogation, le moteur ne peut pas rendre exécutables les pages mémoire qu'il
+      vient d'écrire, et l'application se ferme au démarrage.
+    -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+
+    <!--
+      Complément du précédent : Chromium alloue de la mémoire exécutable qui n'est
+      pas signée (le code produit par le JIT ne peut évidemment pas l'être).
+    -->
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+
+    <!--
+      Electron charge des bibliothèques livrées dans le paquet (frameworks, modules
+      natifs de minecraft-java-core). Sans cette dérogation, macOS n'accepte que les
+      bibliothèques signées par la même équipe qu'un cadre système.
+    -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+
+    <!--
+      Le launcher démarre le jeu comme processus enfant en lui transmettant des
+      variables d'environnement (chemin du Java embarqué notamment). Le hardened
+      runtime les efface sans cette clé.
+    -->
+    <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+    <true/>
+</dict>
+</plist>

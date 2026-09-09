@@ -1,0 +1,543 @@
+<!-- ============================================================================
+     PARAMÈTRES — fragment injecté par le renderer dans l'hôte de panneaux.
+     Aucun <html>/<head>/<body> : ce fichier est un fragment, servi par
+     window.opm.app.panel('settings'). Les chemins relatifs sont résolus depuis le
+     document hôte src/launcher.html, voisin de panels/ — d'où le préfixe « assets/ ».
+
+     CONVENTIONS
+     - Les classes servent EXCLUSIVEMENT au style ; le JS n'utilise que data-*.
+     - Un élément vide portant .opm-skeleton affiche un squelette de chargement ;
+       le JS retire la classe juste après avoir écrit la valeur réelle. Il n'est posé
+       que sur les données qui transitent par un aller-retour IPC (mémoire machine,
+       état des fichiers, chemins) : les valeurs déjà présentes dans LauncherConfig
+       arrivent avec l'initialisation du panneau et n'ont pas d'état de chargement.
+     - Aucune valeur de démonstration : tout emplacement de donnée est vide.
+     - data-key reprend EXACTEMENT le chemin de la clé dans LauncherConfig (docs/IPC.md),
+       aussi bien sur les interrupteurs que sur les champs et les curseurs.
+
+     POINTS D'ANCRAGE (contrat avec panels/settings.js)
+       data-sub     : comptes, java, reso, launcher — porté par les entrées de
+                      navigation (avec data-el="settings-nav") ET par les sous-écrans
+                      (avec data-el="subscreen") ; un seul sous-écran sans [hidden].
+       data-el      : settings-nav, settings-panel, subscreen, files-stat, verify-files,
+                      reset-config, accounts-list, account-tpl, account, account-avatar,
+                      ms-link, ms-linked, ms-unlinked, ms-head, ms-device, ms-device-open,
+                      totp, totp-off, totp-on, totp-setup, totp-code, totp-code-error,
+                      totp-disable-form, totp-disable-password, totp-disable-code,
+                      totp-disable-error, totp-codes,
+                      ram-fill, ram-min, ram-max, ram-note, jvm-args, jvm-args-error,
+                      res-width, res-height, res-preview, switch, clear-cache
+       data-action  : reset-config, set-primary, remove-account, add-account,
+                      link-microsoft, unlink-microsoft, verify-ownership,
+                      copy-ms-code, open-ms-link, cancel-link,
+                      totp-start, totp-copy-secret, totp-confirm, totp-cancel,
+                      totp-ask-disable, totp-disable, totp-disable-cancel,
+                      totp-copy-codes, totp-codes-done,
+                      pick-java, reset-java, preset, open-game-dir, clear-cache,
+                      verify-files
+       data-bind    : files-count, files-size, files-checked, ram-min, ram-max,
+                      ram-total, ram-recommended, ram-free, ram-scale-mid,
+                      ram-scale-max, java-path, res-ratio, game-dir,
+                      cache-size, ms-username, ms-expires, ms-user-code,
+                      totp-secret, totp-list
+                      (dans account-tpl : account-name, account-meta)
+
+     REPÈRES POUR panels/settings.css
+     - .opm-settings : deux colonnes, gap 22px. .opm-settings__nav fait 206px (flex:none),
+       .opm-settings__panel prend le reste (flex:1; min-width:0; overflow:hidden auto).
+     - .opm-subscreen[hidden] { display:none } doit l'emporter sur la règle d'affichage
+       du sous-écran, sinon opmRise le rend visible malgré l'attribut.
+     - .opm-settings__files { margin-top:auto } pousse l'encart en bas de la colonne
+       (aucun élément d'espacement dans le balisage).
+     - .opm-ram__head est une grille 2 colonnes : le kicker et .opm-ram__value occupent
+       la première (deux lignes), .opm-ram__hint la seconde, alignée à droite sur les
+       deux lignes.
+     - .opm-account:not(.opm-account--primary) masque .opm-account__badge ; à l'inverse
+       .opm-account--primary masque son bouton « DÉFINIR PRINCIPAL » et porte le
+       cerclage box-shadow: 0 0 0 2px var(--aqua).
+     - [data-bind="cache-size"]:not(:empty)::before { content:" · " } : le séparateur du
+       bouton « VIDER LE CACHE » n'apparaît qu'une fois la taille réelle connue.
+     - Classes ajoutées à l'inventaire, mêmes conventions : opm-account-list,
+       opm-account__body, opm-account__action--remove, opm-ram__hint, opm-ram__slider,
+       opm-resfields__x, opm-preview__box, opm-preview__ratio, opm-link-ms__state,
+       opm-link-ms__face, opm-link-ms__info, opm-link-ms__name, opm-link-ms__meta,
+       opm-link-ms__actions.
+     ========================================================================== -->
+
+<section class="opm-screen opm-settings" data-tab="settings" role="tabpanel" aria-label="Paramètres">
+
+  <!-- ====================================================== COLONNE DE NAVIGATION -->
+  <div class="opm-settings__nav" role="tablist" aria-orientation="vertical"
+       aria-label="Sections des paramètres">
+    <h1 class="opm-settings__title">PARAMÈTRES</h1>
+
+    <button type="button" class="opm-settings__navbtn opm-settings__navbtn--active"
+            data-el="settings-nav" data-sub="comptes"
+            role="tab" id="opm-sub-tab-comptes" aria-controls="opm-sub-comptes"
+            aria-selected="true">COMPTES</button>
+
+    <button type="button" class="opm-settings__navbtn"
+            data-el="settings-nav" data-sub="java"
+            role="tab" id="opm-sub-tab-java" aria-controls="opm-sub-java"
+            aria-selected="false" tabindex="-1">JAVA &amp; MÉMOIRE</button>
+
+    <button type="button" class="opm-settings__navbtn"
+            data-el="settings-nav" data-sub="reso"
+            role="tab" id="opm-sub-tab-reso" aria-controls="opm-sub-reso"
+            aria-selected="false" tabindex="-1">RÉSOLUTION</button>
+
+    <button type="button" class="opm-settings__navbtn"
+            data-el="settings-nav" data-sub="launcher"
+            role="tab" id="opm-sub-tab-launcher" aria-controls="opm-sub-launcher"
+            aria-selected="false" tabindex="-1">LAUNCHER</button>
+
+    <!-- Encart d'état des fichiers, alimenté par game.filesStat(). -->
+    <div class="opm-settings__files" data-el="files-stat">
+      <p class="opm-kicker">ÉTAT DES FICHIERS</p>
+      <p>
+        <span class="opm-skeleton" data-bind="files-count"></span> fichiers ·
+        <span class="opm-skeleton" data-bind="files-size"></span><br>
+        Dernière vérification : <span class="opm-skeleton" data-bind="files-checked"></span>
+      </p>
+    </div>
+
+    <!-- Contrôle intégral des fichiers du jeu (game.verifyFiles()) : il prolonge
+         l'encart ci-dessus, dont il rafraîchit les chiffres. Même gabarit que le
+         bouton de réinitialisation, l'écart vertical venant du `gap` de la colonne. -->
+    <button type="button" class="opm-settings__reset"
+            data-el="verify-files" data-action="verify-files">VÉRIFIER LES FICHIERS</button>
+
+    <button type="button" class="opm-settings__reset"
+            data-el="reset-config" data-action="reset-config">TOUT RÉINITIALISER</button>
+  </div>
+
+  <!-- ============================================================ CARTE CLAIRE -->
+  <div class="opm-settings__panel" data-el="settings-panel">
+
+    <!-- ------------------------------------------------------------- COMPTES -->
+    <div class="opm-subscreen" data-el="subscreen" data-sub="comptes"
+         id="opm-sub-comptes" role="tabpanel" aria-labelledby="opm-sub-tab-comptes">
+
+      <p class="opm-kicker"><span class="opm-kicker__dot" aria-hidden="true"></span>IDENTITÉ</p>
+      <h2>VOS COMPTES D'ÉQUIPAGE</h2>
+      <p>Le compte principal est utilisé au lancement. Les comptes secondaires restent
+         connectés pour vos alts et vos rôles RP.</p>
+
+      <!-- Une carte par compte connu, clonée depuis account-tpl. -->
+      <div class="opm-account-list" data-el="accounts-list"></div>
+
+      <template data-el="account-tpl">
+        <article class="opm-account" data-el="account" data-id="">
+          <img class="opm-account__avatar" data-el="account-avatar"
+               src="assets/images/steve.png" alt="" width="56" height="56">
+          <div class="opm-account__body">
+            <p class="opm-account__name">
+              <span data-bind="account-name"></span>
+              <span class="opm-account__badge">PRINCIPAL</span>
+            </p>
+            <p class="opm-account__meta" data-bind="account-meta"></p>
+          </div>
+          <button type="button" class="opm-account__action"
+                  data-action="set-primary">DÉFINIR PRINCIPAL</button>
+          <button type="button" class="opm-account__action opm-account__action--remove"
+                  data-action="remove-account" aria-label="Retirer ce compte du launcher"
+                  title="Retirer ce compte du launcher">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M4.5 6.5h15M9.5 6.5V4.6c0-.6.5-1.1 1.1-1.1h2.8c.6 0 1.1.5 1.1 1.1v1.9M6.6 6.5l.9 12.4c.05.7.6 1.2 1.3 1.2h6.4c.7 0 1.25-.5 1.3-1.2l.9-12.4"
+                    stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
+              <path d="M10.4 10.2v6.2M13.6 10.2v6.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path>
+            </svg>
+          </button>
+        </article>
+      </template>
+
+      <button type="button" class="opm-account-add" data-action="add-account">
+        + AJOUTER UN COMPTE
+      </button>
+
+      <!-- ......................................... POSSESSION DU JEU (Microsoft) -->
+      <p class="opm-kicker"><span class="opm-kicker__dot" aria-hidden="true"></span>POSSESSION DU JEU</p>
+      <h2>VOTRE COMPTE MINECRAFT</h2>
+      <p>One Piece Minecraft délivre lui-même votre session de jeu. Nous demandons une seule
+         fois à Microsoft de confirmer que vous possédez Minecraft : votre mot de passe
+         Microsoft ne transite jamais par le launcher, et aucun jeton Microsoft n'est envoyé
+         au jeu.</p>
+
+      <!-- Les deux états partent masqués : le JS révèle celui qui correspond au compte
+           courant, ce qui évite d'afficher brièvement le mauvais. -->
+      <div class="opm-link-ms" data-el="ms-link">
+
+        <div class="opm-link-ms__state" data-el="ms-linked" hidden>
+          <img class="opm-link-ms__face" data-el="ms-head"
+               src="assets/images/steve.png" alt="" width="48" height="48">
+          <div class="opm-link-ms__info">
+            <p class="opm-link-ms__name" data-bind="ms-username"></p>
+            <p class="opm-link-ms__meta">
+              Possession vérifiée · valable jusqu'au <span data-bind="ms-expires"></span>
+            </p>
+          </div>
+          <div class="opm-link-ms__actions">
+            <button type="button" class="opm-btn opm-btn--outline"
+                    data-action="verify-ownership">RE-VÉRIFIER</button>
+            <button type="button" class="opm-btn opm-btn--ghost"
+                    data-action="unlink-microsoft">DISSOCIER</button>
+          </div>
+        </div>
+
+        <div class="opm-link-ms__state" data-el="ms-unlinked" hidden>
+          <p class="opm-link-ms__meta">
+            Aucun compte Microsoft n'est rattaché : le bouton JOUER reste indisponible tant
+            que la possession de Minecraft n'a pas été confirmée.
+          </p>
+          <button type="button" class="opm-btn opm-btn--aqua"
+                  data-action="link-microsoft">RATTACHER MON COMPTE MINECRAFT</button>
+        </div>
+
+        <!-- Flux « device » (bootstrap.auth.flow = device) : la page Microsoft réclame un
+             code, et le rattachement lancé d'ici doit donc l'afficher ici. La valeur vient
+             du champ link_device du compte diffusé par auth.onChange — exactement la même
+             source que l'écran de connexion, jamais une valeur écrite dans ce fichier. -->
+        <div class="opm-link-ms__state" data-el="ms-device" hidden>
+          <p class="opm-link-ms__meta">
+            Saisissez ce code sur la page Microsoft qui vient de s'ouvrir. Il reste valable
+            quelques minutes ; passé ce délai, il faut en demander un nouveau.
+          </p>
+          <p class="opm-link-ms__code" data-bind="ms-user-code"></p>
+          <div class="opm-link-ms__actions">
+            <button type="button" class="opm-btn opm-btn--outline"
+                    data-action="copy-ms-code">COPIER</button>
+            <button type="button" class="opm-btn opm-btn--outline"
+                    data-el="ms-device-open" data-action="open-ms-link">OUVRIR LA PAGE</button>
+            <button type="button" class="opm-btn opm-btn--ghost"
+                    data-action="cancel-link">ANNULER</button>
+          </div>
+        </div>
+
+      </div>
+
+      <p class="opm-account__meta">Le launcher ne stocke jamais vos mots de passe : seuls les
+         jetons de session délivrés par One Piece Minecraft sont conservés localement,
+         chiffrés par votre système.</p>
+
+      <!-- ................................... DOUBLE AUTHENTIFICATION (TOTP, API §1.2) -->
+      <p class="opm-kicker"><span class="opm-kicker__dot" aria-hidden="true"></span>SÉCURITÉ</p>
+      <h2>DOUBLE AUTHENTIFICATION</h2>
+      <p>Une application d'authentification (Aegis, 2FAS, Google Authenticator…) produit un code
+         à six chiffres renouvelé toutes les trente secondes. Une fois la double authentification
+         active, ce code vous est demandé à chaque connexion, en plus de votre mot de passe.</p>
+
+      <!-- Les quatre états partent masqués : le JS ne révèle que celui qui correspond
+           réellement au compte courant et à l'étape en cours. -->
+      <div class="opm-link-ms" data-el="totp">
+
+        <div class="opm-link-ms__state" data-el="totp-off" hidden>
+          <p class="opm-link-ms__meta">
+            La double authentification n'est pas activée sur ce compte.
+          </p>
+          <div class="opm-link-ms__actions">
+            <button type="button" class="opm-btn opm-btn--aqua"
+                    data-action="totp-start">ACTIVER</button>
+          </div>
+        </div>
+
+        <div class="opm-link-ms__state" data-el="totp-on" hidden>
+          <p class="opm-link-ms__meta">
+            La double authentification est active sur ce compte.
+          </p>
+          <div class="opm-link-ms__actions">
+            <button type="button" class="opm-btn opm-btn--ghost"
+                    data-action="totp-ask-disable">DÉSACTIVER</button>
+          </div>
+        </div>
+
+        <!-- Activation en deux temps : la clé, puis le premier code qu'elle produit.
+             Le serveur n'active rien tant que ce code n'a pas été vérifié. -->
+        <div class="opm-link-ms__state" data-el="totp-setup" hidden>
+          <div class="opm-link-ms__info">
+            <p class="opm-link-ms__name">1 · Ajoutez cette clé dans votre application</p>
+            <div class="opm-path">
+              <span class="opm-path__value" data-bind="totp-secret"></span>
+              <button type="button" class="opm-btn opm-btn--outline"
+                      data-action="totp-copy-secret">COPIER</button>
+            </div>
+
+            <p class="opm-link-ms__name">2 · Saisissez le code affiché par l'application</p>
+            <div class="opm-field">
+              <label class="opm-field__label" for="opm-totp-code">Code à six chiffres</label>
+              <input class="opm-field__input" type="text" id="opm-totp-code"
+                     data-el="totp-code" inputmode="numeric" autocomplete="one-time-code"
+                     maxlength="6" spellcheck="false" autocapitalize="off">
+              <p class="opm-field__error" data-el="totp-code-error" role="alert" hidden></p>
+            </div>
+          </div>
+          <div class="opm-link-ms__actions">
+            <button type="button" class="opm-btn opm-btn--aqua"
+                    data-action="totp-confirm">VALIDER</button>
+            <button type="button" class="opm-btn opm-btn--ghost"
+                    data-action="totp-cancel">ANNULER</button>
+          </div>
+        </div>
+
+        <!-- Codes de secours : affichés une seule fois, après l'activation réelle. -->
+        <div class="opm-link-ms__state" data-el="totp-codes" hidden>
+          <div class="opm-link-ms__info">
+            <p class="opm-link-ms__name">Codes de secours</p>
+            <p class="opm-link-ms__meta">
+              Chacun de ces codes remplace une fois votre code à six chiffres si vous perdez
+              votre téléphone. Notez-les hors du launcher : ils ne seront plus affichés.
+            </p>
+            <p class="opm-link-ms__meta" data-bind="totp-list"></p>
+          </div>
+          <div class="opm-link-ms__actions">
+            <button type="button" class="opm-btn opm-btn--outline"
+                    data-action="totp-copy-codes">COPIER</button>
+            <button type="button" class="opm-btn opm-btn--ink"
+                    data-action="totp-codes-done">J'AI NOTÉ CES CODES</button>
+          </div>
+        </div>
+
+        <!-- Désactivation : mot de passe ET code valide, comme l'exige l'API. -->
+        <div class="opm-link-ms__state" data-el="totp-disable-form" hidden>
+          <div class="opm-link-ms__info">
+            <p class="opm-link-ms__name">Désactiver la double authentification</p>
+            <p class="opm-link-ms__meta">
+              Votre mot de passe et un code valide sont exigés : une session volée ne doit pas
+              pouvoir abaisser la sécurité de votre compte.
+            </p>
+
+            <div class="opm-field">
+              <label class="opm-field__label" for="opm-totp-password">Mot de passe One Piece Minecraft</label>
+              <input class="opm-field__input" type="password" id="opm-totp-password"
+                     data-el="totp-disable-password" name="password"
+                     autocomplete="current-password">
+            </div>
+            <div class="opm-field">
+              <label class="opm-field__label" for="opm-totp-disable-code">Code à six chiffres</label>
+              <input class="opm-field__input" type="text" id="opm-totp-disable-code"
+                     data-el="totp-disable-code" inputmode="numeric"
+                     autocomplete="one-time-code" maxlength="6" spellcheck="false"
+                     autocapitalize="off">
+            </div>
+            <p class="opm-field__error" data-el="totp-disable-error" role="alert" hidden></p>
+          </div>
+          <div class="opm-link-ms__actions">
+            <button type="button" class="opm-btn opm-btn--danger"
+                    data-action="totp-disable">DÉSACTIVER</button>
+            <button type="button" class="opm-btn opm-btn--ghost"
+                    data-action="totp-disable-cancel">ANNULER</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ------------------------------------------------------- JAVA &amp; MÉMOIRE -->
+    <div class="opm-subscreen" data-el="subscreen" data-sub="java"
+         id="opm-sub-java" role="tabpanel" aria-labelledby="opm-sub-tab-java" hidden>
+
+      <p class="opm-kicker"><span class="opm-kicker__dot" aria-hidden="true"></span>PERFORMANCES</p>
+      <h2>MÉMOIRE ALLOUÉE À VOTRE JEU</h2>
+      <p>Une allocation plus large fluidifie le jeu, mais en réserver trop pénalise vos autres
+         applications. Ne dépassez pas la moitié de la mémoire de votre machine, et gardez la
+         valeur minimale sous 4 Go.</p>
+
+      <div class="opm-card opm-card--light opm-ram">
+
+        <!-- Toutes les bornes viennent de app.totalMemoryGb() / app.freeMemoryGb() :
+             aucune capacité machine n'est écrite dans le balisage. -->
+        <div class="opm-ram__head">
+          <p class="opm-kicker">ALLOCATION</p>
+          <p class="opm-ram__value">
+            <span data-bind="ram-min"></span> – <span data-bind="ram-max"></span> Go
+            <span>sur <span class="opm-skeleton" data-bind="ram-total"></span> Go</span>
+          </p>
+          <p class="opm-ram__hint">
+            Recommandé pour cette instance : <b class="opm-skeleton" data-bind="ram-recommended"></b><br>
+            <span class="opm-skeleton" data-bind="ram-free"></span> Go disponibles actuellement
+          </p>
+        </div>
+
+        <!-- Jauge à rayures : left/width sont posés au runtime (valeurs calculées,
+             seule dérogation admise au style en attribut, cf. UI-SPEC §1.5). -->
+        <div class="opm-ram__gauge" role="img" aria-label="Plage de mémoire allouée">
+          <div class="opm-ram__fill" data-el="ram-fill"></div>
+          <div class="opm-ram__mid"></div>
+        </div>
+        <div class="opm-ram__scale">
+          <span>0 GO</span>
+          <span class="opm-skeleton" data-bind="ram-scale-mid"></span>
+          <span class="opm-skeleton" data-bind="ram-scale-max"></span>
+        </div>
+
+        <!-- Les attributs max des deux curseurs sont posés au runtime depuis la mémoire
+             réelle de la machine ; le JS maintient l'invariant min ≤ max.
+             max="1" est le repli honnête si app.memory échoue : sans lui, HTML5 retombe
+             sur 100 et laisserait promettre 100 Go que la machine n'a pas. Le JS
+             désactive alors les deux curseurs plutôt que de les laisser mentir. -->
+        <div class="opm-ram__sliders">
+          <div class="opm-ram__slider">
+            <label for="opm-ram-min">RAM minimale<span><span data-bind="ram-min"></span> Go</span></label>
+            <input type="range" id="opm-ram-min" min="1" max="1" step="1"
+                   data-el="ram-min" data-key="java.memory.min">
+          </div>
+          <div class="opm-ram__slider">
+            <label for="opm-ram-max">RAM maximale<span><span data-bind="ram-max"></span> Go</span></label>
+            <input type="range" id="opm-ram-max" min="1" max="1" step="1"
+                   data-el="ram-max" data-key="java.memory.max">
+          </div>
+        </div>
+
+        <!-- Note contextuelle : le JS ajoute opm-note--warn quand l'allocation sort de
+             la plage saine, et la retire quand elle y revient. -->
+        <p class="opm-ram__note" data-el="ram-note" role="status"></p>
+      </div>
+
+      <p class="opm-kicker"><span class="opm-kicker__dot" aria-hidden="true"></span>ENVIRONNEMENT</p>
+      <h2>EMPLACEMENT DE JAVA</h2>
+      <p>Le launcher embarque sa propre version de Java. Vous pouvez pointer votre propre
+         exécutable si votre configuration l'exige.</p>
+
+      <div class="opm-path">
+        <span class="opm-path__value opm-skeleton" data-bind="java-path" data-key="java.path"></span>
+        <button type="button" class="opm-btn opm-btn--aqua" data-action="pick-java">CHANGER</button>
+        <button type="button" class="opm-btn opm-btn--outline" data-action="reset-java">PAR DÉFAUT</button>
+      </div>
+
+      <div class="opm-field">
+        <label class="opm-field__label" for="opm-jvm-args">Arguments JVM</label>
+        <input class="opm-field__input" type="text" id="opm-jvm-args"
+               data-el="jvm-args" data-key="java.args"
+               spellcheck="false" autocomplete="off" autocapitalize="off">
+        <p class="opm-field__error" data-el="jvm-args-error" role="alert" hidden></p>
+      </div>
+    </div>
+
+    <!-- ---------------------------------------------------------- RÉSOLUTION -->
+    <div class="opm-subscreen" data-el="subscreen" data-sub="reso"
+         id="opm-sub-reso" role="tabpanel" aria-labelledby="opm-sub-tab-reso" hidden>
+
+      <p class="opm-kicker"><span class="opm-kicker__dot" aria-hidden="true"></span>AFFICHAGE</p>
+      <h2>FENÊTRE DE JEU</h2>
+      <p>Taille de la fenêtre au démarrage. En plein écran, la résolution de votre bureau est
+         utilisée.</p>
+
+      <!-- Le JS pose opm-preset--active sur la puce dont data-preset correspond au couple
+           largeur × hauteur courant, et n'en active aucune pour une taille personnalisée. -->
+      <div class="opm-presets" role="group" aria-label="Résolutions prédéfinies">
+        <button type="button" class="opm-preset" data-action="preset" data-preset="1280x720">1280 × 720</button>
+        <button type="button" class="opm-preset" data-action="preset" data-preset="1600x900">1600 × 900</button>
+        <button type="button" class="opm-preset" data-action="preset" data-preset="1920x1080">1920 × 1080</button>
+        <button type="button" class="opm-preset" data-action="preset" data-preset="2560x1440">2560 × 1440</button>
+      </div>
+
+      <div class="opm-card opm-card--light opm-resfields">
+        <div class="opm-field">
+          <label class="opm-field__label" for="opm-res-width">Largeur</label>
+          <input class="opm-field__input" type="number" id="opm-res-width"
+                 min="640" max="7680" step="1" inputmode="numeric"
+                 data-el="res-width" data-key="game.width">
+        </div>
+        <span class="opm-resfields__x" aria-hidden="true">×</span>
+        <!-- min="640" sur les DEUX dimensions : c'est la borne appliquée par
+             services/store.js (RESOLUTION_MIN). Accepter 480 ici afficherait 480 au
+             joueur alors que 640 serait enregistré puis utilisé par le jeu. -->
+        <div class="opm-field">
+          <label class="opm-field__label" for="opm-res-height">Hauteur</label>
+          <input class="opm-field__input" type="number" id="opm-res-height"
+                 min="640" max="4320" step="1" inputmode="numeric"
+                 data-el="res-height" data-key="game.height">
+        </div>
+        <!-- Aperçu de ratio : largeur fixe 96px, hauteur calculée au runtime. -->
+        <div class="opm-preview">
+          <div class="opm-preview__box" data-el="res-preview"></div>
+          <p class="opm-preview__ratio" data-bind="res-ratio"></p>
+        </div>
+      </div>
+
+      <div class="opm-row">
+        <div class="opm-row__text">
+          <p class="opm-row__title">Démarrer en plein écran</p>
+          <p class="opm-row__desc">Ignore la largeur et la hauteur définies ci-dessus.</p>
+        </div>
+        <button type="button" class="opm-switch" role="switch" aria-checked="false"
+                aria-label="Démarrer en plein écran"
+                data-el="switch" data-key="game.fullscreen"><span class="opm-switch__knob"></span></button>
+      </div>
+
+      <!-- « Se souvenir de la dernière taille » (game.remember_size) a été retiré :
+           aucune géométrie de fenêtre n'est sauvegardée ni relue par le processus
+           principal. L'interrupteur écrivait une clé que personne ne lisait — un
+           réglage qui ment est pire qu'un réglage absent. À réintroduire le jour où
+           windows/mainWindow.js mémorisera réellement la taille du jeu. -->
+    </div>
+
+    <!-- ------------------------------------------------------------ LAUNCHER -->
+    <div class="opm-subscreen" data-el="subscreen" data-sub="launcher"
+         id="opm-sub-launcher" role="tabpanel" aria-labelledby="opm-sub-tab-launcher" hidden>
+
+      <p class="opm-kicker"><span class="opm-kicker__dot" aria-hidden="true"></span>COMPORTEMENT</p>
+      <h2>LE LAUNCHER À VOTRE MAIN</h2>
+
+      <div class="opm-row">
+        <div class="opm-row__text">
+          <p class="opm-row__title">Fermer le launcher au lancement du jeu</p>
+          <p class="opm-row__desc">Libère la mémoire pendant votre session.</p>
+        </div>
+        <button type="button" class="opm-switch" role="switch" aria-checked="false"
+                aria-label="Fermer le launcher au lancement du jeu"
+                data-el="switch" data-key="launcher.close_on_launch"><span class="opm-switch__knob"></span></button>
+      </div>
+
+      <div class="opm-row">
+        <div class="opm-row__text">
+          <p class="opm-row__title">Garder la console de jeu ouverte</p>
+          <p class="opm-row__desc">Utile pour signaler un crash au staff.</p>
+        </div>
+        <button type="button" class="opm-switch" role="switch" aria-checked="false"
+                aria-label="Garder la console de jeu ouverte"
+                data-el="switch" data-key="launcher.keep_console"><span class="opm-switch__knob"></span></button>
+      </div>
+
+      <div class="opm-row">
+        <div class="opm-row__text">
+          <p class="opm-row__title">Mises à jour automatiques</p>
+          <p class="opm-row__desc">Télécharge les correctifs dès l'ouverture du launcher.</p>
+        </div>
+        <button type="button" class="opm-switch" role="switch" aria-checked="false"
+                aria-label="Mises à jour automatiques"
+                data-el="switch" data-key="launcher.auto_update"><span class="opm-switch__knob"></span></button>
+      </div>
+
+      <!-- Trois réglages ont été retirés de ce sous-écran, faute de consommateur :
+             · launcher.rp_notifications — aucune notification système n'est émise ;
+             · launcher.music / launcher.volume — le launcher n'embarque aucune piste
+               sonore (assets/ ne contient aucun fichier audio).
+           Leur interrupteur bougeait, la clé était bien écrite dans config.json, et rien
+           ne se produisait jamais. À réintroduire avec l'implémentation, pas avant. -->
+
+      <p class="opm-kicker"><span class="opm-kicker__dot" aria-hidden="true"></span>STOCKAGE</p>
+      <h2>DOSSIER DU JEU</h2>
+
+      <div class="opm-path">
+        <span class="opm-path__value opm-skeleton" data-bind="game-dir"></span>
+        <button type="button" class="opm-btn opm-btn--outline" data-action="open-game-dir">OUVRIR</button>
+        <button type="button" class="opm-btn opm-btn--ink" data-el="clear-cache"
+                data-action="clear-cache">VIDER LE CACHE<span data-bind="cache-size"></span></button>
+      </div>
+
+      <p class="opm-kicker"><span class="opm-kicker__dot" aria-hidden="true"></span>VERSION</p>
+      <h2>VERSION DU LAUNCHER</h2>
+
+      <div class="opm-row">
+        <div class="opm-row__text">
+          <p class="opm-row__title" data-bind="launcher-version"></p>
+          <p class="opm-row__desc" data-el="launcher-latest" hidden></p>
+        </div>
+        <button type="button" class="opm-btn opm-btn--aqua"
+                data-action="download-launcher" hidden>TÉLÉCHARGER</button>
+      </div>
+      <p class="opm-note--warn" data-el="launcher-update" role="status" hidden></p>
+    </div>
+
+  </div>
+</section>

@@ -1,0 +1,54 @@
+/* ============================================================================
+   OPM LAUNCHER — RAIL SOCIAL (60 px)
+   Quatre tuiles : Discord, Twitch, YouTube, séparateur, site du serveur.
+   Les URL viennent de `bootstrap.links` : le rail ne connaît que ses formes.
+   ========================================================================== */
+
+.opm-rail {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: var(--w-social-rail);
+  padding: 22px 0;
+  background-color: var(--veil-50);
+  /* Le filet du rail est le plus discret de la maquette (.10), un cran sous
+     celui des lignes de classement (--line-dark-hair, .12). */
+  border-right: 1px solid var(--line-dark-faint);
+}
+
+.opm-rail__link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid color-mix(in srgb, var(--aqua) 18%, transparent);
+  border-radius: var(--r-lg);
+  background-color: color-mix(in srgb, var(--white) 5%, transparent);
+  color: var(--aqua);
+  transition: background-color var(--t-nav) ease,
+              border-color var(--t-nav) ease,
+              color var(--t-nav) ease,
+              transform var(--t-nav) ease;
+}
+
+/* La tuile s'allume et se soulève : c'est le seul mouvement du rail. */
+.opm-rail__link:hover {
+  background-color: var(--aqua);
+  border-color: var(--aqua);
+  color: var(--ink);
+  transform: translateY(-2px);
+}
+
+/* Au clic, la tuile revient à sa place — le retour d'appui de la maquette. */
+.opm-rail__link:active { transform: translateY(0); }
+
+/* Filet entre les réseaux et le site du serveur. */
+.opm-rail__sep {
+  width: 20px;
+  height: 1px;
+  margin: 4px 0;
+  background-color: var(--line-dark);
+}

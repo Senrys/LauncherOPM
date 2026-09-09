@@ -1,0 +1,39 @@
+# Miroir figé du bloc [project].dependencies de pyproject.toml.
+# Toute modification ici doit être répercutée dans pyproject.toml (et inversement).
+# Installation : python -m pip install -r requirements.txt
+# Les extras de développement vivent dans pyproject.toml : pip install -e ".[dev]"
+
+# --- Socle web -------------------------------------------------------------
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+
+# --- Base de données -------------------------------------------------------
+sqlalchemy[asyncio]==2.0.36
+aiosqlite==0.20.0
+asyncpg==0.30.0
+alembic==1.14.0
+
+# --- Validation et configuration ------------------------------------------
+pydantic==2.10.4
+pydantic-settings==2.7.0
+email-validator==2.2.0
+
+# --- Cryptographie et authentification ------------------------------------
+# Aucune bibliothèque de hachage de mots de passe : les empreintes sont au format
+# Werkzeug (pbkdf2:sha256), produites avec hashlib seul, pour que le site Flask
+# continue de vérifier les mots de passe (docs/DATA.md §3). N'ajoutez pas
+# argon2-cffi : ce serait couper l'accès au site aux joueurs concernés.
+pyjwt[crypto]==2.10.1
+cryptography==44.0.0
+pyotp==2.9.0
+
+# --- Divers ----------------------------------------------------------------
+httpx==0.28.1
+pillow==11.1.0
+
+# --- Optionnel -------------------------------------------------------------
+# Limitation de débit partagée entre plusieurs processus (extra « redis » de
+# pyproject.toml). Décommentez pour un déploiement à plusieurs workers ; sans
+# elle, les compteurs restent en mémoire dans chaque processus.
+# redis==5.2.1
