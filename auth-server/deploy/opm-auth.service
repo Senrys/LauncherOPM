@@ -12,8 +12,9 @@
 [Unit]
 Description=Serveur d'authentification One Piece Minecraft
 Documentation=https://github.com/Senrys/LauncherOPM
-# Le serveur lit la base du site : il ne démarre qu'après PostgreSQL.
-After=network-online.target postgresql.service
+# La base est un PostgreSQL managé OVH, joint par le réseau : il n'y a pas de
+# postgresql.service local à attendre, seulement le réseau.
+After=network-online.target
 Wants=network-online.target
 
 [Service]
