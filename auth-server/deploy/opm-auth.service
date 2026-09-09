@@ -23,6 +23,11 @@ User=opmauth
 Group=opmauth
 WorkingDirectory=/opt/opm-auth/auth-server
 
+# Sans cela, Python tamponne sa sortie quand elle n'est pas un terminal : les
+# messages d'erreur du démarrage n'atteignent jamais journalctl, et un service
+# qui échoue le fait en silence.
+Environment=PYTHONUNBUFFERED=1
+
 # UN SEUL worker. La limitation de débit (5 connexions/minute par IP, etc.) est
 # tenue en mémoire dans chaque processus : avec 4 workers, un attaquant obtient
 # 4 fois le quota. Passez à plusieurs workers seulement après avoir activé Redis
