@@ -1,0 +1,28 @@
+# Régénère le manifeste « files.json » du modpack.
+#
+# Déclenché par opm-files-json.timer. Vous n'avez jamais à le lancer à la main :
+# déposez vos mods dans /var/www/opm-launcher/ et le manifeste suit tout seul.
+#
+# Le générateur est incrémental : il garde les empreintes des fichiers dont la
+# taille et la date n'ont pas changé. Un passage sans modification ne lit aucun
+# octet, et l'ajout d'un mod ne hache que ce mod.
+
+[Unit]
+Description=Génération du manifeste files.json du modpack OPM
+After=network.target
+
+[Service]
+Type=oneshot
+User=www-data
+Group=www-data
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /opt/opm-auth/scripts/build-files-json.py \
+          /var/www/opm-launcher \
+          https://onepieceminecraft.fr/launcher
+
+# Le script n'écrit que dans le dossier du modpack.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=tmpfs
+ReadWritePaths=/var/www/opm-launcher
