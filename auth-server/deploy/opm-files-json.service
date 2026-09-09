@@ -25,4 +25,8 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=tmpfs
-ReadWritePaths=/var/www/opm-launcher
+# Le « - » rend le chemin facultatif au montage. Sans lui, si le dossier
+# n'existe pas encore, systemd refuse de créer l'espace de noms et le service
+# meurt sur un « 226/NAMESPACE » opaque, AVANT même de lancer Python. Avec, le
+# service démarre et c'est le script qui dit clairement « Dossier introuvable ».
+ReadWritePaths=-/var/www/opm-launcher
