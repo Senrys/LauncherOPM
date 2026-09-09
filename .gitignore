@@ -1,5 +1,9 @@
 # ── Dépendances et sorties de compilation ───────────────────────────────────
 node_modules/
+# Contenu du modpack : des centaines de Mio de .jar, qui vivent sur le serveur
+# web (/var/www/opm-launcher) et non dans le dépôt. GitHub refuse d'ailleurs
+# tout fichier de plus de 100 Mio.
+modpack/
 launcher/dist/
 launcher/.stage/
 launcher/data/
