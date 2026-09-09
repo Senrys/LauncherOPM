@@ -725,3 +725,44 @@
 .opm-ram__hint .opm-skeleton       { display: inline-block; min-width: 46px; min-height: 11px; }
 .opm-ram__scale .opm-skeleton      { display: inline-block; min-width: 48px; min-height: 10px; }
 .opm-path__value.opm-skeleton      { min-height: 40px; }
+
+
+/* ── Mentions légales et attributions ────────────────────────────────────────
+   Dernier bloc du panneau. Corps réduit et couleur atténuée : présent pour qui
+   descend jusqu'en bas, sans peser sur la lecture du reste des réglages.
+   Le trait supérieur le détache des réglages : c'est de l'information, pas une
+   commande. */
+.opm-legal {
+  margin-top: 28px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(15, 26, 25, .10);
+}
+
+.opm-legal p {
+  margin: 0 0 6px;
+  font: 400 var(--fs-small)/1.5 var(--font-ui);
+  color: var(--muted);
+}
+
+.opm-legal p:last-child { margin-bottom: 0; }
+
+.opm-legal strong {
+  font-weight: 600;
+  color: var(--text-body);
+}
+
+/* Un <button> et non un <a> : le renderer ne doit jamais naviguer lui-même.
+   Le clic passe par l'IPC, qui n'autorise que http(s) (main/ipc.js:465). */
+.opm-legal__link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--text-body);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.opm-legal__link:hover,
+.opm-legal__link:focus-visible { color: var(--text-dark); }
