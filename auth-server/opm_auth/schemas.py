@@ -604,6 +604,29 @@ def make_excerpt(content: str | None, *, limit: int = EXCERPT_LENGTH) -> str | N
     return cut.rstrip(" ,;:.–—-") + "…"
 
 
+def article_url(raw: str | None, site_url: str | None = None) -> str | None:
+    """Rend l'adresse ouvrable d'un article à partir de ce que stocke le site.
+
+    La colonne ``article.url`` contient un **slug** (« la-v7-une-version-
+    nostalgique »), que le site sert à sa racine. Livré tel quel au launcher,
+    il était refusé par le garde-fou « http(s) seulement » de l'ouverture des
+    liens, et le joueur lisait « Le navigateur n'a pas pu être lancé ».
+
+    Une valeur déjà absolue est rendue telle quelle : si le site change un jour
+    de convention et stocke des adresses complètes, rien ne casse.
+    """
+    slug = (raw or "").strip()
+    if not slug:
+        return None
+    if slug.startswith(("http://", "https://")):
+        return slug
+    if site_url is None:
+        from opm_auth.config import get_settings  # import différé : schemas.py reste sans dépendance
+
+        site_url = get_settings().site_url
+    return f"{site_url.rstrip('/')}/{slug.lstrip('/')}"
+
+
 class NewsItemOut(ApiModel):
     """Entrée du **JOURNAL DE BORD**, dérivée d'une ligne ``article``."""
 
@@ -618,7 +641,9 @@ class NewsItemOut(ApiModel):
     author: str | None = None
 
     @classmethod
-    def from_article(cls, article: Any, *, with_body: bool = False) -> NewsItemOut:
+    def from_article(
+        cls, article: Any, *, with_body: bool = False, site_url: str | None = None
+    ) -> NewsItemOut:
         """Construit une entrée à partir d'un ``Article``.
 
         ``kind`` est dérivé de ``article.categorie`` et ``excerpt`` du contenu :
@@ -627,6 +652,8 @@ class NewsItemOut(ApiModel):
 
         :param with_body: joint le HTML complet (vue détaillée). La liste ne le
             transporte pas : trois articles suffisent à alourdir la réponse.
+        :param site_url: base publique du site, pour transformer le slug de
+            ``article.url`` en adresse. ``None`` = lue dans la configuration.
         """
         return cls(
             id=article.id,
@@ -635,7 +662,7 @@ class NewsItemOut(ApiModel):
             excerpt=make_excerpt(article.content),
             body_html=article.content if with_body else None,
             published_at=article.published_date,
-            url=article.url or None,
+            url=article_url(article.url, site_url),
             image=article.image or None,
             author=(article.auteur or None),
         )
@@ -648,7 +675,7 @@ class NewsOut(ApiModel):
     items: list[NewsItemOut] = Field(default_factory=list)
 
     @classmethod
-    def from_articles(cls, articles: list[Any]) -> NewsOut:
+    def from_articles(cls, articles: list[Any], *, site_url: str | None = None) -> NewsOut:
         """Assemble le journal : la plus récente en vedette, les autres en liste.
 
         Les articles sont attendus **déjà triés** ``published_date DESC`` par le
@@ -657,8 +684,8 @@ class NewsOut(ApiModel):
         if not articles:
             return cls()
         return cls(
-            featured=NewsItemOut.from_article(articles[0]),
-            items=[NewsItemOut.from_article(article) for article in articles[1:]],
+            featured=NewsItemOut.from_article(articles[0], site_url=site_url),
+            items=[NewsItemOut.from_article(article, site_url=site_url) for article in articles[1:]],
         )
 
 
