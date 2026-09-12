@@ -636,6 +636,11 @@
   <div class="opm-toasts" data-el="toasts" role="status" aria-live="polite"></div>
   <div data-el="modal-root"></div>
 
+  <!-- Rendu 3D du skin (accueil). Script classique, pas un module : le bundle
+       UMD expose le global `skinview3d`. Chargé avant le renderer pour que
+       l'accueil le trouve dès son montage ; « defer » garde l'ordre et n'ouvre
+       rien tant que le document n'est pas analysé. -->
+  <script src="assets/js/vendor/skinview3d.bundle.js" defer></script>
   <script type="module" src="assets/js/renderer.js"></script>
 </body>
 </html>

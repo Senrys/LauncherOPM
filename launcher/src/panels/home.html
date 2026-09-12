@@ -146,8 +146,16 @@
 
     <div class="opm-scene__halo" aria-hidden="true"></div>
 
-    <!-- Silhouette neutre par défaut ; le JS remplace la source par le rendu EN
-         PIED du skin du compte sélectionné dès qu'il est disponible. -->
+    <!-- Le personnage, en 3D quand c'est possible : skin complet, tête aux
+         pieds, animé et en rotation lente — on peut le faire tourner à la
+         souris. Rendu par skinview3d dans ce canevas. Masqué tant qu'aucun
+         skin n'est chargé, ou si WebGL n'est pas disponible sur la machine. -->
+    <canvas class="opm-scene__char3d" data-el="character-3d" hidden
+            aria-label="Votre personnage en 3D"></canvas>
+
+    <!-- Repli 2D : silhouette neutre par défaut, puis rendu EN PIED du skin.
+         C'est ce que voit un joueur sans WebGL, ou le temps que la 3D soit
+         prête. -->
     <img class="opm-scene__char" data-el="character"
          src="assets/images/silhouette.png" alt="Votre personnage">
 

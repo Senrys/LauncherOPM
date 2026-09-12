@@ -33,7 +33,7 @@ import { $, delegate, el, on, setText, toggle } from '../utils/dom.js';
 import { countdown, dateFr, nf, relTime } from '../utils/format.js';
 import { blockedLabel } from '../utils/labels.js';
 import { network, store } from '../utils/state.js';
-import { FALLBACK_BODY, bodyDataUrl } from '../utils/skin.js';
+import { FALLBACK_BODY, bodyDataUrl, skinImage } from '../utils/skin.js';
 import { toast } from '../components/toast.js';
 
 /** Rafraîchissement du statut du serveur. */
@@ -155,6 +155,19 @@ export default class Home {
     this.votesUrl = null;
     /** Numéro de la dernière demande de skin, pour ignorer les rendus périmés. */
     this.skinSeq = 0;
+
+    /**
+     * Rendu 3D du personnage (skinview3d), créé à la première texture reçue et
+     * réutilisé ensuite : changer de compte recharge le skin, ne recrée pas la
+     * scène. `null` tant qu'aucune texture n'est arrivée, ou si la 3D est
+     * hors service sur cette machine (`viewerBroken`) — auquel cas l'image 2D
+     * reste seule en place.
+     * @type {any}
+     */
+    this.viewer = null;
+    this.viewerBroken = false;
+    /** @type {ResizeObserver|null} */
+    this.viewerResize = null;
   }
 
   /**
@@ -202,20 +215,25 @@ export default class Home {
   async show() {
     this.startTimers();
     this.tickCountdown();
+    if (this.viewer) this.viewer.renderPaused = false;
     await this.refresh({ newsMaxAge: NEWS_TTL, tilesMaxAge: 5_000 });
   }
 
-  /** Le panneau est masqué : plus aucun minuteur ne tourne. */
+  /** Le panneau est masqué : plus aucun minuteur ne tourne, ni le rendu 3D. */
   async hide() {
     this.stopTimers();
+    // Une boucle WebGL qui tourne derrière un autre onglet, c'est du GPU pour
+    // rien — et un ventilateur qui s'emballe sur les portables.
+    if (this.viewer) this.viewer.renderPaused = true;
   }
 
-  /** Relâche minuteurs et abonnements. */
+  /** Relâche minuteurs, abonnements et la scène 3D. */
   dispose() {
     this.stopTimers();
     for (const off of this.offs) off();
     this.offs = [];
     this.staleAt = {};
+    this.disposeViewer();
   }
 
   /* --------------------------------------------------------- ancrage DOM */
@@ -252,6 +270,7 @@ export default class Home {
       serverDetail: $('[data-bind="server-detail"]', root),
 
       character: $('[data-el="character"]', root),
+      character3d: $('[data-el="character-3d"]', root),
       playerName: $('[data-bind="player-name"]', root),
       playerSub: $('[data-bind="player-sub"]', root),
 
@@ -751,12 +770,149 @@ export default class Home {
 
     // La maquette montre un personnage EN PIED sur 404 px de haut : on compose
     // donc le corps entier du skin (16 × 32 unités), jamais une tête carrée que
-    // la feuille de style étirerait en cube de 404 px de côté.
+    // la feuille de style étirerait en cube de 404 px de côté. Ce rendu 2D est
+    // toujours produit : il couvre l'attente de la 3D, et la remplace là où
+    // WebGL fait défaut.
     bodyDataUrl(account.skin_url, { model: account.minecraft?.model ?? null }).then((source) => {
       // Un changement de compte pendant le rendu annule le résultat périmé.
       if (seq !== this.skinSeq || !this.refs.character) return;
       this.refs.character.src = source;
     });
+
+    this.paintPlayer3d(account, seq);
+  }
+
+  /* ----------------------------------------------------------- scène 3D */
+
+  /**
+   * Le personnage en 3D : skin complet, tête aux pieds, animé et en rotation
+   * lente, comme sur la page de profil du site — mais en pied, là où le site
+   * ne montre qu'un buste.
+   *
+   * Tout échec est silencieux et définitif pour la session (`viewerBroken`) :
+   * le rendu 2D, toujours produit par `paintPlayer()`, reste alors seul en
+   * place. On ne réessaie pas à chaque changement de compte : une machine sans
+   * WebGL n'en aura pas plus la seconde fois.
+   *
+   * @param {Object|null} account
+   * @param {number} seq  jeton de `paintPlayer()` — un compte changé entre-temps
+   *   rend le résultat périmé
+   */
+  async paintPlayer3d(account, seq) {
+    const canvas = this.refs.character3d;
+    if (!canvas || this.viewerBroken || typeof window.skinview3d === 'undefined') return;
+
+    if (!account?.skin_url) {
+      this.showCharacter3d(false);
+      return;
+    }
+
+    let image;
+    try {
+      // La même texture que le rendu 2D, déjà en mémoire et lisible : pas de
+      // second téléchargement, pas de question d'origine.
+      image = await skinImage(account.skin_url);
+    } catch {
+      this.showCharacter3d(false);
+      return;
+    }
+    if (seq !== this.skinSeq) return;
+
+    try {
+      const viewer = this.ensureViewer(canvas);
+      await viewer.loadSkin(image);
+      if (seq !== this.skinSeq) return;
+      this.showCharacter3d(true);
+    } catch (error) {
+      console.warn('opm : rendu 3D du personnage indisponible, repli sur le rendu 2D.', error);
+      this.viewerBroken = true;
+      this.disposeViewer();
+      this.showCharacter3d(false);
+    }
+  }
+
+  /**
+   * Crée la scène une seule fois. Les réglages sont ceux du site (animation
+   * de repos, rotation lente, zoom et déplacement à la souris désactivés),
+   * moins le cadrage buste : ici on veut le personnage entier.
+   *
+   * @param {HTMLCanvasElement} canvas
+   * @returns {any}
+   */
+  ensureViewer(canvas) {
+    if (this.viewer) return this.viewer;
+
+    const lib = window.skinview3d;
+    const box = canvas.getBoundingClientRect();
+    const viewer = new lib.SkinViewer({
+      canvas,
+      width: Math.max(1, Math.round(box.width) || 360),
+      height: Math.max(1, Math.round(box.height) || 404),
+    });
+
+    // Cadrage en pied, réglé à l'œil sur un canevas de 360 × 404 : la tête
+    // frôle le haut, les pieds gardent une marge en bas pour le balancement de
+    // l'animation de repos. En dessous de 1.0 le personnage flotte au milieu
+    // d'un vide ; au-dessus de 1.2 les mains sortent du cadre en rotation.
+    viewer.fov = 40;
+    viewer.zoom = 1.15;
+
+    viewer.animation = new lib.IdleAnimation();
+    viewer.animation.speed = 0.6;
+    viewer.autoRotate = true;
+    viewer.autoRotateSpeed = 0.35;
+
+    if (viewer.controls) {
+      // On peut faire tourner le personnage à la souris ; ni zoomer, ni le
+      // sortir du cadre.
+      viewer.controls.enableZoom = false;
+      viewer.controls.enablePan = false;
+    }
+
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      viewer.autoRotate = false;
+      viewer.animation.paused = true;
+    }
+
+    // La scène change de taille avec la fenêtre : le canevas suit.
+    if (typeof ResizeObserver === 'function') {
+      this.viewerResize = new ResizeObserver(() => {
+        const rect = canvas.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          viewer.width = Math.round(rect.width);
+          viewer.height = Math.round(rect.height);
+        }
+      });
+      this.viewerResize.observe(canvas);
+    }
+
+    this.viewer = viewer;
+    return viewer;
+  }
+
+  /**
+   * Bascule entre le canevas 3D et l'image 2D : un seul des deux est visible.
+   * @param {boolean} live
+   */
+  showCharacter3d(live) {
+    if (this.refs.character3d) this.refs.character3d.hidden = !live;
+    if (this.refs.character) this.refs.character.hidden = live;
+  }
+
+  /** Libère la scène WebGL et son observateur de taille. */
+  disposeViewer() {
+    if (this.viewerResize) {
+      this.viewerResize.disconnect();
+      this.viewerResize = null;
+    }
+    if (this.viewer) {
+      try {
+        this.viewer.dispose();
+      } catch {
+        /* rien à rattraper : on abandonne la scène de toute façon */
+      }
+      this.viewer = null;
+    }
   }
 
   /**
