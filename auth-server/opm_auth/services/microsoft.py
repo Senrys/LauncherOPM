@@ -971,9 +971,16 @@ async def minecraft_login(
         if response.status_code >= 500:
             raise _unavailable("mc_login")
         if response.status_code >= 400:
+            # Le corps de la réponse est décisif pour l'exploitant : un 403
+            # « Invalid app registration » veut dire que l'application Azure
+            # n'est pas sur la liste blanche de Mojang, ce qui ne se règle que
+            # par le formulaire aka.ms/mce-reviewappid. Un autre motif appelle
+            # un autre diagnostic. Il ne contient aucun secret : ce n'est que
+            # l'explication du refus.
             logger.info(
-                "Minecraft Services a refusé le jeton XSTS (statut %s).",
+                "Minecraft Services a refusé le jeton XSTS (statut %s) : %s",
                 response.status_code,
+                response.text[:300].replace("\n", " ") if response.text else "(corps vide)",
             )
             raise MicrosoftError(
                 "minecraft_rejected",
