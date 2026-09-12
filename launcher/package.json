@@ -1,7 +1,7 @@
 {
   "name": "opm-launcher",
   "productName": "OPM Launcher",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "Le launcher officiel de One Piece Minecraft — authentification souveraine OPM",
   "main": "src/app.js",
   "author": {
