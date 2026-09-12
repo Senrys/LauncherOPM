@@ -180,6 +180,22 @@ async function acquire(url) {
   return loadImage(url);
 }
 
+/**
+ * La texture BRUTE du skin (64×64 ou 64×32), chargée par la même chaîne que
+ * les rendus 2D — donc lisible au pixel près, jamais teintée. C'est ce que le
+ * rendu 3D de l'accueil donne à manger à skinview3d : lui passer l'image déjà
+ * en mémoire évite un second téléchargement et tout problème d'origine.
+ *
+ * Rejette si la texture est inaccessible : l'appelant retombe sur le rendu 2D.
+ *
+ * @param {string} url
+ * @returns {Promise<HTMLImageElement>}
+ */
+export async function skinImage(url) {
+  if (typeof url !== 'string' || url === '') throw new Error('Aucune adresse de skin.');
+  return acquire(url);
+}
+
 /* ========================================================================== */
 /*  Canevas                                                                   */
 /* ========================================================================== */

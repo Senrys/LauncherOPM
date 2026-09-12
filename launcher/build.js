@@ -70,6 +70,9 @@ const COPIED_EXTENSIONS = new Set([
  */
 const NEVER_OBFUSCATE = new Set([
   'preload.js',
+  // Bibliothèques tierces déjà minifiées : les obfusquer n'apporte rien et
+  // peut casser leur code (skinview3d s'appuie sur des noms de propriétés).
+  'assets/js/vendor/skinview3d.bundle.js',
 ]);
 
 /** Options de `javascript-obfuscator`, chargées seulement si `--obf=true`. */

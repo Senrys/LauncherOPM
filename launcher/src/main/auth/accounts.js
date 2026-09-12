@@ -245,12 +245,28 @@ function userOf(payload) {
 }
 
 /**
+ * Service public de skins par pseudo, utilisé en repli quand le serveur OPM n'a pas encore
+ * de texture pour le compte. `https://mineskin.eu/skin/<pseudo>` rend le PNG brut 64×64,
+ * que la chaîne de rendu du renderer sait lire. Même source que le site.
+ */
+const FALLBACK_SKIN_BASE = 'https://mineskin.eu';
+
+/**
  * Adresse du skin à afficher dans l'interface (la tête 8×8 est rendue par le renderer).
  *
  * Le serveur héberge lui-même les textures (`GET /textures/{sha256}.png`, docs/API.md § 2.5)
  * après les avoir importées au rattachement (docs/DATA.md § 6). Selon ce qu'il expose, on
- * accepte une URL toute faite ou une empreinte à composer. À défaut : `null`, et le renderer
- * affiche la silhouette par défaut — jamais d'adresse inventée.
+ * accepte une URL toute faite ou une empreinte à composer.
+ *
+ * À défaut — typiquement un compte pas encore rattaché à Microsoft — on retombe sur
+ * mineskin.eu, qui sert le skin d'un joueur premium d'après son pseudo. Le compte du site
+ * est créé avec le pseudo Minecraft (le site l'exige à l'inscription) : le nom du compte
+ * vaut donc identifiant avant même le rattachement, et le joueur voit SON personnage dès
+ * la première connexion au lieu d'une silhouette. C'est un affichage, rien de plus : la
+ * possession du jeu, elle, n'est établie que par le rattachement.
+ *
+ * `null` seulement si aucun nom exploitable n'existe : le renderer affiche alors la
+ * silhouette par défaut.
  *
  * @param {object} user
  * @returns {string|null}
@@ -272,6 +288,14 @@ function skinUrl(user) {
   if (typeof sha === 'string' && /^[0-9a-f]{64}$/i.test(sha)) {
     return `${api.baseUrl()}/textures/${sha.toLowerCase()}.png`;
   }
+
+  // Repli par pseudo : celui du profil Minecraft rattaché s'il existe, sinon le nom du
+  // compte du site. Un pseudo Minecraft fait 3 à 16 caractères alphanumériques ou « _ » ;
+  // tout autre nom ne désigne personne chez Mojang et n'a pas à être demandé.
+  const name = [ms.minecraft_username, user.username].find(
+    (value) => typeof value === 'string' && /^[A-Za-z0-9_]{3,16}$/.test(value),
+  );
+  if (name) return `${FALLBACK_SKIN_BASE}/skin/${encodeURIComponent(name)}`;
 
   return null;
 }

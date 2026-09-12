@@ -449,6 +449,24 @@
   user-select: none;
 }
 
+/* Le personnage en 3D. Même ancrage et même hauteur que l'image 2D qu'il
+   remplace ; la largeur laisse la place aux bras pendant la rotation. Pas
+   d'animation de flottement : le modèle s'anime lui-même. Les pointeurs
+   passent — on peut le faire tourner à la souris. */
+.opm-scene__char3d {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 360px;
+  height: 404px;
+  filter: var(--sh-char);
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.opm-scene__char3d:active { cursor: grabbing; }
+
 /* Seul le rendu du skin est de l'art pixel : c'est un canevas de 128 × 256
    servi en `data:` par utils/skin.js, qu'il faut agrandir sans lissage. La
    silhouette neutre, elle, est une image en pleine résolution (644 × 790) que

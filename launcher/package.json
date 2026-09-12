@@ -19,6 +19,7 @@
     "dev": "cross-env NODE_ENV=development DEV_TOOL=open nodemon --exec electron .",
     "fonts": "node scripts/fetch-fonts.js",
     "icon": "node scripts/make-icons.js",
+    "vendor": "node scripts/vendor.js",
     "build": "node build.js --obf=false --build=platform",
     "build:obf": "node build.js --obf=true --build=platform",
     "build:dir": "node build.js --obf=false --dir"
@@ -45,7 +46,8 @@
     "javascript-obfuscator": "^4.1.1",
     "jimp": "^0.22.12",
     "nodemon": "^3.1.7",
-    "png2icons": "^2.0.1"
+    "png2icons": "^2.0.1",
+    "skinview3d": "^3.4.2"
   },
   "repository": {
     "type": "git",
