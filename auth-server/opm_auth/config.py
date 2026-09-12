@@ -229,6 +229,12 @@ class Settings(BaseSettings):
     link_twitch: str = ""
     link_youtube: str = ""
     link_website: str = ""
+    #: Adresse publique du site Flask. La table « article » ne stocke que le
+    #: SLUG de chaque billet (« la-v7-une-version-nostalgique ») : c'est cette
+    #: base qui en fait une adresse ouvrable par le launcher. Distincte de
+    #: ``link_website`` (le rail social, facultatif) et de ``public_url`` (ce
+    #: serveur-ci).
+    site_url: str = "https://onepieceminecraft.fr"
 
     # -------------------------------------------------------------- 12. Contenu
     #: Nombre d'articles renvoyés par défaut par ``GET /api/v1/news``.
