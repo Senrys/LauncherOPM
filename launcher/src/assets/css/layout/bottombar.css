@@ -337,6 +337,29 @@
   transform: none;
 }
 
+/* À régler — le compte est bloqué, mais la solution est à un clic : le bouton
+   mène aux Paramètres. Contour aqua, fond transparent : actionnable, sans se
+   faire passer pour JOUER. */
+.opm-bottom__play--link {
+  background-color: transparent;
+  color: var(--aqua);
+  box-shadow: inset 0 0 0 2px var(--aqua);
+  cursor: pointer;
+}
+
+.opm-bottom__play--link:hover {
+  background-color: color-mix(in srgb, var(--aqua) 14%, transparent);
+  transform: translateY(-2px);
+}
+
+.opm-bottom__play--link:active { transform: translateY(0); }
+
+.opm-bottom__play--link:focus-visible { box-shadow: inset 0 0 0 2px var(--aqua), var(--sh-focus); }
+
+/* La jauge suit : ni verte (prêt), ni grise (maintenance). */
+.opm-bottom:has(.opm-bottom__play--link) .opm-bottom__fill { background-color: var(--aqua); opacity: .35; }
+.opm-bottom:has(.opm-bottom__play--link) .opm-bottom__shimmer { opacity: 0; }
+
 /* Maintenance — le serveur refuse les connexions. */
 .opm-bottom__play--maint {
   background-color: color-mix(in srgb, var(--white) 8%, transparent);
