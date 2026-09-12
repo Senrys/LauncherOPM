@@ -490,13 +490,20 @@ function setScreen(name) {
 
 /**
  * Décide de l'écran à afficher à partir du compte sélectionné.
- * Le rattachement Microsoft étant imposé, un compte connecté mais non rattaché
- * repart sur l'écran de connexion, vue « rattachement ».
  *
- * Le motif de blocage n'est jamais transporté brut : il est traduit ici même par
- * `blockedLabel()`, qui dit aussi où envoyer le joueur. C'est cette sortie qui
- * décide de la vue — une possession expirée ouvre le RATTACHEMENT, pas la
- * connexion : le joueur a déjà un compte, il lui manque la re-vérification.
+ * Un compte AUTHENTIFIÉ entre dans l'application, qu'il puisse jouer ou non.
+ * Le joueur connecté avec son compte du site retrouve son journal de bord, les
+ * statistiques et les mises à jour ; seul le bouton JOUER est fermé, et il dit
+ * pourquoi — rattachement Microsoft à faire, possession à revérifier, compte
+ * suspendu. Le rattachement se fait depuis les Paramètres, où le bouton
+ * l'emmène. L'ancien comportement, qui bloquait tout derrière l'écran de
+ * rattachement, faisait passer un compte parfaitement valide pour un compte
+ * refusé.
+ *
+ * Seul un blocage qui exige de SE RECONNECTER (session expirée ou révoquée,
+ * identifiants refusés) ramène à l'écran de connexion : là, il n'y a rien à
+ * montrer, le compte n'est plus authentifié. C'est `blockedLabel()` qui porte
+ * cette distinction (`action.target`), jamais un motif brut.
  *
  * @param {Object|null} account
  * @returns {{screen: 'app'|'login', view?: string, notice?: {title: string, message: string}}}
@@ -506,16 +513,13 @@ function decideRoute(account) {
 
   if (account.can_play) return { screen: 'app' };
 
-  if (!account.minecraft || account.blocked_reason === 'microsoft_required') {
-    return { screen: 'login', view: 'link' };
-  }
-
   const blocked = blockedLabel(account.blocked_reason);
-  return {
-    screen: 'login',
-    view: blocked.action?.target === 'link' ? 'link' : 'login',
-    notice: { title: blocked.title, message: blocked.message },
-  };
+  const notice = { title: blocked.title, message: blocked.message };
+
+  if (blocked.action?.target === 'login') {
+    return { screen: 'login', view: 'login', notice };
+  }
+  return { screen: 'app', notice };
 }
 
 /**
@@ -534,6 +538,12 @@ async function prepareRoute(decision) {
 function enterRoute(decision) {
   if (decision.screen === 'app') {
     setScreen('app');
+    // Compte bloqué mais admis dans l'application : on le dit une fois, à
+    // l'entrée. La barre du bas le répète en permanence, avec le bouton qui
+    // mène à la solution.
+    if (decision.notice) {
+      toast({ kind: 'info', title: decision.notice.title, message: decision.notice.message });
+    }
     return;
   }
 

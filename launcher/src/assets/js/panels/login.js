@@ -804,22 +804,17 @@ export default class LoginScreen {
     // frais dans le magasin pour que la décision de routage soit prise dessus.
     if (account) this.ctx.store.set({ account });
 
+    // Même règle que `decideRoute()` dans le renderer : un compte authentifié
+    // entre dans l'application, rattaché ou non — le rattachement se fait
+    // depuis les Paramètres, et la barre du bas y mène. Seul un blocage qui
+    // exige de se reconnecter retient le joueur ici.
     if (account && !account.can_play) {
-      if (!account.minecraft || account.blocked_reason === 'microsoft_required') {
-        this.setView('link', { sync: true });
+      const blocked = blockedLabel(account.blocked_reason);
+      if (blocked.action?.target === 'login') {
+        this.setView('login', { sync: true });
+        this.showBanner(this.el.loginError, blocked.message);
         return;
       }
-
-      // Même aiguillage que le routage du renderer : c'est `blockedLabel()` qui
-      // dit où envoyer le joueur. Une possession expirée se règle sur la vue de
-      // rattachement — laisser le joueur devant le formulaire qu'il vient de
-      // remplir serait une impasse.
-      const blocked = blockedLabel(account.blocked_reason);
-      const link = blocked.action?.target === 'link';
-
-      this.setView(link ? 'link' : 'login', { sync: true });
-      this.showBanner(link ? this.el.linkError : this.el.loginError, blocked.message);
-      return;
     }
     this.leave();
   }

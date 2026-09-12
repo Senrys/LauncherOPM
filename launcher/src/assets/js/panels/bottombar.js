@@ -36,6 +36,7 @@ const PLAY_MODIFIERS = [
   'opm-bottom__play--ready',
   'opm-bottom__play--busy',
   'opm-bottom__play--maint',
+  'opm-bottom__play--link',
 ];
 
 /** États du jeu pendant lesquels la mise à jour travaille. */
@@ -58,6 +59,15 @@ const PHASES = {
   maintenance: { modifier: 'opm-bottom__play--maint', label: 'INDISPONIBLE', kicker: 'MAINTENANCE EN COURS', playable: false },
   blocked: { modifier: 'opm-bottom__play--maint', label: 'INDISPONIBLE', kicker: 'CONNEXION REQUISE', playable: false },
 };
+
+/**
+ * Variante de « blocked » quand le motif se règle depuis les Paramètres :
+ * rattachement Microsoft à faire, possession à revérifier, mauvais compte
+ * Microsoft. Le bouton ne lance pas le jeu — il emmène là où ça se règle, et
+ * son libellé est l'action elle-même (« RATTACHER », « RE-VÉRIFIER »…).
+ * `label` et `kicker` sont posés à l'exécution depuis `blockedLabel()`.
+ */
+const LINK_VIEW = { modifier: 'opm-bottom__play--link', label: '', kicker: '', playable: true, link: true };
 
 /**
  * Motifs de blocage et messages d'erreur : la barre n'a plus de table à elle.
@@ -644,6 +654,13 @@ export default class Bottombar {
    * fin réelle du travail (`closed`, `error`), et non au retour de l'appel.
    */
   async play() {
+    // Compte bloqué pour un motif qui se règle dans les Paramètres : le bouton
+    // y conduit au lieu de rester un mur. Le rattachement lui-même vit là-bas.
+    if (this.linkAction(this.phase())) {
+      this.ctx?.setTab?.('settings');
+      return;
+    }
+
     if (this.launching || this.phase() !== 'ready') return;
 
     this.launching = true;
@@ -760,6 +777,35 @@ export default class Bottombar {
   /* ---------------------------------------------------------------- rendu */
 
   /**
+   * L'action de `blockedLabel()` si le blocage courant se règle depuis les
+   * Paramètres (cible « link »), sinon `null`. Hors ligne, rien n'est
+   * proposé : le rattachement exigerait le serveur.
+   *
+   * @param {string} phase
+   * @returns {{label: string, target: string}|null}
+   */
+  linkAction(phase) {
+    if (phase !== 'blocked' || !this.online || !this.account) return null;
+    if (this.account.can_play !== false) return null;
+    const action = blockedLabel(this.account.blocked_reason).action;
+    return action?.target === 'link' ? action : null;
+  }
+
+  /**
+   * Vue du bouton pour un blocage réglable : le libellé est l'action, le
+   * chapeau est le titre court du motif.
+   * @returns {Object}
+   */
+  linkView() {
+    const blocked = blockedLabel(this.account.blocked_reason);
+    return {
+      ...LINK_VIEW,
+      label: blocked.action.label,
+      kicker: blocked.title.toLocaleUpperCase('fr-FR'),
+    };
+  }
+
+  /**
    * Phase courante de la barre, du plus urgent au plus calme.
    * @returns {'ready'|'busy'|'launching'|'running'|'maintenance'|'blocked'}
    */
@@ -777,7 +823,7 @@ export default class Bottombar {
     if (!this.refs.play) return;
 
     const phase = this.phase();
-    const view = PHASES[phase];
+    const view = this.linkAction(phase) ? this.linkView() : PHASES[phase];
 
     this.paintAccount();
     this.paintPlay(view, phase);
