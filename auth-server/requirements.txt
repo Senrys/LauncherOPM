@@ -31,6 +31,8 @@ pyotp==2.9.0
 # --- Divers ----------------------------------------------------------------
 httpx==0.28.1
 pillow==11.1.0
+# Sessions de paiement des dons, créées comme sur le site (même clé, même webhook).
+stripe==11.4.1
 
 # --- Optionnel -------------------------------------------------------------
 # Limitation de débit partagée entre plusieurs processus (extra « redis » de

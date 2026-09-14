@@ -1017,6 +1017,39 @@ class Instance(Base):
     )
 
 
+class Paiement(Base):
+    """Table ``paiements`` du site — les encaissements Stripe, **en lecture**.
+
+    Écrite par le site seul (retour de paiement et webhook Stripe, ``boutique.py``).
+    Ici on ne fait qu'additionner : la cagnotte du mois est la somme des
+    paiements du mois — dons ET achats de gigots, comme sur l'accueil du site —
+    plus le complément manuel ``statistiques.dons_collecte``.
+    """
+
+    __tablename__ = "paiements"
+    __table_args__ = (
+        Index("idx_paiements_date", "date"),
+        Index("idx_paiements_user", "user_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    #: Identifiant de session Stripe, unique : un paiement n'est crédité qu'une fois.
+    session_id: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    #: ``gigot`` ou ``don``.
+    type: Mapped[str] = mapped_column(
+        String(10), nullable=False, default="gigot", server_default=text("'gigot'")
+    )
+    montant_cents: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default=text("0")
+    )
+    gigots: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default=text("0"))
+    points: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default=text("0"))
+    date: Mapped[datetime] = mapped_column(TS, nullable=False)
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 #   PROPRIÉTÉ DES TABLES — le garde-fou
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1028,6 +1061,7 @@ SITE_TABLES: tuple[Table, ...] = (
     Statistiques.__table__,
     Equipage.__table__,
     Ile.__table__,
+    Paiement.__table__,
 )
 
 #: Tables du launcher. Les seules que ``init_models()`` et notre migration créent.

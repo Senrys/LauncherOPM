@@ -236,6 +236,16 @@ class Settings(BaseSettings):
     #: serveur-ci).
     site_url: str = "https://onepieceminecraft.fr"
 
+    # ---------------------------------------------------------------- 11b. Dons
+    #: Clé secrète Stripe (``sk_test_…`` puis ``sk_live_…``) — LA MÊME que celle
+    #: du site : le launcher crée ses sessions de paiement exactement comme lui,
+    #: et c'est le webhook du site qui crédite. Vide = pas de Stripe, le bouton
+    #: « FAIRE UN DON » ouvre ``donation_url`` comme avant.
+    stripe_secret_key: str = ""
+    #: Bornes d'un don libre, en centimes (1 € à 1 000 €, comme sur le site).
+    donation_min_cents: int = Field(default=100, ge=50)
+    donation_max_cents: int = Field(default=100_000, ge=100)
+
     # -------------------------------------------------------------- 12. Contenu
     #: Nombre d'articles renvoyés par défaut par ``GET /api/v1/news``.
     news_limit: int = Field(default=10, ge=1, le=50)
@@ -248,7 +258,7 @@ class Settings(BaseSettings):
     #: ``dons_objectif`` et ``donateurs``, et rien d'autre (``docs/DATA.md`` §2).
     #: Le bouton « FAIRE UN DON » ouvre simplement cette page dans le navigateur :
     #: aucun paiement n'a lieu dans le launcher.
-    donation_url: str = "https://onepieceminecraft.fr/don"
+    donation_url: str = "https://onepieceminecraft.fr/#dons"
 
     # -------------------------------------------------------------- 14. Courriel
     smtp_enabled: bool = False

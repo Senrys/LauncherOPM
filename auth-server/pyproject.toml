@@ -54,6 +54,7 @@ dependencies = [
     # Divers
     "httpx>=0.28.0",                  # appels sortants (Microsoft, XBL, XSTS, ping serveur)
     "pillow>=11.1.0",                 # validation et normalisation des skins PNG
+    "stripe>=11.4.0",                 # sessions de paiement des dons, comme sur le site
 ]
 
 [project.optional-dependencies]
