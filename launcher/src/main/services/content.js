@@ -225,11 +225,13 @@ async function refresh(key) {
  * @param {string} key
  * @returns {Promise<any>}
  */
-async function read(key) {
+async function read(key, { fresh = false } = {}) {
   const source = SOURCES[key];
   const cached = await readCache(key);
 
-  if (cached && Date.now() - cached.at < source.ttl) return decorate(cached, false);
+  // `fresh` saute le cache : après un don, le joueur attend de voir sa jauge
+  // bouger, et deux minutes de cache le laisseraient croire que rien n'est passé.
+  if (!fresh && cached && Date.now() - cached.at < source.ttl) return decorate(cached, false);
 
   let pending = inflight.get(key);
   if (!pending) {
@@ -286,10 +288,11 @@ function votes() {
 
 /**
  * Cagnotte : montant collecté, objectif, paliers et donateurs.
+ * @param {{fresh?: boolean}} [options] `fresh` ignore le cache local
  * @returns {Promise<object>}
  */
-function donations() {
-  return read('donations');
+function donations(options = {}) {
+  return read('donations', { fresh: Boolean(options.fresh) });
 }
 
 /**
