@@ -624,7 +624,9 @@ function register(windowGetter) {
   handle('content:status', () => content.status());
   handle('content:next-event', () => content.nextEvent());
   handle('content:votes', () => content.votes());
-  handle('content:donations', () => content.donations());
+  handle('content:donations', (options) => content.donations({
+    fresh: Boolean(options && typeof options === 'object' && options.fresh),
+  }));
 
   handle('content:donate', async (amountCents) => {
     if (!Number.isInteger(amountCents) || amountCents <= 0) {

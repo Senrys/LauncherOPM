@@ -36,6 +36,15 @@ import { network } from '../utils/state.js';
  */
 const TIER_SHARES = [0.25, 0.5, 0.75, 1];
 
+/**
+ * Guet de la cagnotte après un don : on relit la collecte toutes les 15 s
+ * pendant 6 minutes. Un paiement Stripe prend moins d'une minute ; au-delà de
+ * six, le joueur a fermé l'onglet sans payer, ou reviendra plus tard — la
+ * jauge se mettra alors à jour au prochain affichage du panneau.
+ */
+const WATCH_INTERVAL_MS = 15_000;
+const WATCH_DURATION_MS = 6 * 60_000;
+
 /** États d'un palier, du plus bas au plus haut, avec leur classe et leur libellé. */
 const TIER_STATES = {
   locked: { className: 'opm-tier--locked', label: 'VERROUILLÉ' },
@@ -133,6 +142,12 @@ export default class DonationPanel {
     /** Une requête est déjà en vol : inutile d'en empiler une seconde. */
     this.loading = false;
 
+    /** Guet de la cagnotte après un don (voir `watchForDonation`). */
+    this.watchTimer = null;
+    this.watchFocus = null;
+    this.watchBaseline = 0;
+    this.watchUntil = 0;
+
     this.el = {
       amounts: $$('[data-action="pick-amount"]', this.root),
       projection: $('[data-bind="donation-projection"]', this.root),
@@ -149,7 +164,6 @@ export default class DonationPanel {
       donorTpl: $('[data-el="donor-tpl"]', this.root),
       donorsCount: $('[data-bind="donors-count"]', this.root),
       donate: $('[data-action="donate"]', this.root),
-      perks: $('[data-action="open-perks"]', this.root),
     };
 
     // Le bandeau de fraîcheur s'ancre sur la jauge : il se construit donc une
@@ -172,6 +186,11 @@ export default class DonationPanel {
     await this.load();
   }
 
+  /** Le panneau est masqué : le guet de la cagnotte n'a plus de spectateur. */
+  async hide() {
+    this.stopWatch();
+  }
+
   /* ---------------------------------------------------------------- câblage */
 
   /**
@@ -187,7 +206,6 @@ export default class DonationPanel {
     });
 
     delegate(this.root, 'click', '[data-action="donate"]', () => this.donate());
-    delegate(this.root, 'click', '[data-action="open-perks"]', () => this.openPerks());
   }
 
   /* --------------------------------------------------------- fraîcheur */
@@ -268,7 +286,7 @@ export default class DonationPanel {
   /* ------------------------------------------------------------- données */
 
   /** Interroge l'API et redessine tout l'écran. */
-  async load() {
+  async load({ fresh = false } = {}) {
     if (this.loading) return;
     this.loading = true;
 
@@ -276,7 +294,7 @@ export default class DonationPanel {
       // `network.watch` tient le compteur d'échecs d'où la clé `online` est
       // dérivée : une réponse marquée `stale` y compte comme une panne, une
       // réponse fraîche comme une liaison rétablie.
-      this.data = await network.watch(this.ctx.opm.content.donations());
+      this.data = await network.watch(this.ctx.opm.content.donations(fresh ? { fresh: true } : undefined));
       this.markFreshness(this.data);
       this.render();
     } catch (error) {
@@ -337,7 +355,6 @@ export default class DonationPanel {
     this.renderTiers();
     this.renderDonors();
     this.renderProjection();
-    this.renderPerks();
   }
 
   /**
@@ -517,27 +534,6 @@ export default class DonationPanel {
     this.bind(this.el.projection, sentence);
   }
 
-  /**
-   * Le bouton « AVANTAGES » mène à la page du site qui les détaille. Sans URL
-   * connue, il est désactivé plutôt que de ne mener nulle part.
-   */
-  renderPerks() {
-    if (!this.el.perks) return;
-    this.el.perks.disabled = this.perksUrl() === null;
-  }
-
-  /**
-   * URL de la page des avantages, prise dans les données réelles.
-   * @returns {string|null}
-   */
-  perksUrl() {
-    const fromApi = firstText(this.data, ['perks_url', 'url']);
-    if (fromApi) return fromApi;
-
-    const website = this.ctx.store.get().bootstrap?.links?.website;
-    return typeof website === 'string' && website !== '' ? website : null;
-  }
-
   /* ------------------------------------------------------------- actions */
 
   /**
@@ -571,6 +567,7 @@ export default class DonationPanel {
         title: 'Page de paiement ouverte',
         message: `Terminez votre don de ${this.ctx.format.euros(this.amount)} dans votre navigateur.`,
       });
+      this.watchForDonation();
     } catch (error) {
       this.reportFailure(
         error,
@@ -582,9 +579,58 @@ export default class DonationPanel {
     }
   }
 
-  /** Ouvre la page des avantages dans le navigateur du système. */
-  openPerks() {
-    const url = this.perksUrl();
-    if (url) this.ctx.openExternal(url);
+  /* ------------------------------------------------ après un don : la jauge */
+
+  /**
+   * Après l'ouverture de la page de paiement, on guette la cagnotte.
+   *
+   * Le launcher ne sait pas quand le joueur a payé : ça se passe dans son
+   * navigateur, et c'est le webhook Stripe du site qui crédite. Alors on
+   * relit la cagnotte régulièrement pendant quelques minutes, en sautant les
+   * caches (celui du launcher, 2 min, et celui du serveur, 10 s pour la
+   * collecte), jusqu'à voir le montant augmenter — et on le dit au joueur.
+   *
+   * Le guet s'arrête de lui-même au premier don vu, à l'expiration, ou quand le
+   * panneau est masqué.
+   */
+  watchForDonation() {
+    this.stopWatch();
+    this.watchBaseline = this.collected;
+    this.watchUntil = Date.now() + WATCH_DURATION_MS;
+
+    const tick = async () => {
+      if (Date.now() > this.watchUntil) {
+        this.stopWatch();
+        return;
+      }
+      await this.load({ fresh: true });
+      if (this.collected > this.watchBaseline) {
+        this.stopWatch();
+        this.ctx.toast({
+          kind: 'success',
+          title: 'Merci pour votre soutien !',
+          message: `Votre don de ${this.ctx.format.euros(this.collected - this.watchBaseline)} `
+            + 'a été reçu : la cagnotte vient de bouger.',
+        });
+      }
+    };
+
+    this.watchTimer = setInterval(tick, WATCH_INTERVAL_MS);
+    // Le retour du joueur dans le launcher est le moment le plus probable :
+    // il vient de fermer l'onglet Stripe. On relit tout de suite.
+    this.watchFocus = () => { tick(); };
+    window.addEventListener('focus', this.watchFocus);
+  }
+
+  /** Arrête le guet de la cagnotte, s'il court. */
+  stopWatch() {
+    if (this.watchTimer) {
+      clearInterval(this.watchTimer);
+      this.watchTimer = null;
+    }
+    if (this.watchFocus) {
+      window.removeEventListener('focus', this.watchFocus);
+      this.watchFocus = null;
+    }
   }
 }

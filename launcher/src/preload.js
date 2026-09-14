@@ -211,7 +211,7 @@ const opm = {
     status: () => call('content:status'),
     nextEvent: () => call('content:next-event'),
     votes: () => call('content:votes'),
-    donations: () => call('content:donations'),
+    donations: (options) => call('content:donations', options && options.fresh ? { fresh: true } : undefined),
     donate: async (amountCents) => call('content:donate', assertNumber(amountCents, 'montant')),
   },
 
