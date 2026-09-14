@@ -80,7 +80,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from opm_auth.config import Settings, get_settings
 from opm_auth.db import SessionDep
-from opm_auth.models import STATS_ROW_ID, Article, Equipage, Ile, Instance, Statistiques
+from opm_auth.models import STATS_ROW_ID, Article, Equipage, Ile, Instance, Paiement, Statistiques
 from opm_auth.schemas import (
     AuthInfoOut,
     BootstrapOut,
@@ -136,12 +136,12 @@ STALE_RETRY_SECONDS: Final[float] = 5.0
 #: En-tête signalant une réponse servie depuis un cache périmé.
 STALE_HEADER: Final[str] = "X-OPM-Stale"
 
-#: Paliers de la cagnotte, repris de la maquette (écran Donation). Ils n'ont
-#: aucune source en base : il n'existe pas de table de dons, la partie paiement
-#: du site n'étant pas terminée (``docs/DATA.md`` §2). Seuls les **seuils** sont
-#: calculés, depuis ``dons_objectif``.
+#: Paliers de la cagnotte, repris de la maquette (écran Donation). Les
+#: récompenses n'ont pas de source en base : seuls les **seuils** sont calculés,
+#: depuis ``dons_objectif``. Un palier dont la récompense n'est pas encore
+#: arrêtée s'affiche « À déterminer » — jamais une promesse inventée.
 DONATION_TIERS: Final[tuple[tuple[str, int, str, str], ...]] = (
-    ("weekend-xp", 25, "Week-end double XP", "Tout le serveur, samedi et dimanche."),
+    ("palier-1", 25, "À déterminer", "La récompense de ce palier sera annoncée par le staff."),
     ("evenement-rp", 50, "Événement RP surprise", "Animé par le staff, primes doublées."),
     ("ile-avant-premiere", 75, "Île en avant-première", "Ouverture anticipée d'une semaine."),
     ("coffre-tresor", 100, "Coffre du Trésor pour tous", "Et un cosmétique exclusif du mois."),
@@ -332,6 +332,61 @@ async def _stats(session: AsyncSession) -> tuple[_Stats | None, bool]:
     """``statistiques`` en cache 60 s. Lève ``503`` si rien n'est servable."""
     settings = get_settings()
     return await _cache.fetch("stats", _ttl(STATS_TTL, settings), lambda: _load_stats(session))
+
+
+#: Cache court de la collecte : après un don, le launcher relit la cagnotte
+#: toutes les quelques secondes pour voir sa jauge bouger — 60 s seraient
+#: trop longs, mais interroger la base à chaque requête serait absurde.
+COLLECTE_TTL: Final[float] = 10.0
+
+
+@dataclass(slots=True)
+class _Collecte:
+    """Ce que ``paiements`` a encaissé depuis le premier jour du mois (UTC)."""
+
+    total_cents: int
+    count: int
+
+
+async def _load_collecte(session: AsyncSession) -> _Collecte:
+    """Somme et nombre des paiements du mois — dons ET achats de gigots.
+
+    Même règle que ``collecte_du_mois()`` sur le site : l'objectif du mois est
+    « ce que Stripe a encaissé », quel que soit le type. Le mois commence au
+    premier jour à minuit **UTC**, comme là-bas (``datetime.utcnow()``), pour
+    que les deux écrans affichent le même chiffre à toute heure.
+    """
+    debut = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    row = (
+        await session.execute(
+            select(
+                func.coalesce(func.sum(Paiement.montant_cents), 0),
+                func.count(Paiement.id),
+            ).where(Paiement.date >= debut)
+        )
+    ).one()
+    return _Collecte(total_cents=int(row[0] or 0), count=int(row[1] or 0))
+
+
+async def _collecte(session: AsyncSession) -> tuple[_Collecte | None, bool]:
+    """La collecte en cache 10 s ; ``None`` si ``paiements`` est illisible.
+
+    Une table absente (site pas encore migré) ou un droit manquant ne doit
+    pas casser l'écran : on retombe alors sur ``statistiques`` seule, comme
+    avant, et on le dit dans le journal.
+    """
+    settings = get_settings()
+    try:
+        return await _cache.fetch(
+            "collecte", _ttl(COLLECTE_TTL, settings), lambda: _load_collecte(session)
+        )
+    except ApiError:
+        logger.warning(
+            "« paiements » illisible : la cagnotte ne compte que statistiques.dons_collecte. "
+            "Vérifiez que la migration « paiements » du site est passée et que le rôle "
+            "a le droit SELECT dessus."
+        )
+        return None, True
 
 
 async def _stats_soft(session: AsyncSession) -> tuple[_Stats | None, bool]:
@@ -728,29 +783,35 @@ async def votes(session: SessionDep) -> Any:
 
 @router.get("/donations", response_model=DonationsOut, summary="Cagnotte du mois")
 async def donations(session: SessionDep) -> Any:
-    """État de la cagnotte, paliers compris.
+    """État de la cagnotte, paliers compris — le même chiffre que l'accueil du site.
 
-    Tout vient de ``statistiques.dons_collecte``, ``dons_objectif`` et
-    ``donateurs`` — **des euros entiers**, convertis en centimes par le schéma.
-    Il n'existe aucune table de dons (``docs/DATA.md`` §2), donc :
+    Collecté = somme des ``paiements`` du mois (Stripe : dons et gigots) plus
+    le complément manuel ``statistiques.dons_collecte`` ; donateurs = nombre de
+    paiements du mois plus ``statistiques.donateurs``. Objectif : ``dons_objectif``.
+    ``statistiques`` est en **euros entiers**, ``paiements`` en centimes.
 
-    * les quatre paliers sont calculés depuis le ratio, pas lus quelque part ;
-    * ``top`` est **toujours vide** : le classement « MERCI À L'ÉQUIPAGE » n'a
-      aucune source, et le launcher affiche un état vide honnête plutôt que
-      trois faux donateurs ;
-    * ``perks_url`` reste ``null`` : le launcher retombe alors sur le site
-      annoncé par ``/bootstrap``.
+    * les quatre paliers sont calculés depuis le ratio ;
+    * ``top`` reste vide : le site n'affiche pas de classement de donateurs, et
+      le launcher n'a pas à en inventer un ;
+    * ``perks_url`` reste ``null``.
     """
     stats, stale = await _stats(session)
-    if stats is None:
-        payload = DonationsOut(tiers=_build_tiers(0, 0), days_left=_days_left_in_month())
-    else:
-        payload = DonationsOut.from_stats(
-            stats,
-            tiers=_build_tiers(stats.dons_collecte * 100, stats.dons_objectif * 100),
-            days_left=_days_left_in_month(),
-        )
-    return _respond(payload, stale=stale)
+    collecte, collecte_stale = await _collecte(session)
+
+    manual_cents = (stats.dons_collecte if stats else 0) * 100
+    manual_donors = stats.donateurs if stats else 0
+    goal_cents = (stats.dons_objectif if stats else 0) * 100
+    collected_cents = manual_cents + (collecte.total_cents if collecte else 0)
+    donors = manual_donors + (collecte.count if collecte else 0)
+
+    payload = DonationsOut(
+        collected_cents=max(0, collected_cents),
+        goal_cents=max(0, goal_cents),
+        donors_count=max(0, donors),
+        days_left=_days_left_in_month(),
+        tiers=_build_tiers(collected_cents, goal_cents),
+    )
+    return _respond(payload, stale=stale or collecte_stale)
 
 
 @router.post(
@@ -759,33 +820,130 @@ async def donations(session: SessionDep) -> Any:
     summary="Ouvrir la page de don",
 )
 async def donations_checkout(payload: DonateCheckoutIn, user: OptionalUser) -> DonateCheckoutOut:
-    """Renvoie l'adresse de la page de don du site. **Aucun paiement ici.**
+    """Ouvre une session de paiement Stripe pour le montant choisi — **comme le site**.
 
-    La partie paiement du site n'est pas terminée : le launcher se contente
-    d'ouvrir ``OPM_DONATION_URL`` dans le navigateur du joueur
-    (``docs/DATA.md`` §2). Le montant choisi n'est pas transmis — il n'existe
-    aucune intention de paiement à créer — mais il est journalisé, ce qui
-    renseignera utilement le jour où une passerelle sera branchée.
+    Le launcher fait exactement ce que fait ``create_donation_session`` sur
+    le site (``boutique.py``) : même clé Stripe, mêmes métadonnées
+    (``type=don``, ``user_id``, ``gigots=0``), et surtout **mêmes pages de
+    retour** — ``/paiement/succes`` et ``/paiement/annule`` du site. C'est donc
+    le webhook du site qui crédite ``paiements`` et les points de fidélité :
+    rien n'est dupliqué, aucun paiement ne peut être compté deux fois, et la
+    cagnotte du launcher (``/donations``) reflète le don dès qu'il est encaissé.
 
-    L'authentification est facultative : cette route ne divulgue rien et un
-    joueur déconnecté doit pouvoir soutenir le serveur. Quand le compte est
-    connu, la limite de débit par compte s'applique.
+    Le joueur connecté au launcher l'est via ``users`` — la table du site — donc
+    ``user_id`` est directement celui que le site attend pour créditer.
+
+    Sans ``OPM_STRIPE_SECRET_KEY``, comportement d'avant : on ouvre
+    ``OPM_DONATION_URL`` et le joueur donne depuis le site.
+
+    L'authentification est facultative : un joueur déconnecté doit pouvoir
+    soutenir le serveur (don anonyme, sans points). Quand le compte est connu,
+    la limite de débit par compte s'applique.
     """
     settings = get_settings()
     if user is not None:
         await enforce("donations.checkout.account", str(user.id))
 
-    url = settings.donation_url.strip()
-    if not url:
-        logger.error("OPM_DONATION_URL est vide : le bouton « FAIRE UN DON » ne mène nulle part.")
+    amount = payload.amount_cents
+    if not settings.donation_min_cents <= amount <= settings.donation_max_cents:
         raise ApiError(
-            "content_unavailable",
-            "La page de don n'est pas configurée.",
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            "invalid_amount",
+            f"Un don va de {settings.donation_min_cents // 100} € à "
+            f"{settings.donation_max_cents // 100} €.",
+            status_code=status.HTTP_400_BAD_REQUEST,
         )
 
-    logger.info("Intention de don de %.2f € ouverte vers %s.", payload.amount_cents / 100, url)
-    return DonateCheckoutOut(checkout_url=url)
+    if not settings.stripe_secret_key.strip():
+        url = settings.donation_url.strip()
+        if not url:
+            logger.error(
+                "Ni OPM_STRIPE_SECRET_KEY ni OPM_DONATION_URL : le bouton « FAIRE UN DON » "
+                "ne mène nulle part."
+            )
+            raise ApiError(
+                "content_unavailable",
+                "La page de don n'est pas configurée.",
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        logger.info("Intention de don de %.2f € ouverte vers %s (sans Stripe).", amount / 100, url)
+        return DonateCheckoutOut(checkout_url=url)
+
+    checkout_url = await _stripe_checkout(settings, amount, user.id if user else None)
+    logger.info(
+        "Session Stripe créée : don de %.2f € par %s.",
+        amount / 100,
+        f"le compte {user.id}" if user else "un joueur anonyme",
+    )
+    return DonateCheckoutOut(checkout_url=checkout_url)
+
+
+async def _stripe_checkout(settings: Settings, amount_cents: int, user_id: int | None) -> str:
+    """Crée la session Stripe et rend l'URL de paiement.
+
+    La bibliothèque ``stripe`` est synchrone : l'appel passe par un fil à part
+    pour ne pas figer la boucle d'événements — même règle que le SMTP et les
+    textures.
+
+    Le libellé, la description et les métadonnées sont **copiés du site** : le
+    webhook de celui-ci lit ``metadata.type`` pour distinguer un don d'un achat
+    et ``metadata.user_id`` pour créditer le bon joueur. Changer ces clés ici
+    casserait le crédit là-bas.
+    """
+    import stripe  # import différé : la bibliothèque n'est chargée que si Stripe est configuré
+
+    site = settings.site_url.rstrip("/")
+    session_kwargs = {
+        "payment_method_types": ["card"],
+        "mode": "payment",
+        "submit_type": "donate",
+        "line_items": [
+            {
+                "price_data": {
+                    "currency": "eur",
+                    "product_data": {
+                        "name": "Don à One Piece Minecraft",
+                        "description": (
+                            "Soutien au serveur : hébergement, modération et développement de la map."
+                        ),
+                    },
+                    "unit_amount": amount_cents,
+                },
+                "quantity": 1,
+            }
+        ],
+        "success_url": f"{site}/paiement/succes?session_id={{CHECKOUT_SESSION_ID}}",
+        "cancel_url": f"{site}/paiement/annule",
+        "metadata": {
+            "type": "don",
+            "user_id": str(user_id) if user_id else "",
+            "gigots": "0",
+            "source": "launcher",
+        },
+    }
+
+    def create() -> str:
+        client = stripe.StripeClient(settings.stripe_secret_key.strip())
+        session = client.checkout.sessions.create(params=session_kwargs)
+        return str(session.url or "")
+
+    try:
+        url = await asyncio.to_thread(create)
+    except Exception as exc:  # noqa: BLE001 — n'importe quelle erreur Stripe ou réseau
+        logger.exception("Création de la session Stripe impossible : %s", exc)
+        raise ApiError(
+            "checkout_unavailable",
+            "Le paiement est momentanément indisponible. Réessayez dans un instant.",
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        ) from exc
+
+    if not url.startswith("https://"):
+        logger.error("Stripe a répondu sans URL de paiement exploitable.")
+        raise ApiError(
+            "checkout_unavailable",
+            "Le paiement est momentanément indisponible. Réessayez dans un instant.",
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+    return url
 
 
 @router.get("/profile/rp", response_model=UserProfileOut, summary="Fiche RP du joueur")
