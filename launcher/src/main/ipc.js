@@ -184,6 +184,54 @@ function needObject(value, label) {
   return value;
 }
 
+/** Plafond d'un fichier de skin : un PNG 64×64 pèse quelques Ko, jamais plus de 256 Ko. */
+const SKIN_MAX_BYTES = 256 * 1024;
+
+/** Signature PNG : les huit premiers octets de tout fichier PNG. */
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+/**
+ * Lit les dimensions d'un PNG dans son en-tête IHDR et vérifie que ce sont
+ * celles d'un skin : 64×64 (format actuel) ou 64×32 (ancien format, sans
+ * seconde couche ni bras gauche distinct). Tout autre fichier est refusé avant
+ * d'atteindre le serveur — qui refuserait aussi, mais avec un aller-retour.
+ *
+ * @param {Buffer} png
+ * @returns {{width: number, height: number}}
+ */
+function skinDimensions(png) {
+  if (!Buffer.isBuffer(png) || png.length < 24 || !png.subarray(0, 8).equals(PNG_SIGNATURE)) {
+    throw fail('invalid_texture', 'Ce fichier n’est pas un PNG.');
+  }
+  // IHDR suit immédiatement la signature : longueur (4) + « IHDR » (4) + largeur (4) + hauteur (4).
+  if (png.toString('ascii', 12, 16) !== 'IHDR') {
+    throw fail('invalid_texture', 'PNG illisible : en-tête IHDR absent.');
+  }
+  const width = png.readUInt32BE(16);
+  const height = png.readUInt32BE(20);
+  const valid = width === 64 && (height === 64 || height === 32);
+  if (!valid) {
+    throw fail(
+      'invalid_texture',
+      `Un skin fait 64×64 ou 64×32 pixels ; ce fichier fait ${width}×${height}.`
+    );
+  }
+  return { width, height };
+}
+
+/**
+ * Décode la `data:` URL d'un PNG produite par le renderer (éditeur ou import).
+ * @param {unknown} value
+ * @returns {Buffer}
+ */
+function pngFromDataUrl(value) {
+  const match = typeof value === 'string' && /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/.exec(value);
+  if (!match) throw fail('invalid_texture', 'Skin illisible.');
+  const png = Buffer.from(match[1], 'base64');
+  if (png.length > SKIN_MAX_BYTES) throw fail('texture_too_large', 'Ce skin dépasse 256 Ko.');
+  return png;
+}
+
 /**
  * N'autorise que http(s) : `shell.openExternal` peut sinon lancer des protocoles
  * arbitraires (`file:`, `ms-…`) si le renderer est compromis.
@@ -639,6 +687,44 @@ function register(windowGetter) {
     }
     await shell.openExternal(url);
   });
+
+  /* --------------------------------------------------------------- SKIN */
+
+  // Le fichier est choisi, lu et VALIDÉ ici, dans le processus principal : le
+  // renderer ne touche jamais au disque et ne reçoit qu'une image déjà reconnue
+  // comme un skin — dimensions comprises. Le serveur revalidera de toute façon.
+
+  handle('textures:pick', async () => {
+    const win = getWindow();
+    const options = {
+      title: 'Choisissez un skin Minecraft (PNG 64×64 ou 64×32)',
+      buttonLabel: 'Utiliser ce skin',
+      properties: ['openFile', 'dontAddToRecent'],
+      filters: [{ name: 'Skin Minecraft (PNG)', extensions: ['png'] }],
+    };
+    const { canceled, filePaths } = win
+      ? await dialog.showOpenDialog(win, options)
+      : await dialog.showOpenDialog(options);
+    if (canceled || !filePaths.length) return null;
+
+    const stat = await fsp.stat(filePaths[0]);
+    if (stat.size > SKIN_MAX_BYTES) {
+      throw fail('texture_too_large', 'Ce fichier dépasse 256 Ko : ce n’est pas un skin.');
+    }
+    const png = await fsp.readFile(filePaths[0]);
+    const dims = skinDimensions(png);
+    return { dataUrl: `data:image/png;base64,${png.toString('base64')}`, ...dims };
+  });
+
+  handle('textures:upload', async (payload) => {
+    if (!payload || typeof payload !== 'object') throw fail('invalid_texture', 'Skin manquant.');
+    const model = payload.model === 'slim' ? 'slim' : 'classic';
+    const png = pngFromDataUrl(payload.dataUrl);
+    skinDimensions(png); // lève si ce n'est pas un skin
+    return accounts.uploadSkin(png, model);
+  });
+
+  handle('textures:remove', () => accounts.removeSkin());
 
   /* --------------------------------------------------------- MISE À JOUR */
 

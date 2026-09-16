@@ -21,7 +21,7 @@ import { $, $$, delegate, el, focusTrap, hide, on, setHtml, setText, show, toggl
 import * as format from './utils/format.js';
 import { blockedLabel } from './utils/labels.js';
 import { GAME_IDLE, LOG_LIMIT, UPDATER_IDLE, network, store } from './utils/state.js';
-import { bodyDataUrl, headDataUrl, preloadSkin } from './utils/skin.js';
+import { FALLBACK_BODY, bodyDataUrl, headDataUrl, preloadSkin, skinImage } from './utils/skin.js';
 import { toast } from './components/toast.js';
 import { confirmModal } from './components/modal.js';
 import { Popover, closeAllPopovers } from './components/popover.js';
@@ -244,7 +244,7 @@ function makeContext(root) {
     closeAllPopovers,
     dom: { $, $$, el, on, delegate, setText, setHtml, show, hide, toggle, focusTrap },
     format,
-    skin: { headDataUrl, bodyDataUrl, preloadSkin },
+    skin: { headDataUrl, bodyDataUrl, preloadSkin, skinImage, FALLBACK_BODY },
     /** Bascule d'onglet, pour qu'un module puisse renvoyer vers un autre écran. */
     setTab,
     /** Change la vue de l'écran de connexion (login|totp|register|link|forgot). */

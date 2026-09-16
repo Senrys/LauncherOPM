@@ -141,6 +141,19 @@ const opm = {
   },
 
   /* ------------------------------------------------------------- COMPTES */
+  /** Skin du personnage sur One Piece Minecraft (docs/API.md §2.5). */
+  textures: {
+    /** Ouvre le sélecteur de fichier ; rend `{dataUrl, width, height}` ou `null`. */
+    pick: () => call('textures:pick'),
+    /** Enregistre un PNG (data: URL) comme skin ; rend le compte mis à jour. */
+    upload: async (dataUrl, model) => call('textures:upload', {
+      dataUrl: assertString(dataUrl, 'dataUrl'),
+      model: model === 'slim' ? 'slim' : 'classic',
+    }),
+    /** Retire le skin enregistré ; rend le compte mis à jour. */
+    remove: () => call('textures:remove'),
+  },
+
   auth: {
     bootstrap: () => call('auth:bootstrap'),
     list: () => call('auth:list'),

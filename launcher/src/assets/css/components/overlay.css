@@ -362,3 +362,215 @@
     transform: translateY(8px);
   }
 }
+
+/* ------------------------------------------------------- ÉDITEUR DE SKIN */
+
+/* Même famille que la modale : voile, carte claire, mais en grand — la grille
+   64 × 64 agrandie et l'aperçu 3D ont besoin de place. Tient dans la fenêtre
+   minimale (1100 × 700) sans défilement. */
+.opm-skined {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.opm-skined__veil {
+  position: absolute;
+  inset: 0;
+  background: var(--veil-72);
+}
+
+.opm-skined__card {
+  position: relative;
+  width: 1040px;
+  max-width: 100%;
+  max-height: 100%;
+  overflow: auto;
+  padding: 18px 22px 16px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-xl);
+  background: var(--paper);
+  box-shadow: var(--sh-card);
+  color: var(--text-body);
+  animation: opmRise .22s ease both;
+}
+
+.opm-skined__head { margin-bottom: 12px; }
+
+.opm-skined__title {
+  margin: 0 0 4px;
+  font: 400 26px/1 var(--font-display);
+  letter-spacing: .02em;
+  color: var(--text-dark);
+}
+
+.opm-skined__lead {
+  margin: 0;
+  font: 400 var(--fs-small)/1.4 var(--font-ui);
+  color: var(--muted);
+}
+
+.opm-skined__body {
+  display: grid;
+  grid-template-columns: 92px 448px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+/* Outils : une colonne de boutons texte, le courant surligné. */
+.opm-skined__toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.opm-skined__tool {
+  padding: 9px 8px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-md);
+  background: transparent;
+  font: 600 var(--fs-small)/1 var(--font-ui);
+  letter-spacing: .04em;
+  color: var(--text-body);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.opm-skined__tool:hover { background: color-mix(in srgb, var(--aqua) 14%, transparent); }
+
+.opm-skined__tool--on {
+  border-color: var(--aqua);
+  background: var(--aqua);
+  color: var(--ink);
+}
+
+/* La grille : la texture et le guide superposés, même taille, même origine. */
+.opm-skined__grid {
+  position: relative;
+  width: 448px;
+  height: 448px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  background: #c3cbce;
+}
+
+.opm-skined__pixels,
+.opm-skined__guide {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 448px;
+  height: 448px;
+  image-rendering: pixelated;
+}
+
+.opm-skined__pixels { cursor: crosshair; touch-action: none; }
+.opm-skined__pixels:focus-visible { outline: 2px solid var(--aqua); outline-offset: -2px; }
+.opm-skined__guide { pointer-events: none; }
+
+.opm-skined__status {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 6px;
+  font: 500 var(--fs-small)/1.3 var(--font-ui);
+  color: var(--muted);
+}
+
+.opm-skined__coords { font-variant-numeric: tabular-nums; color: var(--text-dark); }
+
+/* Colonne de droite : aperçu 3D puis réglages. */
+.opm-skined__side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.opm-skined__preview {
+  display: block;
+  width: 260px;
+  height: 300px;
+  margin: 0 auto;
+  border-radius: var(--r-md);
+  background: linear-gradient(180deg, #1b5f7a, #0b2a3a);
+  cursor: grab;
+}
+
+.opm-skined__preview:active { cursor: grabbing; }
+
+.opm-skined__section { display: flex; flex-direction: column; gap: 8px; }
+
+.opm-skined__label {
+  margin: 0;
+  font: 700 11px/1 var(--font-ui);
+  letter-spacing: .12em;
+  color: var(--muted);
+}
+
+.opm-skined__colorrow { display: flex; gap: 8px; align-items: center; }
+
+.opm-skined__color {
+  width: 44px;
+  height: 34px;
+  padding: 2px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  background: transparent;
+  cursor: pointer;
+}
+
+.opm-skined__hex {
+  width: 96px;
+  padding: 7px 9px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  font: 500 var(--fs-body)/1 var(--font-ui);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dark);
+  background: var(--white);
+}
+
+.opm-skined__palette {
+  display: grid;
+  grid-template-columns: repeat(8, 26px);
+  gap: 6px;
+}
+
+.opm-skined__swatch {
+  width: 26px;
+  height: 26px;
+  border: 1px solid rgba(15, 26, 25, .18);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+}
+
+.opm-skined__swatch--on { outline: 2px solid var(--aqua); outline-offset: 1px; }
+
+.opm-skined__radios { display: flex; gap: 16px; }
+
+.opm-skined__radio,
+.opm-skined__check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: 500 var(--fs-body)/1.3 var(--font-ui);
+  color: var(--text-dark);
+  cursor: pointer;
+}
+
+.opm-skined__hint { font: 400 var(--fs-small)/1 var(--font-ui); color: var(--muted); }
+
+.opm-skined__history { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.opm-skined__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+}

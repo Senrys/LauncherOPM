@@ -22,6 +22,7 @@
  */
 
 import { blockedLabel, errorLabel } from '../utils/labels.js';
+import { openSkinEditor } from '../components/skin-editor.js';
 
 /* ========================================================================== */
 /*  Constantes                                                                */
@@ -240,6 +241,10 @@ export default class SettingsPanel {
       msLinked: $('[data-el="ms-linked"]', this.root),
       msUnlinked: $('[data-el="ms-unlinked"]', this.root),
       msHead: $('[data-el="ms-head"]', this.root),
+      skinPreview: $('[data-el="skin-preview"]', this.root),
+      skinModel: $('[data-el="skin-model"]', this.root),
+      skinRemove: $('[data-el="skin-remove"]', this.root),
+      skinStatus: $('[data-el="skin-status"]', this.root),
       msUsername: $('[data-bind="ms-username"]', this.root),
       msExpires: $('[data-bind="ms-expires"]', this.root),
       msDevice: $('[data-el="ms-device"]', this.root),
@@ -415,6 +420,9 @@ export default class SettingsPanel {
       'verify-files': (target) => this.verifyFiles(target),
       'download-launcher': () => this.downloadLauncher(),
       'open-link': (target) => this.openLink(target),
+      'import-skin': (target) => this.importSkin(target),
+      'edit-skin': (target) => this.editSkin(target),
+      'remove-skin': (target) => this.removeSkin(target),
     };
 
     for (const [name, handler] of Object.entries(actions)) {
@@ -720,6 +728,7 @@ export default class SettingsPanel {
     if (this.el.msLinked) this.el.msLinked.hidden = !linked || pending;
     if (this.el.msUnlinked) this.el.msUnlinked.hidden = linked || pending;
     this.renderTotp(account);
+    this.renderSkin(account);
     if (!linked || !account) return;
 
     setText(this.el.msUsername, account.minecraft.name ?? '');
@@ -1720,6 +1729,172 @@ export default class SettingsPanel {
   downloadLauncher() {
     const url = trimmed(this.ctx.store.get().bootstrap?.launcher?.download_url);
     if (url) this.ctx.openExternal(url);
+  }
+
+  /* ------------------------------------------------------------- skin */
+
+  /**
+   * Aperçu en pied du skin courant et état des boutons.
+   *
+   * Le skin OPM et le repli Mojang passent par la même adresse (`skin_url`) :
+   * l'aperçu ne distingue pas les deux. C'est `account.skin_source` qui
+   * dirait lequel — le serveur ne l'expose pas, alors on lit l'origine de
+   * l'adresse : une texture servie par notre serveur est un skin OPM, donc
+   * retirable ; tout le reste vient de Mojang.
+   *
+   * @param {Object|null} account
+   */
+  renderSkin(account) {
+    const { setText } = this.ctx.dom;
+    const preview = this.el.skinPreview;
+    if (!preview) return;
+
+    const url = account?.skin_url ?? null;
+    const own = this.isOwnSkin(url);
+    if (this.el.skinRemove) this.el.skinRemove.hidden = !own;
+
+    // Le modèle de bras enregistré, si le serveur le renvoie.
+    const model = account?.skin_model === 'slim' ? 'slim' : 'classic';
+    const radio = this.el.skinModel?.querySelector(`input[value="${model}"]`);
+    if (radio && !this.skinModelTouched) radio.checked = true;
+
+    if (!url) {
+      preview.src = this.ctx.skin.FALLBACK_BODY ?? preview.src;
+      setText(this.el.skinStatus, 'Aucun skin connu : connectez-vous pour le voir.');
+      return;
+    }
+
+    setText(
+      this.el.skinStatus,
+      own
+        ? 'Skin enregistré sur One Piece Minecraft. RETIRER rend votre apparence Mojang.'
+        : 'Apparence Mojang actuelle. Importez ou dessinez un skin pour la remplacer sur le serveur.',
+    );
+    const seq = (this.skinSeq = (this.skinSeq ?? 0) + 1);
+    this.ctx.skin.bodyDataUrl(url, { model }).then((source) => {
+      if (seq === this.skinSeq) preview.src = source;
+    });
+  }
+
+  /**
+   * Une texture servie par notre propre serveur d'auth est un skin OPM.
+   * @param {string|null} url
+   * @returns {boolean}
+   */
+  isOwnSkin(url) {
+    if (typeof url !== 'string' || url === '') return false;
+    try {
+      // Les textures OPM sont servies en contenu adressable : /textures/<sha256>.png
+      // (config.texture_url côté serveur). Le repli Mojang, lui, est /skin/<pseudo>.
+      return /\/textures\/[0-9a-f]{64}\.png$/i.test(new URL(url).pathname);
+    } catch {
+      return false;
+    }
+  }
+
+  /** Modèle de bras choisi dans les radios. */
+  chosenModel() {
+    const checked = this.el.skinModel?.querySelector('input[name="skin-model"]:checked');
+    return checked?.value === 'slim' ? 'slim' : 'classic';
+  }
+
+  /**
+   * Importer un PNG : le processus principal ouvre le sélecteur, lit et valide
+   * le fichier ; on ne reçoit qu'un skin reconnu, qu'on envoie aussitôt.
+   * @param {HTMLButtonElement} button
+   */
+  async importSkin(button) {
+    button.disabled = true;
+    try {
+      const picked = await this.ctx.opm.textures.pick();
+      if (!picked) return;
+      await this.saveSkin(picked.dataUrl, this.chosenModel());
+    } catch (error) {
+      this.reportSkinError(error, "Le skin n'a pas pu être importé.");
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  /**
+   * Dessiner : ouvre l'éditeur sur le skin courant (ou un modèle vierge), et
+   * enregistre ce qu'il rend.
+   * @param {HTMLButtonElement} button
+   */
+  async editSkin(button) {
+    button.disabled = true;
+    try {
+      const account = this.currentAccount();
+      const result = await openSkinEditor({
+        ctx: this.ctx,
+        skinUrl: account?.skin_url ?? null,
+        model: this.chosenModel(),
+      });
+      if (!result) return;
+      const radio = this.el.skinModel?.querySelector(`input[value="${result.model}"]`);
+      if (radio) radio.checked = true;
+      await this.saveSkin(result.dataUrl, result.model);
+    } catch (error) {
+      this.reportSkinError(error, "Le skin n'a pas pu être enregistré.");
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  /**
+   * Envoie le PNG au serveur et confirme. Le compte mis à jour arrive aussi par
+   * `auth.onChange`, qui repeint tout : l'aperçu, la tête de la barre du bas et
+   * le personnage 3D de l'accueil suivent sans rien de plus.
+   * @param {string} dataUrl
+   * @param {'classic'|'slim'} model
+   */
+  async saveSkin(dataUrl, model) {
+    this.skinModelTouched = false;
+    await this.ctx.opm.textures.upload(dataUrl, model);
+    this.ctx.toast({
+      kind: 'success',
+      title: 'Skin enregistré',
+      message: "C'est maintenant l'apparence de votre personnage sur One Piece Minecraft.",
+    });
+  }
+
+  /**
+   * Retirer : retour à l'apparence Mojang, après confirmation.
+   * @param {HTMLButtonElement} button
+   */
+  async removeSkin(button) {
+    const confirmed = await this.ctx.confirmModal({
+      title: 'Retirer ce skin ?',
+      message: 'Votre personnage reprendra votre apparence Mojang sur le serveur. '
+        + 'Le skin retiré n’est pas conservé.',
+      confirmLabel: 'RETIRER',
+      danger: true,
+    });
+    if (!confirmed) return;
+
+    button.disabled = true;
+    try {
+      await this.ctx.opm.textures.remove();
+      this.ctx.toast({ kind: 'info', title: 'Skin retiré', message: 'Retour à votre apparence Mojang.' });
+    } catch (error) {
+      this.reportSkinError(error, "Le skin n'a pas pu être retiré.");
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  /**
+   * Erreur de skin : le détail part au journal, le joueur lit une phrase.
+   * @param {unknown} error
+   * @param {string} fallback
+   */
+  reportSkinError(error, fallback) {
+    console.error('opm : skin.', error);
+    this.ctx.toast({
+      kind: 'error',
+      title: 'Skin',
+      message: errorLabel(error?.code, fallback).message,
+    });
   }
 
   /**
