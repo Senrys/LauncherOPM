@@ -292,6 +292,8 @@ async function attempt(method, url, headers, payload, timeoutMs, external) {
 async function request(method, path, options = {}) {
   const {
     body,
+    rawBody,
+    contentType,
     query,
     token,
     timeoutMs = TIMEOUT_MS,
@@ -304,7 +306,12 @@ async function request(method, path, options = {}) {
   if (token) headers.Authorization = `Bearer ${token}`;
 
   let payload;
-  if (body !== undefined) {
+  if (rawBody !== undefined) {
+    // Corps binaire tel quel (un PNG de skin) : le serveur lit le contenu, jamais
+    // le type annoncé — on l'annonce quand même, par honnêteté HTTP.
+    headers['Content-Type'] = contentType || 'application/octet-stream';
+    payload = rawBody;
+  } else if (body !== undefined) {
     headers['Content-Type'] = 'application/json';
     payload = JSON.stringify(body);
   }
@@ -610,6 +617,50 @@ function donateCheckout(amountCents, token) {
   return request('POST', `${API}/donations/checkout`, { body: { amount_cents: amountCents }, token });
 }
 
+/* ============================================================ 2.5 Textures ============ */
+
+/**
+ * Textures actives du compte (skin et cape), `GET /textures/me`.
+ * @param {string} token
+ */
+function myTextures(token) {
+  return request('GET', '/textures/me', { token });
+}
+
+/**
+ * Téléverse un skin ou une cape, `POST /textures/{kind}` (docs/API.md §2.5).
+ *
+ * Le PNG part brut dans le corps ; le modèle de bras passe par `?model=`. Le
+ * serveur ne regarde que le contenu : un fichier qui n'est pas un PNG de skin
+ * valide revient en `400 invalid_texture`, un trop gros en `413`.
+ *
+ * @param {'skin'|'cape'} kind
+ * @param {Buffer} png
+ * @param {'classic'|'slim'} model
+ * @param {string} token
+ */
+function uploadTexture(kind, png, model, token) {
+  return request('POST', `/textures/${kind}`, {
+    rawBody: png,
+    contentType: 'image/png',
+    query: { model },
+    token,
+    // Un téléversement n'est pas rejouable à l'aveugle : une seule tentative.
+    attempts: 1,
+    timeoutMs: 30_000,
+  });
+}
+
+/**
+ * Retire la texture active, `DELETE /textures/{kind}` : le joueur retrouve son
+ * skin Mojang (ou la silhouette par défaut).
+ * @param {'skin'|'cape'} kind
+ * @param {string} token
+ */
+function deleteTexture(kind, token) {
+  return request('DELETE', `/textures/${kind}`, { token, attempts: 1 });
+}
+
 module.exports = {
   ApiError,
   setBaseUrl,
@@ -621,6 +672,9 @@ module.exports = {
   refresh,
   logout,
   me,
+  myTextures,
+  uploadTexture,
+  deleteTexture,
   forgotPassword,
   resetPassword,
   totpSetup,

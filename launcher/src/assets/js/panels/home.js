@@ -773,7 +773,7 @@ export default class Home {
     // la feuille de style étirerait en cube de 404 px de côté. Ce rendu 2D est
     // toujours produit : il couvre l'attente de la 3D, et la remplace là où
     // WebGL fait défaut.
-    bodyDataUrl(account.skin_url, { model: account.minecraft?.model ?? null }).then((source) => {
+    bodyDataUrl(account.skin_url, { model: account.skin_model ?? null }).then((source) => {
       // Un changement de compte pendant le rendu annule le résultat périmé.
       if (seq !== this.skinSeq || !this.refs.character) return;
       this.refs.character.src = source;

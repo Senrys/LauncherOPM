@@ -219,6 +219,42 @@
          jetons de session délivrés par One Piece Minecraft sont conservés localement,
          chiffrés par votre système.</p>
 
+      <!-- ................................................... SKIN DU PERSONNAGE -->
+      <!-- Le skin enregistré ici est celui du personnage SUR ONE PIECE MINECRAFT :
+           c'est notre Yggdrasil qui le sert au jeu (docs/API.md §2.5). Le skin
+           Mojang du joueur n'est pas touché — et c'est dit au joueur.
+           data-el : skin-preview (rendu en pied), skin-model (radios), skin-remove
+           data-action : import-skin, edit-skin, remove-skin -->
+      <p class="opm-kicker"><span class="opm-kicker__dot" aria-hidden="true"></span>APPARENCE</p>
+      <h2>VOTRE SKIN SUR ONE PIECE MINECRAFT</h2>
+      <p>Importez un skin ou dessinez-le pixel par pixel : c'est l'apparence de votre
+         personnage sur le serveur, servie par One Piece Minecraft lui-même. Votre skin
+         Mojang reste tel quel ailleurs.</p>
+
+      <div class="opm-skin">
+        <img class="opm-skin__preview" data-el="skin-preview"
+             src="assets/images/silhouette.png" alt="Votre skin actuel">
+        <div class="opm-skin__side">
+          <div class="opm-skin__model" role="radiogroup" aria-label="Modèle de bras" data-el="skin-model">
+            <label class="opm-skin__radio">
+              <input type="radio" name="skin-model" value="classic" checked> Classique
+              <span class="opm-skin__hint">bras de 4 px</span>
+            </label>
+            <label class="opm-skin__radio">
+              <input type="radio" name="skin-model" value="slim"> Slim
+              <span class="opm-skin__hint">bras de 3 px</span>
+            </label>
+          </div>
+          <div class="opm-skin__actions">
+            <button type="button" class="opm-btn opm-btn--aqua" data-action="import-skin">IMPORTER UN PNG</button>
+            <button type="button" class="opm-btn opm-btn--outline" data-action="edit-skin">DESSINER</button>
+            <button type="button" class="opm-btn opm-btn--ghost" data-action="remove-skin"
+                    data-el="skin-remove" hidden>RETIRER</button>
+          </div>
+          <p class="opm-row__desc" data-el="skin-status"></p>
+        </div>
+      </div>
+
       <!-- ................................... DOUBLE AUTHENTIFICATION (TOTP, API §1.2) -->
       <p class="opm-kicker"><span class="opm-kicker__dot" aria-hidden="true"></span>SÉCURITÉ</p>
       <h2>DOUBLE AUTHENTIFICATION</h2>

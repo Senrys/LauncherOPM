@@ -330,6 +330,9 @@ function toAccount(user) {
         }
       : null,
     skin_url: skinUrl(user),
+    // Modèle de bras de la texture active (« classic » | « slim »), quand le
+    // serveur le renvoie ; sert à rendre le skin et à pré-cocher l'éditeur.
+    skin_model: isPlainObject(user.skin) && user.skin.model === 'slim' ? 'slim' : 'classic',
     can_play: Boolean(user.can_play),
     blocked_reason: typeof user.blocked_reason === 'string' ? user.blocked_reason : null,
     session_expires_at: ms && typeof ms.expires_at === 'string' ? ms.expires_at : null,
@@ -1252,6 +1255,36 @@ async function verifyOwnership() {
   return account;
 }
 
+/* ------------------------------------------------------------------ skin */
+
+/**
+ * Enregistre un nouveau skin pour le compte courant, puis relit le profil : le
+ * serveur y renvoie la texture active, que `skinUrl()` place en tête — le
+ * personnage de l'accueil et la tête de la barre du bas changent dans la foulée.
+ *
+ * Ce skin est celui du personnage SUR ONE PIECE MINECRAFT : c'est notre
+ * Yggdrasil qui le sert au jeu. Le skin Mojang du joueur n'est pas touché.
+ *
+ * @param {Buffer} png     le fichier, validé en amont par le canal IPC
+ * @param {'classic'|'slim'} model
+ * @returns {Promise<object>} le compte mis à jour
+ */
+async function uploadSkin(png, model) {
+  await withAuth((token) => api.uploadTexture('skin', png, model, token));
+  logger.info(`Skin enregistré (${model}, ${png.length} octets).`);
+  return syncCurrent();
+}
+
+/**
+ * Retire le skin enregistré : le joueur retrouve son apparence Mojang.
+ * @returns {Promise<object>} le compte mis à jour
+ */
+async function removeSkin() {
+  await withAuth((token) => api.deleteTexture('skin', token));
+  logger.info('Skin retiré : retour à l’apparence Mojang.');
+  return syncCurrent();
+}
+
 /* ------------------------------------------------------------------ session de jeu */
 
 /**
@@ -1327,6 +1360,8 @@ module.exports = {
   cancelLink,
   unlinkMicrosoft,
   verifyOwnership,
+  uploadSkin,
+  removeSkin,
   forgotPassword,
   totpSetup,
   totpEnable,

@@ -212,6 +212,20 @@ type LogLine = { ts: string, level: 'info'|'warn'|'error'|'game', text: string }
 
 ---
 
+## Skin du personnage (`opm.textures`)
+
+Le skin enregistré ici est **celui du personnage sur One Piece Minecraft** : c'est
+notre Yggdrasil qui le sert au jeu (docs/API.md §2.5). Le skin Mojang du joueur
+n'est jamais touché.
+
+| Méthode | Canal | Rôle |
+|---|---|---|
+| `textures.pick()` | `textures:pick` | Sélecteur de fichier PNG. Le **processus principal** lit et valide (signature PNG, 64×64 ou 64×32, ≤ 256 Ko) et rend `{dataUrl, width, height}`, ou `null` si annulé. Le renderer ne touche jamais au disque. |
+| `textures.upload(dataUrl, model)` | `textures:upload` | Enregistre le PNG (`data:` URL, produite par l'import ou l'éditeur) avec `model` = `classic` \| `slim`. Revalide, envoie `POST /textures/skin`, relit le profil : rend le compte mis à jour, dont `skin_url` pointe désormais sur la texture OPM. |
+| `textures.remove()` | `textures:remove` | `DELETE /textures/skin` puis relecture du profil : retour au skin Mojang. |
+
+Erreurs : `invalid_texture` (pas un PNG, ou mauvaises dimensions), `texture_too_large`, et celles du serveur via `translate()`.
+
 ## Canaux IPC réels (`ipcMain`)
 
 Nommage : `domaine:action`. Tout ce qui renvoie une valeur utilise `invoke/handle`.
@@ -237,6 +251,8 @@ game:verify          game:clear-cache       game:files-stat     game:event (→ 
 
 content:news         content:status         content:next-event  content:votes
 content:donations    content:donate
+
+textures:pick        textures:upload        textures:remove
 
 updater:check        updater:event (→ renderer)
 
