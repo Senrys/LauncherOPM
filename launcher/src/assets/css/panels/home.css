@@ -449,16 +449,17 @@
   user-select: none;
 }
 
-/* Le personnage en 3D. Même ancrage et même hauteur que l'image 2D qu'il
-   remplace ; la largeur laisse la place aux bras pendant la rotation. Pas
-   d'animation de flottement : le modèle s'anime lui-même. Les pointeurs
-   passent — on peut le faire tourner à la souris. */
+/* Le personnage en 3D. Même ancrage que l'image 2D qu'il remplace, un peu
+   plus grand : le cadrage garde de la marge autour du personnage pour que
+   l'épée, la chope et le coffre de ses scènes restent entièrement visibles
+   (components/character3d.js). Pas d'animation de flottement : le modèle
+   s'anime lui-même. Les pointeurs passent — on le fait tourner à la souris. */
 .opm-scene__char3d {
   position: absolute;
   right: 0;
   bottom: 0;
-  width: 360px;
-  height: 404px;
+  width: 400px;
+  height: 450px;
   filter: var(--sh-char);
   cursor: grab;
   user-select: none;
