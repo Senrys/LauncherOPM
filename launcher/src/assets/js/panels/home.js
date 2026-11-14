@@ -35,6 +35,7 @@ import { blockedLabel } from '../utils/labels.js';
 import { network, store } from '../utils/state.js';
 import { FALLBACK_BODY, bodyDataUrl, skinImage } from '../utils/skin.js';
 import { toast } from '../components/toast.js';
+import { createCharacter } from '../components/character3d.js';
 
 /** Rafraîchissement du statut du serveur. */
 const STATUS_INTERVAL = 30_000;
@@ -164,7 +165,7 @@ export default class Home {
      * reste seule en place.
      * @type {any}
      */
-    this.viewer = null;
+    this.character = null;
     this.viewerBroken = false;
     /** @type {ResizeObserver|null} */
     this.viewerResize = null;
@@ -215,7 +216,7 @@ export default class Home {
   async show() {
     this.startTimers();
     this.tickCountdown();
-    if (this.viewer) this.viewer.renderPaused = false;
+    this.character?.setPaused(false);
     await this.refresh({ newsMaxAge: NEWS_TTL, tilesMaxAge: 5_000 });
   }
 
@@ -224,7 +225,7 @@ export default class Home {
     this.stopTimers();
     // Une boucle WebGL qui tourne derrière un autre onglet, c'est du GPU pour
     // rien — et un ventilateur qui s'emballe sur les portables.
-    if (this.viewer) this.viewer.renderPaused = true;
+    this.character?.setPaused(true);
   }
 
   /** Relâche minuteurs, abonnements et la scène 3D. */
@@ -785,9 +786,10 @@ export default class Home {
   /* ----------------------------------------------------------- scène 3D */
 
   /**
-   * Le personnage en 3D : skin complet, tête aux pieds, animé et en rotation
-   * lente, comme sur la page de profil du site — mais en pied, là où le site
-   * ne montre qu'un buste.
+   * Le personnage en 3D, avec SON skin, tête aux pieds — et vivant : il
+   * respire, tourne lentement, et de temps en temps rit, boit une chope, sort
+   * une épée d'un coffre pour s'entraîner, salue ou regarde autour de lui
+   * (components/character3d.js). On peut le faire tourner à la souris.
    *
    * Tout échec est silencieux et définitif pour la session (`viewerBroken`) :
    * le rendu 2D, toujours produit par `paintPlayer()`, reste alors seul en
@@ -819,8 +821,8 @@ export default class Home {
     if (seq !== this.skinSeq) return;
 
     try {
-      const viewer = this.ensureViewer(canvas);
-      await viewer.loadSkin(image);
+      const character = this.ensureCharacter(canvas);
+      await character.loadSkin(image, account.skin_model === 'slim' ? 'slim' : 'classic');
       if (seq !== this.skinSeq) return;
       this.showCharacter3d(true);
     } catch (error) {
@@ -832,62 +834,30 @@ export default class Home {
   }
 
   /**
-   * Crée la scène une seule fois. Les réglages sont ceux du site (animation
-   * de repos, rotation lente, zoom et déplacement à la souris désactivés),
-   * moins le cadrage buste : ici on veut le personnage entier.
-   *
+   * Crée le personnage une seule fois ; changer de compte recharge le skin.
    * @param {HTMLCanvasElement} canvas
-   * @returns {any}
+   * @returns {ReturnType<typeof createCharacter>}
    */
-  ensureViewer(canvas) {
-    if (this.viewer) return this.viewer;
+  ensureCharacter(canvas) {
+    if (this.character) return this.character;
 
-    const lib = window.skinview3d;
     const box = canvas.getBoundingClientRect();
-    const viewer = new lib.SkinViewer({
-      canvas,
-      width: Math.max(1, Math.round(box.width) || 360),
-      height: Math.max(1, Math.round(box.height) || 404),
+    const character = createCharacter(canvas, {
+      width: Math.max(1, Math.round(box.width) || 400),
+      height: Math.max(1, Math.round(box.height) || 450),
     });
-
-    // Cadrage en pied, réglé à l'œil sur un canevas de 360 × 404 : la tête
-    // frôle le haut, les pieds gardent une marge en bas pour le balancement de
-    // l'animation de repos. En dessous de 1.0 le personnage flotte au milieu
-    // d'un vide ; au-dessus de 1.2 les mains sortent du cadre en rotation.
-    viewer.fov = 40;
-    viewer.zoom = 1.15;
-
-    viewer.animation = new lib.IdleAnimation();
-    viewer.animation.speed = 0.6;
-    viewer.autoRotate = true;
-    viewer.autoRotateSpeed = 0.35;
-
-    if (viewer.controls) {
-      // On peut faire tourner le personnage à la souris ; ni zoomer, ni le
-      // sortir du cadre.
-      viewer.controls.enableZoom = false;
-      viewer.controls.enablePan = false;
-    }
-
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
-      viewer.autoRotate = false;
-      viewer.animation.paused = true;
-    }
 
     // La scène change de taille avec la fenêtre : le canevas suit.
     if (typeof ResizeObserver === 'function') {
       this.viewerResize = new ResizeObserver(() => {
         const rect = canvas.getBoundingClientRect();
-        if (rect.width > 0 && rect.height > 0) {
-          viewer.width = Math.round(rect.width);
-          viewer.height = Math.round(rect.height);
-        }
+        character.resize(rect.width, rect.height);
       });
       this.viewerResize.observe(canvas);
     }
 
-    this.viewer = viewer;
-    return viewer;
+    this.character = character;
+    return character;
   }
 
   /**
@@ -905,13 +875,13 @@ export default class Home {
       this.viewerResize.disconnect();
       this.viewerResize = null;
     }
-    if (this.viewer) {
+    if (this.character) {
       try {
-        this.viewer.dispose();
+        this.character.dispose();
       } catch {
         /* rien à rattraper : on abandonne la scène de toute façon */
       }
-      this.viewer = null;
+      this.character = null;
     }
   }
 

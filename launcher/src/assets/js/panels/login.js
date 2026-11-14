@@ -26,6 +26,7 @@
  */
 
 import { blockedLabel, errorLabel } from '../utils/labels.js';
+import { createCharacter } from '../components/character3d.js';
 
 /* ========================================================================== */
 /*  Constantes                                                                */
@@ -245,6 +246,22 @@ export default class LoginScreen {
     /** Le code de secours remplace les six cases. */
     this.recoveryMode = false;
 
+    /**
+     * Le personnage de la scène : celui du joueur dès qu'un compte est connu
+     * sur cette machine, en 3D et animé comme sur l'accueil. Melodia (l'image
+     * du balisage) ne reste que pour un tout premier lancement, ou si la 3D est
+     * indisponible.
+     */
+    this.scene = {
+      canvas: $('[data-el="login-char-3d"]', this.root),
+      image: $('[data-el="login-char"]', this.root),
+      character: null,
+      skinUrl: null,
+      broken: false,
+      seq: 0,
+    };
+    this.paintScene(ctx.store.get());
+
     // L'écran est monté une seule fois pour la durée de la fenêtre : les
     // abonnements posés ici n'ont jamais à être relâchés.
     this.wireForms();
@@ -252,6 +269,9 @@ export default class LoginScreen {
     this.wireOtp();
 
     ctx.store.subscribe((state, changed) => {
+      if (changed.has('account') || changed.has('accounts') || changed.has('screen')) {
+        this.paintScene(state);
+      }
       if (changed.has('loginView') && state.loginView !== this.view) {
         this.setView(state.loginView);
       }
@@ -788,6 +808,72 @@ export default class LoginScreen {
     }
 
     this.showBanner(banner, this.messageFor(result));
+  }
+
+  /* ----------------------------------------------------------- personnage */
+
+  /**
+   * Affiche le personnage du compte courant — ou, à défaut, du premier compte
+   * enregistré sur cette machine. La boucle 3D est mise en pause quand l'écran
+   * de connexion n'est pas affiché.
+   * @param {Object} state  état du magasin
+   */
+  async paintScene(state) {
+    const scene = this.scene;
+    if (!scene?.canvas || !scene.image) return;
+
+    scene.character?.setPaused(state.screen !== 'login');
+
+    const owner = state.account?.skin_url
+      ? state.account
+      : (state.accounts ?? []).find((item) => item?.skin_url) ?? null;
+    const url = owner?.skin_url ?? null;
+    if (url === scene.skinUrl) return;
+    scene.skinUrl = url;
+
+    const showMelodia = () => {
+      scene.canvas.hidden = true;
+      scene.image.hidden = false;
+    };
+    if (!url || scene.broken || typeof window.skinview3d === 'undefined') {
+      showMelodia();
+      return;
+    }
+
+    const seq = ++scene.seq;
+    let texture;
+    try {
+      texture = await this.ctx.skin.skinImage(url);
+    } catch {
+      if (seq === scene.seq) showMelodia();
+      return;
+    }
+    if (seq !== scene.seq) return;
+
+    try {
+      if (!scene.character) {
+        const box = scene.canvas.getBoundingClientRect();
+        scene.character = createCharacter(scene.canvas, {
+          width: Math.round(box.width) || 400,
+          height: Math.round(box.height) || 450,
+        });
+        if (typeof ResizeObserver === 'function') {
+          new ResizeObserver(() => {
+            const rect = scene.canvas.getBoundingClientRect();
+            scene.character?.resize(rect.width, rect.height);
+          }).observe(scene.canvas);
+        }
+      }
+      await scene.character.loadSkin(texture, owner.skin_model === 'slim' ? 'slim' : 'classic');
+      if (seq !== scene.seq) return;
+      scene.character.setPaused(this.ctx.store.get().screen !== 'login');
+      scene.canvas.hidden = false;
+      scene.image.hidden = true;
+    } catch (error) {
+      console.warn('opm : personnage 3D de l’écran de connexion indisponible.', error);
+      scene.broken = true;
+      showMelodia();
+    }
   }
 
   /**

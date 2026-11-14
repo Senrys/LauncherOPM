@@ -336,9 +336,13 @@
       </div>
     </header>
 
-    <!-- Personnage : même traitement que sur l'Accueil. -->
+    <!-- Personnage : même traitement que sur l'Accueil. Dès qu'un compte est
+         connu sur cette machine (dernier compte utilisé, ou compte en cours de
+         rattachement), c'est SON personnage, en 3D et animé, qui s'affiche ;
+         Melodia n'est que le visage d'accueil d'un tout premier lancement. -->
     <div class="opm-scene" aria-hidden="true">
       <div class="opm-scene__halo"></div>
+      <canvas class="opm-scene__char3d" data-el="login-char-3d" hidden></canvas>
       <img class="opm-scene__char" data-el="login-char"
            src="assets/images/melodia.webp" alt="">
     </div>
