@@ -4,17 +4,16 @@
  *
  * Créatrice — calme, comme dans une simulation. La musique, ralentie et
  * feutrée, baigne dans une grande réverbération, avec un léger miroitement
- * numérique (filtre en peigne, grain). Dessous, une nappe d'accords doux, et
- * de temps en temps des « pings » de données, lointains, qui se répètent en
- * écho.
+ * numérique (filtre en peigne, grain). De temps en temps, des « pings » de
+ * données, lointains, qui se répètent en écho.
  *
  * Corrompue — tendue, sous pression. La musique se durcit (voix mécanique :
  * modulation en anneau aiguë, grain marqué), descend, se hache de coupures.
- * Dessous, un bourdon grave et dissonant, un battement de cœur sourd, une
- * montée de souffle qui revient sans cesse, un sifflement aigu inquiétant.
+ * Dessous, un battement de cœur sourd, et une montée — souffle et bourdon
+ * grave dissonant — qui revient sans cesse.
  *
- * Le passage d'un état à l'autre est un fondu. Aucun effet de « tremblement »
- * (volume ou hauteur battus vite) : il gênait l'écoute.
+ * Le passage d'un état à l'autre est un fondu. Aucun son tenu en continu, ni
+ * aucun « tremblement » (volume ou hauteur battus vite) : ils gênaient l'écoute.
  *
  * Réglages : `launcher.ambiance` (marche/arrêt) et `launcher.volume` (0 → 100).
  * La musique se tait pendant une partie, et quand le launcher est réduit.
@@ -30,14 +29,14 @@ const FADE = 1.2;
 /** Les deux remix. Les niveaux des couches ajoutées sont dans `layers`. */
 const PROFILES = {
   creatrice: {
-    dry: 0.72, ring: 0, ringHz: 420, comb: 0.16, feedback: 0.42, crush: 0.05, steps: 14,
+    dry: 0.72, ring: 0, ringHz: 420, comb: 0.16, feedback: 0.42, crush: 0, steps: 14,
     rate: 0.94, cutoff: 2900, reverb: 0.5, glitch: false,
-    layers: { pad: 0.045, blips: 1, drone: 0, heart: 0, riser: 0, whistle: 0 },
+    layers: { blips: 1, drone: 0, heart: 0, riser: 0 },
   },
   corrompue: {
     dry: 0.46, ring: 0.3, ringHz: 290, comb: 0.42, feedback: 0.7, crush: 0.28, steps: 7,
     rate: 0.9, cutoff: 3800, reverb: 0.24, glitch: true,
-    layers: { pad: 0, blips: 0, drone: 0.11, heart: 1, riser: 0.05, whistle: 0.012 },
+    layers: { blips: 0, drone: 0.11, heart: 1, riser: 0.05 },
   },
 };
 
@@ -157,24 +156,6 @@ export function createAmbiance() {
     const crushWet = ctx.createGain();
     music.connect(crusher).connect(crushWet).connect(bus);
 
-    // --- couche « simulation » : une nappe d'accords (la mineur 9), très douce
-    const pad = ctx.createGain();
-    pad.gain.value = 0;
-    const padFilter = ctx.createBiquadFilter();
-    padFilter.type = 'lowpass';
-    padFilter.frequency.value = 1400;
-    pad.connect(padFilter);
-    padFilter.connect(master);
-    padFilter.connect(reverb);
-    for (const [f, detune] of [[220, -4], [261.6, 3], [329.6, -2], [392, 5], [493.9, -3]]) {
-      const o = ctx.createOscillator();
-      o.type = 'sine';
-      o.frequency.value = f;
-      o.detune.value = detune;
-      o.connect(pad);
-      o.start();
-    }
-
     // Les « pings » de données : envoyés dans un écho et dans la réverbération.
     const pingBus = ctx.createGain();
     const echo = ctx.createDelay(1);
@@ -221,20 +202,9 @@ export function createAmbiance() {
     noise.connect(riserFilter).connect(riser).connect(master);
     noise.start();
 
-    const whistle = ctx.createGain();
-    whistle.gain.value = 0;
-    for (const f of [1760, 1864.7]) {
-      const o = ctx.createOscillator();
-      o.type = 'sine';
-      o.frequency.value = f;
-      o.connect(whistle);
-      o.start();
-    }
-    whistle.connect(reverb);
-
     nodes = {
       master, bus, tone, dry, carrier, ringWet, feedback, combWet, crusher, crushWet, reverbWet,
-      pad, pingBus, drone, heart, riser, riserFilter, whistle,
+      pingBus, drone, heart, riser, riserFilter,
     };
     applyProfile(true);
     scheduleBlips();
@@ -256,9 +226,6 @@ export function createAmbiance() {
     set(nodes.crushWet.gain, p.crush);
     set(nodes.tone.frequency, p.cutoff);
     set(nodes.reverbWet.gain, p.reverb);
-    set(nodes.pad.gain, p.layers.pad);
-    set(nodes.drone.gain, p.layers.drone);
-    set(nodes.whistle.gain, p.layers.whistle);
     nodes.crusher.curve = staircase(p.steps);
     audio.playbackRate = p.rate;
   }
@@ -313,7 +280,8 @@ export function createAmbiance() {
     }, 1050);
   }
 
-  /** Corrompue : un souffle qui monte pendant huit secondes, puis recommence. */
+  /** Corrompue : un souffle et un bourdon grave qui montent pendant huit
+   *  secondes, puis s'éteignent et recommencent — jamais un son tenu. */
   function scheduleRiser() {
     every(() => {
       if (nodes && playing()) {
@@ -322,11 +290,14 @@ export function createAmbiance() {
         nodes.riserFilter.frequency.cancelScheduledValues(t);
         nodes.riserFilter.frequency.setValueAtTime(180, t);
         nodes.riserFilter.frequency.exponentialRampToValueAtTime(2400, t + 8);
-        nodes.riser.gain.cancelScheduledValues(t);
-        nodes.riser.gain.setValueAtTime(0.0001, t);
-        if (level > 0) {
-          nodes.riser.gain.exponentialRampToValueAtTime(level, t + 7.6);
-          nodes.riser.gain.exponentialRampToValueAtTime(0.0001, t + 8.4);
+        const drone = PROFILES[etat].layers.drone;
+        for (const [param, peak] of [[nodes.riser.gain, level], [nodes.drone.gain, drone]]) {
+          param.cancelScheduledValues(t);
+          param.setValueAtTime(0.0001, t);
+          if (peak > 0) {
+            param.exponentialRampToValueAtTime(peak, t + 7.6);
+            param.exponentialRampToValueAtTime(0.0001, t + 8.4);
+          }
         }
       }
       scheduleRiser();
