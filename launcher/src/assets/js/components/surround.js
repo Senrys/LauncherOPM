@@ -7,8 +7,8 @@
  * fondus sont tramés (matrice de Bayer), les mouvements avancent case par case.
  *
  *   - Derrière le cadre (`[data-el="surround"]`) : une nappe sombre tramée qui
- *     prolonge le launcher dans le décor, la mer sous le cadre, des circuits (ou
- *     des fissures), des cubes en suspension, des bits qui scintillent. Ce qui
+ *     prolonge le launcher dans le décor, des circuits (ou des fissures), des
+ *     cubes en suspension, des bits qui scintillent. Ce qui
  *     passe derrière le cadre est caché par lui : la scène a de la profondeur.
  *
  *   - Devant le cadre (`[data-el="surround-front"]`) : ce qui l'incruste dans la
@@ -18,8 +18,8 @@
  *   - Le cadre lui-même reçoit un masque en escalier (coins pixelisés, quelques
  *     encoches) : plus aucune bordure lisse ni arrondie.
  *
- * Créatrice : cyan, circuits, mer claire — le monde se construit. Corrompue :
- * rouge et violet, fissures, mer sombre, parasites — le monde se défait. Passage de l'un
+ * Créatrice : cyan, circuits — le monde se construit. Corrompue : rouge et
+ * violet, fissures, parasites — le monde se défait. Passage de l'un
  * à l'autre en fondu, sur `<html data-xenodys>` (utils/xenodys.js).
  *
  * Sobriété : 20 images par seconde au plus (un rythme de sprite), arrêt quand la
@@ -46,7 +46,6 @@ const THEMES = {
     bits: ['#91D9D1', '#ECFFFC', '#5BBDB1'],
     cube: { top: '#BFF1EA', hi: '#ECFFFC', left: '#78CBC1', right: '#3F9C91', line: '#0E3531' },
     crystal: ['#F0FFFD', '#A6E8E0', '#5BBDB1', '#2A7A70'],
-    sea: { deep: '#0A2A3A', mid: '#145A6E', light: '#2E8FA6', foam: ['#E6FFFB', '#91D9D1'] },
     particle: ['#2E6E67', '#4FAAA0', '#91D9D1'],
     glitch: null,
   },
@@ -61,7 +60,6 @@ const THEMES = {
     bits: ['#F0506E', '#C77DFF', '#FFD3DD'],
     cube: { top: '#3B1838', hi: '#F0506E', left: '#24101F', right: '#170A15', line: '#B02850' },
     crystal: ['#FFD3DD', '#F0506E', '#9E1F5A', '#4A0F2E'],
-    sea: { deep: '#160620', mid: '#34102E', light: '#6A1F4F', foam: ['#FFD3DD', '#F0506E'] },
     particle: ['#5A1F4A', '#B02850', '#F0506E'],
     glitch: ['#F0506E', '#C77DFF', '#FFFFFF', '#0B0410'],
   },
@@ -535,38 +533,12 @@ export function createSurround({ back, front, frame, stage }) {
     }
   }
 
-  /** La mer, sous le cadre : des vagues qui avancent case par case, tramées
-   *  vers les bords de la fenêtre. Le cadre flotte au-dessus. */
-  function drawSea(sea, t) {
-    const base = fb.y + fb.h - 3;
-    if (base >= H - 2) return;
-    for (let x = 0; x < W; x += 1) {
-      const side = Math.min(x, W - 1 - x) / 10;
-      const swell = Math.round(Math.sin(x * 0.35 + t * 1.6) * 0.8 + Math.sin(x * 0.13 - t * 0.9) * 0.7);
-      const top = base + swell;
-      for (let y = top; y < H; y += 1) {
-        const v = Math.min(side, (H - 1 - y) / 4);
-        if (v < 1 && v < bayer(x, y)) continue;
-        const k = y - top;
-        let color;
-        if (k === 0) color = (x + Math.floor(t * 6)) % 9 < 3 ? sea.foam[0] : sea.foam[1];
-        else if (k < 2) color = sea.light;
-        else if (k < 5) color = (k === 2 && bayer(x, y) < 0.5) ? sea.light : sea.mid;
-        else color = (k === 5 && bayer(x, y) < 0.5) ? sea.mid : sea.deep;
-        // Reflets qui scintillent dans l'eau.
-        if (k > 1 && hash(x, y, Math.floor(t * 3)) < 0.012) color = sea.foam[1];
-        dot(bctx, x, y, color);
-      }
-    }
-  }
-
   function drawState(name, alpha, t) {
     const layer = layers[name];
     const { c } = layer;
 
     bctx.globalAlpha = alpha;
     bctx.drawImage(layer.back, 0, 0);
-    drawSea(c.sea, t);
 
     // Bits.
     for (const bit of layers.bits) {

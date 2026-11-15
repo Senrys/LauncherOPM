@@ -90,7 +90,7 @@ demande de réduire les animations.
 
 - **Fenêtre ouverte** (réglage `launcher.window_open`, Windows et macOS, écran assez
   grand) : la fenêtre est transparente et plus grande que le launcher. Autour du cadre, un
-  décor en pixel art (`components/surround.js`) : nappe sombre tramée, mer, circuits (ou
+  décor en pixel art (`components/surround.js`) : nappe sombre tramée, circuits (ou
   fissures), cubes, bords du cadre qui s'effritent. Les clics sur la marge vide traversent
   jusqu'au bureau. Sinon, mode compact : la fenêtre classique.
 - **Xenodys elle-même** (`components/xenodys3d.js`) : le modèle de `xenodys/`, immense,
@@ -103,6 +103,7 @@ demande de réduire les animations.
   par moments dans l'image, fondues en dégradé tramé, et un voile de teinte selon l'état.
 - **La musique** (`components/ambiance.js`, réglages `launcher.ambiance` et
   `launcher.volume`) : `ambiance2` du site, passée par une voix mécanique (modulation en
-  anneau, filtre en peigne, quantification), et `wave` (la mer) plus bas. Corrompue : plus
+  anneau aiguë, filtre en peigne, quantification, bourdonnement grave), et `wave` (la mer),
+  très bas. Corrompue : plus
   de machine, plus grave, des coupures. Silence pendant une partie et quand le launcher est
   réduit.
