@@ -1071,7 +1071,9 @@ function createLauncher(run, verifyOnly) {
     if (run.cancelled) return { error: CANCELLED };
     if (run.beforeStart && !prepared?.error) {
       try {
-        await run.beforeStart();
+        const refusal = await run.beforeStart();
+        // Anti-triche : des fichiers du jeu hors du modpack arrêtent tout ici.
+        if (typeof refusal === 'string' && refusal) return { error: refusal };
       } catch (err) {
         // Le pont est un plus : son échec ne doit jamais empêcher de jouer.
         logger.warn(`Préparation du pont launcher → jeu incomplète : ${err.message}`);
@@ -1168,6 +1170,33 @@ async function launch(instanceName) {
       await bridge.installGameFiles(instanceDir).catch((err) =>
         logger.warn(`Installation du mod OPM impossible : ${err.message}`)
       );
+
+      // Anti-triche : les mods de l'instance doivent être ceux du modpack (plus
+      // le mod OPM) ; le serveur d'authentification reçoit l'empreinte et
+      // n'ouvrira le serveur de jeu qu'à une session conforme.
+      const print = await bridge.fingerprint(instanceDir, instance.url);
+      if (print.extra.length || print.modified.length) {
+        const list = [...print.extra, ...print.modified].map((p) => p.replace(/^mods\//, '')).slice(0, 5).join(', ');
+        logger.warn(`Fichiers hors du modpack : ${list}.`);
+      }
+      try {
+        const verdict = await require('../auth/accounts').gameAttest({
+          client_token: run.clientToken,
+          mods: print.mods,
+          resourcepacks: print.packs,
+        });
+        if (!verdict.ok) {
+          return (
+            verdict.message ||
+            'Vos fichiers de jeu ne correspondent pas au modpack One Piece Minecraft : lancez « Vérifier les fichiers ».'
+          );
+        }
+      } catch (err) {
+        logger.warn(`Empreinte des fichiers non transmise : ${err.message}`);
+        if (print.extra.length || print.modified.length) {
+          return 'Des mods ont été ajoutés ou modifiés dans le jeu : lancez « Vérifier les fichiers » dans les paramètres.';
+        }
+      }
       const scene =
         mainWindow.windowMode() === 'ouvert' && config.game.intro && bridge.hasOpmMod(instanceDir);
       run.scene = scene;

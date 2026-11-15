@@ -1322,6 +1322,19 @@ async function gameSession() {
 }
 
 /**
+ * Anti-triche : déclare l'empreinte des fichiers du jeu pour la session ouverte.
+ * @param {{client_token: string, mods: object[], resourcepacks: string[]}} payload
+ * @returns {Promise<{ok: boolean, message: string|null}>}
+ */
+async function gameAttest(payload) {
+  const data = await withAuth((token) => api.gameAttest(payload, token));
+  return {
+    ok: !isPlainObject(data) || data.ok !== false,
+    message: isPlainObject(data) && typeof data.message === 'string' ? data.message : null,
+  };
+}
+
+/**
  * Clôt la session de jeu du compte actif à la fermeture de Minecraft.
  *
  * Deux effets côté serveur (docs/API.md § 1.4, docs/DATA.md § 4) : la durée jouée s'ajoute à
@@ -1367,6 +1380,7 @@ module.exports = {
   totpEnable,
   totpDisable,
   gameSession,
+  gameAttest,
   closeGameSession,
   onChange,
 };

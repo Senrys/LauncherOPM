@@ -192,6 +192,8 @@ Erreurs : `403 {"error":"microsoft_required"}`, `403 {"error":"banned","until":�
 | `GET` | `/api/v1/votes` | `{count, goal, reward, reset_at}` |
 | `GET` | `/api/v1/donations` | `{collected_cents, goal_cents, currency, donors_count, days_left, tiers[], top[]}` |
 | `POST` | `/api/v1/donations/checkout` | `{amount_cents}` → `{checkout_url}` |
+| `POST` | `/api/v1/game/attest` | `{client_token, mods: [{path, sha1}], resourcepacks: [nom]}` → `{ok, message, extra[], modified[]}` — empreinte des fichiers avant le démarrage (jeton du launcher) |
+| `POST` | `/api/v1/game/report` | `{phase: join\|periodic, mods: [{id, version, file}], resourcepacks: [{id, title, xray}]}` → `{ok, message, reasons[]}` — rapport du mod en jeu, **authentifié par le jeton de jeu** (`Authorization: Bearer <accessToken Yggdrasil>`) |
 | `GET` | `/api/v1/skins/gallery` | `{skins: [{url, slim}]}` — 32 skins personnalisés de joueurs, au hasard, **anonymes** (aucun pseudo) ; jamais en erreur (galerie vide) |
 
 `kind` d'une news ∈ `news | event | update`. Le format `instances` est **volontairement
@@ -240,6 +242,11 @@ Erreurs au format Mojang, HTTP 403 :
 | `POST /session/minecraft/join` `{accessToken, selectedProfile, serverId}` | `204` |
 | `GET /session/minecraft/hasJoined?username=&serverId=&ip=` | `200 {profile}` ou `204` |
 | `GET /session/minecraft/profile/{uuid}?unsigned=false` | `200 {profile}` |
+
+**Anti-triche.** `join` exige aussi une **empreinte conforme** (`OPM_JOIN_REQUIRE_ATTESTATION`) :
+`ygg_session.attestation` doit valoir `ok` (ou `unverified` si le modpack officiel est
+illisible : une panne de notre côté ne ferme pas le serveur). Sinon `403` : « mettez le
+launcher à jour » (rien de déclaré) ou « fichiers non conformes ».
 
 **Le serveur ne s'ouvre qu'au launcher OPM** (`OPM_JOIN_LAUNCHER_ONLY`, actif par
 défaut) : `join` n'accepte que les sessions délivrées par `POST /api/v1/game/session`

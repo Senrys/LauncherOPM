@@ -132,6 +132,15 @@ qui l'installe lui-même dans le jeu) se passent le relais sans que rien ne se v
     complet, elle lève la main. L'état de Xenodys et l'annonce du staff se relisent en
     jeu toutes les minutes, sans redémarrer.
 
+**Anti-triche, de bout en bout** (rien n'est sanctionné automatiquement : le staff juge) :
+le launcher refuse de lancer un jeu dont les mods ne sont pas ceux du modpack, et en
+déclare l'empreinte au serveur d'authentification, qui n'ouvre le serveur de jeu qu'à une
+session conforme ; en jeu, le mod OPM rapporte mods et packs (X-ray repérés) ; le serveur
+Minecraft surveille vol, vitesse, portée et minerais (`minecraft/anticheat.sk`). Chaque
+soupçon arrive au staff (en jeu, `/alertes`, et sur Discord) et le joueur voit Xenodys
+corrompue surgir au coin de son écran : « Je te vois… ». `/surveiller <joueur>` la fait
+apparaître près de lui, immense.
+
 Le launcher écrit pour le mod `opm/session.json` (état, pseudo, serveur, galerie,
 liens ; jamais de jeton) ; le mod n'en a pas besoin pour fonctionner (valeurs par
 défaut). Réglages du launcher : « Rejoindre directement le serveur » et « Chargement

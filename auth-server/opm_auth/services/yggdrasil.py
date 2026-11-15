@@ -190,6 +190,17 @@ LAUNCHER_ONLY_MESSAGE = (
 )
 
 
+#: Le launcher n'a pas déclaré les fichiers du jeu (version trop ancienne).
+ATTESTATION_MISSING_MESSAGE = (
+    "Mettez le launcher OPM à jour : la vérification des fichiers du jeu est obligatoire."
+)
+#: Les fichiers du jeu ne sont pas ceux du modpack officiel.
+ATTESTATION_REFUSED_MESSAGE = (
+    "Vos fichiers de jeu ne correspondent pas au modpack One Piece Minecraft : "
+    "relancez depuis le launcher après « Vérifier les fichiers »."
+)
+
+
 class YggdrasilError(Exception):
     """Erreur au format Mojang, transportée jusqu'au routeur.
 
@@ -1159,6 +1170,21 @@ async def join(db: AsyncSession, payload: YggJoinIn, *, ip: str | None = None) -
             "join refusé pour le compte %s : session ouverte hors du launcher.", user.id
         )
         raise YggdrasilError(LAUNCHER_ONLY_MESSAGE)
+    if (
+        get_settings().join_require_attestation
+        and session_row.origin == ORIGIN_LAUNCHER
+        and session_row.attestation not in ("ok", "unverified")
+    ):
+        # Anti-triche : fichiers du jeu non déclarés (launcher trop ancien) ou
+        # non conformes au modpack officiel.
+        logger.info(
+            "join refusé pour le compte %s : empreinte des fichiers « %s ».",
+            user.id,
+            session_row.attestation,
+        )
+        raise YggdrasilError(
+            ATTESTATION_MISSING_MESSAGE if session_row.attestation is None else ATTESTATION_REFUSED_MESSAGE
+        )
     ensure_can_play_yggdrasil(user, now=moment)
 
     await _purge_join_requests(db, moment)

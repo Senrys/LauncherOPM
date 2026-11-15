@@ -36,11 +36,21 @@ Les erreurs suivent le format normalisé de ``docs/API.md`` §3 :
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Response, status
+from typing import Annotated
+
+from fastapi import APIRouter, Header, Response, status
 
 from opm_auth.db import SessionDep
-from opm_auth.schemas import GameSessionEndIn, GameSessionOut
-from opm_auth.security.deps import CurrentUser
+from opm_auth.schemas import (
+    AntiCheatOut,
+    GameAttestIn,
+    GameReportIn,
+    GameSessionEndIn,
+    GameSessionOut,
+)
+from opm_auth.security.deps import ApiError, CurrentUser
+from opm_auth.security.ratelimit import enforce
+from opm_auth.services import anticheat
 from opm_auth.services import yggdrasil as service
 
 __all__ = ["router"]
@@ -94,3 +104,54 @@ async def close_session(
         client_token=payload.client_token,
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/attest",
+    response_model=AntiCheatOut,
+    summary="Empreinte des fichiers du jeu, avant le démarrage (anti-triche)",
+)
+async def attest(payload: GameAttestIn, user: CurrentUser, session: SessionDep) -> AntiCheatOut:
+    """Le launcher déclare les mods (chemin, SHA-1) et les packs de ressources de
+    l'instance, une fois les fichiers vérifiés. Comparés au modpack officiel : un
+    mod en trop ou modifié marque la session ``refused`` — le serveur de jeu la
+    refusera — et une alerte part au staff.
+    """
+    await enforce("game.attest.account", str(user.id))
+    result = await anticheat.attest(
+        session,
+        user,
+        client_token=payload.client_token,
+        mods=[m.model_dump() for m in payload.mods],
+        packs=payload.resourcepacks,
+    )
+    return AntiCheatOut(**{k: result[k] for k in ("ok", "message", "extra", "modified")})
+
+
+@router.post(
+    "/report",
+    response_model=AntiCheatOut,
+    summary="Rapport du mod OPM en jeu : mods chargés, packs actifs (anti-triche)",
+)
+async def report(
+    payload: GameReportIn,
+    session: SessionDep,
+    authorization: Annotated[str | None, Header()] = None,
+) -> AntiCheatOut:
+    """Authentifié par le jeton de **jeu** (Yggdrasil) que porte le client
+    Minecraft. Un écart : alerte au staff, et un message pour le joueur (Xenodys
+    s'affiche dans son coin d'écran).
+    """
+    try:
+        user = await service.resolve_bearer(session, authorization)
+    except service.YggdrasilError as exc:
+        raise ApiError("unauthorized", "Jeton de jeu invalide.", status_code=401) from exc
+    await enforce("game.report.account", str(user.id))
+    result = await anticheat.report(
+        session,
+        user,
+        phase=payload.phase,
+        mods=[m.model_dump() for m in payload.mods],
+        packs=[p.model_dump() for p in payload.resourcepacks],
+    )
+    return AntiCheatOut(ok=result["ok"], message=result["message"], reasons=result["reasons"])
