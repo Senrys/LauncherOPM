@@ -1,69 +1,76 @@
 /**
- * La musique de Xenodys : `ambiance2`, la musique du site, remixée en direct
- * (Web Audio) selon l'état de Xenodys.
+ * La musique de Xenodys — composée en direct, sans fichier audio (Web Audio).
  *
- * Créatrice — calme, comme dans une simulation. La musique, ralentie et
- * feutrée, baigne dans une grande réverbération, avec un léger miroitement
- * numérique (filtre en peigne, grain). De temps en temps, des « pings » de
- * données, lointains, qui se répètent en écho.
+ * Un petit séquenceur joue une musique générative : une grille d'accords, et
+ * sur elle des voix qui tirent leurs notes au hasard parmi celles de l'accord
+ * — jamais deux fois la même phrase. Deux compositions, selon l'état de
+ * Xenodys, qui passent de l'une à l'autre en fondu :
  *
- * Corrompue — tendue, sous pression. La musique se durcit (voix mécanique :
- * modulation en anneau aiguë, grain marqué), descend, se hache de coupures.
- * Dessous, un battement de cœur sourd, et une montée — souffle et bourdon
- * grave dissonant — qui revient sans cesse.
+ * Créatrice — un laboratoire calme, apaisé (ré lydien, ~70 BPM). Nappes douces
+ * qui changent avec les accords, basse ronde, arpège de cloches de verre en
+ * écho, « pings » de données, et le tic feutré d'une horloge de laboratoire.
  *
- * Le passage d'un état à l'autre est un fondu. Aucun son tenu en continu, ni
- * aucun « tremblement » (volume ou hauteur battus vite) : ils gênaient l'écoute.
+ * Corrompue — étrange, tendue, stressante (do phrygien, ~96 BPM). Basse en
+ * ostinato qui pousse, clusters dissonants qui enflent et retombent, frappes
+ * métalliques inharmoniques, tic-tac d'horloge, battement de cœur, montées de
+ * souffle et coupures.
+ *
+ * Aucun son tenu en continu ni aucun « tremblement » : chaque note naît,
+ * vit et s'éteint.
  *
  * Réglages : `launcher.ambiance` (marche/arrêt) et `launcher.volume` (0 → 100).
  * La musique se tait pendant une partie, et quand le launcher est réduit.
  */
 
-const TRACK = 'assets/audio/ambiance2.ogg';
-
 /** Volume maximal réel (100 % du réglage) : une ambiance, pas un concert. */
-const MASTER_MAX = 0.6;
-/** Constante de temps des fondus, en secondes. */
-const FADE = 1.2;
+const MASTER_MAX = 0.5;
+/** Durée du fondu entre les deux compositions, en secondes. */
+const MORPH = 3;
+/** Niveau de chaque composition : la version corrompue, plus clairsemée, est remontée. */
+const LEVEL = { creatrice: 1, corrompue: 1.8 };
+/** Le séquenceur planifie les notes un peu à l'avance (secondes). */
+const LOOKAHEAD = 0.25;
 
-/** Les deux remix. Les niveaux des couches ajoutées sont dans `layers`. */
-const PROFILES = {
+/** Fréquence d'une note MIDI. */
+const hz = (midi) => 440 * 2 ** ((midi - 69) / 12);
+
+/**
+ * Les deux compositions. `chords` : basse + voix de l'accord (notes MIDI),
+ * chacun tenu `barsPerChord` mesures de 4 temps.
+ */
+const SONGS = {
   creatrice: {
-    dry: 0.72, ring: 0, ringHz: 420, comb: 0.16, feedback: 0.42, crush: 0, steps: 14,
-    rate: 0.94, cutoff: 2900, reverb: 0.5, glitch: false,
-    layers: { blips: 1, drone: 0, heart: 0, riser: 0 },
+    bpm: 70,
+    barsPerChord: 2,
+    chords: [
+      { bass: 38, notes: [54, 57, 61, 64] }, // Ré maj9
+      { bass: 47, notes: [50, 54, 57, 61] }, // Si m9
+      { bass: 43, notes: [59, 62, 66, 69] }, // Sol maj9
+      { bass: 45, notes: [61, 64, 66, 71] }, // La 6/9
+    ],
   },
   corrompue: {
-    dry: 0.46, ring: 0.3, ringHz: 290, comb: 0.42, feedback: 0.7, crush: 0.28, steps: 7,
-    rate: 0.9, cutoff: 3800, reverb: 0.24, glitch: true,
-    layers: { blips: 0, drone: 0.11, heart: 1, riser: 0.05 },
+    bpm: 96,
+    barsPerChord: 2,
+    chords: [
+      { bass: 36, notes: [51, 55, 60, 61] }, // Do m (b9)
+      { bass: 37, notes: [53, 56, 61, 62] }, // Ré♭ (b9 en haut)
+      { bass: 35, notes: [50, 53, 56, 59] }, // Si dim
+      { bass: 36, notes: [51, 54, 60, 63] }, // Do m (quinte diminuée)
+    ],
   },
 };
 
-/** Courbe en escalier : le signal ne prend plus que `steps` valeurs. */
-function staircase(steps) {
-  const n = 2048;
-  const curve = new Float32Array(n);
-  for (let i = 0; i < n; i += 1) {
-    const x = (i / (n - 1)) * 2 - 1;
-    curve[i] = Math.round(x * steps) / steps;
-  }
-  return curve;
-}
-
 /** Réponse impulsionnelle d'une grande salle : du bruit qui s'éteint. */
-function impulse(ctx, seconds = 3.6) {
+function impulse(ctx, seconds = 4) {
   const length = Math.floor(ctx.sampleRate * seconds);
   const buffer = ctx.createBuffer(2, length, ctx.sampleRate);
   for (let ch = 0; ch < 2; ch += 1) {
     const data = buffer.getChannelData(ch);
-    for (let i = 0; i < length; i += 1) data[i] = (Math.random() * 2 - 1) * (1 - i / length) ** 2.6;
+    for (let i = 0; i < length; i += 1) data[i] = (Math.random() * 2 - 1) * (1 - i / length) ** 2.8;
   }
   return buffer;
 }
-
-/** Gamme des « pings » de la simulation : la mineure pentatonique, en haut. */
-const PINGS = [880, 1046.5, 1174.7, 1318.5, 1568, 1760];
 
 /**
  * @returns {{
@@ -76,269 +83,331 @@ const PINGS = [880, 1046.5, 1174.7, 1318.5, 1568, 1760];
  */
 export function createAmbiance() {
   let ctx = null;
-  let nodes = null;
+  let out = null; // { master, reverb, echo, buses: {creatrice, corrompue}, noise }
   let enabled = false;
   let silenced = false;
   let volume = 0.4;
   let etat = 'creatrice';
-  const timers = new Set();
-
-  const audio = new Audio(TRACK);
-  audio.loop = true;
-  audio.preload = 'auto';
-  // Le ralenti doit aussi faire descendre la hauteur.
-  audio.preservesPitch = false;
+  let timer = 0;
+  let pauseTimer = 0;
+  // Position dans la musique : temps de la prochaine double-croche, et son rang.
+  let nextStep = 0;
+  let step = 0;
 
   const playing = () => enabled && !silenced && volume > 0;
 
-  /** Une minuterie qui se replanifie, annulée à la fermeture. */
-  function every(fn, delay) {
-    const id = setTimeout(() => {
-      timers.delete(id);
-      fn();
-    }, delay);
-    timers.add(id);
-  }
+  /* ------------------------------------------------------------ chaîne */
 
-  /** La chaîne n'est construite qu'au premier besoin : aucun coût si la musique est coupée. */
   function build() {
     ctx = new AudioContext();
-    const music = ctx.createMediaElementSource(audio);
-
     const master = ctx.createGain();
     master.gain.value = 0;
-    master.connect(ctx.destination);
+    const glue = ctx.createDynamicsCompressor();
+    glue.threshold.value = -18;
+    glue.ratio.value = 3;
+    master.connect(glue).connect(ctx.destination);
 
-    // Réverbération partagée : la musique et les couches y passent.
     const reverb = ctx.createConvolver();
     reverb.buffer = impulse(ctx);
-    const reverbWet = ctx.createGain();
-    reverb.connect(reverbWet).connect(master);
+    const reverbOut = ctx.createGain();
+    reverbOut.gain.value = 0.55;
+    reverb.connect(reverbOut).connect(master);
 
-    // --- la musique remixée
-    const bus = ctx.createGain(); // reçoit les coupures « glitch »
-    const tone = ctx.createBiquadFilter();
-    tone.type = 'lowpass';
-    tone.Q.value = 0.6;
-    bus.connect(tone);
-    tone.connect(master);
-    tone.connect(reverb);
-
-    const dry = ctx.createGain();
-    music.connect(dry).connect(bus);
-
-    // Modulation en anneau (voix mécanique) : un gain dont la valeur EST une sinusoïde aiguë.
-    const ring = ctx.createGain();
-    ring.gain.value = 0;
-    const carrier = ctx.createOscillator();
-    carrier.connect(ring.gain);
-    carrier.start();
-    const ringWet = ctx.createGain();
-    music.connect(ring).connect(ringWet).connect(bus);
-
-    // Filtre en peigne : un écho très court, réinjecté, qui ondule à peine.
-    const delay = ctx.createDelay(0.05);
-    delay.delayTime.value = 0.007;
-    const feedback = ctx.createGain();
-    const lfo = ctx.createOscillator();
-    lfo.frequency.value = 0.1;
-    const lfoDepth = ctx.createGain();
-    lfoDepth.gain.value = 0.0004;
-    lfo.connect(lfoDepth).connect(delay.delayTime);
-    lfo.start();
-    const combWet = ctx.createGain();
-    music.connect(delay);
-    delay.connect(feedback).connect(delay);
-    delay.connect(combWet).connect(bus);
-
-    // Quantification : le grain numérique.
-    const crusher = ctx.createWaveShaper();
-    const crushWet = ctx.createGain();
-    music.connect(crusher).connect(crushWet).connect(bus);
-
-    // Les « pings » de données : envoyés dans un écho et dans la réverbération.
-    const pingBus = ctx.createGain();
-    const echo = ctx.createDelay(1);
-    echo.delayTime.value = 0.42;
+    // Écho en croches pointées, pour les cloches.
+    const echo = ctx.createDelay(2);
+    echo.delayTime.value = 0.64;
     const echoBack = ctx.createGain();
-    echoBack.gain.value = 0.45;
-    pingBus.connect(master);
-    pingBus.connect(reverb);
-    pingBus.connect(echo);
-    echo.connect(echoBack).connect(echo);
-    echo.connect(reverb);
-    echo.connect(master);
+    echoBack.gain.value = 0.38;
+    const echoTone = ctx.createBiquadFilter();
+    echoTone.type = 'lowpass';
+    echoTone.frequency.value = 3200;
+    echo.connect(echoTone).connect(echoBack).connect(echo);
+    echoTone.connect(master);
+    echoTone.connect(reverb);
 
-    // --- couches « pression » : bourdon dissonant, cœur, souffle, sifflement
-    const drone = ctx.createGain();
-    drone.gain.value = 0;
-    const droneFilter = ctx.createBiquadFilter();
-    droneFilter.type = 'lowpass';
-    droneFilter.frequency.value = 220;
-    drone.connect(droneFilter).connect(master);
-    for (const f of [41.2, 61.7, 58.3]) {
-      const o = ctx.createOscillator();
-      o.type = 'sawtooth';
-      o.frequency.value = f;
-      o.connect(drone);
-      o.start();
+    const buses = {};
+    for (const name of Object.keys(SONGS)) {
+      const g = ctx.createGain();
+      g.gain.value = name === etat ? LEVEL[name] : 0;
+      g.connect(master);
+      buses[name] = g;
     }
 
-    const heart = ctx.createGain();
-    heart.gain.value = 0;
-    heart.connect(master);
-
-    const riser = ctx.createGain();
-    riser.gain.value = 0;
-    const riserFilter = ctx.createBiquadFilter();
-    riserFilter.type = 'bandpass';
-    riserFilter.Q.value = 1.4;
-    const noise = ctx.createBufferSource();
     const nb = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
     const nd = nb.getChannelData(0);
     for (let i = 0; i < nd.length; i += 1) nd[i] = Math.random() * 2 - 1;
-    noise.buffer = nb;
-    noise.loop = true;
-    noise.connect(riserFilter).connect(riser).connect(master);
-    noise.start();
 
-    nodes = {
-      master, bus, tone, dry, carrier, ringWet, feedback, combWet, crusher, crushWet, reverbWet,
-      pingBus, drone, heart, riser, riserFilter,
-    };
-    applyProfile(true);
-    scheduleBlips();
-    scheduleHeart();
-    scheduleRiser();
-    scheduleGlitch();
+    out = { master, reverb, echo, buses, noise: nb };
   }
 
-  function applyProfile(instant = false) {
-    if (!nodes) return;
-    const p = PROFILES[etat];
-    const t = ctx.currentTime;
-    const set = (param, value) => (instant ? (param.value = value) : param.setTargetAtTime(value, t, FADE / 3));
-    set(nodes.dry.gain, p.dry);
-    set(nodes.ringWet.gain, p.ring);
-    set(nodes.carrier.frequency, p.ringHz);
-    set(nodes.combWet.gain, p.comb);
-    set(nodes.feedback.gain, p.feedback);
-    set(nodes.crushWet.gain, p.crush);
-    set(nodes.tone.frequency, p.cutoff);
-    set(nodes.reverbWet.gain, p.reverb);
-    nodes.crusher.curve = staircase(p.steps);
-    audio.playbackRate = p.rate;
+  /* ---------------------------------------------------- instruments */
+
+  /** Envoie un son dans le bus de la composition, et dans la réverbération. */
+  function route(node, song, wet = 0.4) {
+    node.connect(out.buses[song]);
+    if (wet > 0) {
+      const send = ctx.createGain();
+      send.gain.value = wet;
+      node.connect(send).connect(out.reverb);
+    }
   }
 
-  /** Créatrice : de temps en temps, une à trois notes de données. */
-  function scheduleBlips() {
-    every(() => {
-      if (nodes && playing() && PROFILES[etat].layers.blips) {
-        const t = ctx.currentTime;
-        const n = 1 + Math.floor(Math.random() * 3);
-        for (let k = 0; k < n; k += 1) {
-          const o = ctx.createOscillator();
-          o.type = 'sine';
-          o.frequency.value = PINGS[Math.floor(Math.random() * PINGS.length)];
-          const env = ctx.createGain();
-          const at = t + k * 0.16;
-          env.gain.setValueAtTime(0.0001, at);
-          env.gain.exponentialRampToValueAtTime(0.035, at + 0.01);
-          env.gain.exponentialRampToValueAtTime(0.0001, at + 0.5);
-          o.connect(env).connect(nodes.pingBus);
-          o.start(at);
-          o.stop(at + 0.55);
+  /** Une enveloppe : montée, maintien, chute. */
+  function envelope(at, attack, hold, release, peak) {
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime(peak, at + attack);
+    g.gain.setValueAtTime(peak, at + attack + hold);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + attack + hold + release);
+    return g;
+  }
+
+  /** Nappe : deux oscillateurs légèrement désaccordés, filtrés, qui enflent. */
+  function pad(song, midi, at, dur, { type = 'triangle', peak = 0.03, cutoff = 1600, attack = 1.6, detune = 6 } = {}) {
+    const env = envelope(at, attack, Math.max(0.1, dur - attack), 2.2, peak);
+    const f = ctx.createBiquadFilter();
+    f.type = 'lowpass';
+    f.frequency.value = cutoff;
+    for (const d of [-detune, detune]) {
+      const o = ctx.createOscillator();
+      o.type = type;
+      o.frequency.value = hz(midi);
+      o.detune.value = d;
+      o.connect(f);
+      o.start(at);
+      o.stop(at + dur + 2.5);
+    }
+    f.connect(env);
+    route(env, song, 0.6);
+  }
+
+  /** Cloche FM : une porteuse modulée dont l'indice s'éteint. `ratio` inharmonique = métal. */
+  function bell(song, midi, at, { peak = 0.05, ratio = 3.5, index = 2.4, decay = 1.6, echoSend = 0.35 } = {}) {
+    const f0 = hz(midi);
+    const carrier = ctx.createOscillator();
+    carrier.frequency.value = f0;
+    const mod = ctx.createOscillator();
+    mod.frequency.value = f0 * ratio;
+    const modGain = ctx.createGain();
+    modGain.gain.setValueAtTime(f0 * index, at);
+    modGain.gain.exponentialRampToValueAtTime(1, at + decay);
+    mod.connect(modGain).connect(carrier.frequency);
+    const env = envelope(at, 0.005, 0.02, decay, peak);
+    carrier.connect(env);
+    route(env, song, 0.5);
+    if (echoSend > 0) {
+      const send = ctx.createGain();
+      send.gain.value = echoSend;
+      env.connect(send).connect(out.echo);
+    }
+    for (const o of [carrier, mod]) {
+      o.start(at);
+      o.stop(at + decay + 0.1);
+    }
+  }
+
+  /** Basse douce : sinus et un soupçon de triangle. */
+  function softBass(song, midi, at, dur, peak = 0.12) {
+    const env = envelope(at, 0.3, Math.max(0.1, dur - 0.6), 1.2, peak);
+    for (const [type, gain] of [['sine', 1], ['triangle', 0.25]]) {
+      const o = ctx.createOscillator();
+      o.type = type;
+      o.frequency.value = hz(midi);
+      const g = ctx.createGain();
+      g.gain.value = gain;
+      o.connect(g).connect(env);
+      o.start(at);
+      o.stop(at + dur + 1.3);
+    }
+    route(env, song, 0.15);
+  }
+
+  /** Basse d'ostinato : une scie dont le filtre s'ouvre et se referme à chaque note. */
+  function pulseBass(song, midi, at, dur, peak = 0.11) {
+    const o = ctx.createOscillator();
+    o.type = 'sawtooth';
+    o.frequency.value = hz(midi);
+    const f = ctx.createBiquadFilter();
+    f.type = 'lowpass';
+    f.Q.value = 6;
+    f.frequency.setValueAtTime(180, at);
+    f.frequency.exponentialRampToValueAtTime(900, at + 0.03);
+    f.frequency.exponentialRampToValueAtTime(160, at + dur);
+    const env = envelope(at, 0.005, dur * 0.5, dur * 0.5, peak);
+    o.connect(f).connect(env);
+    route(env, song, 0.1);
+    o.start(at);
+    o.stop(at + dur + 0.05);
+  }
+
+  /** Un clic d'horloge : bruit très court, filtré. */
+  function tick(song, at, { peak = 0.02, freq = 5000, q = 8 } = {}) {
+    const src = ctx.createBufferSource();
+    src.buffer = out.noise;
+    const f = ctx.createBiquadFilter();
+    f.type = 'bandpass';
+    f.frequency.value = freq;
+    f.Q.value = q;
+    const env = envelope(at, 0.001, 0.004, 0.03, peak);
+    src.connect(f).connect(env);
+    route(env, song, 0.2);
+    src.start(at, Math.random());
+    src.stop(at + 0.06);
+  }
+
+  /** Battement de cœur : deux coups sourds. */
+  function heartbeat(song, at) {
+    for (const [d, peak] of [[0, 0.28], [0.24, 0.18]]) {
+      const o = ctx.createOscillator();
+      o.frequency.setValueAtTime(72, at + d);
+      o.frequency.exponentialRampToValueAtTime(34, at + d + 0.18);
+      const env = envelope(at + d, 0.01, 0.01, 0.24, peak);
+      o.connect(env);
+      route(env, song, 0);
+      o.start(at + d);
+      o.stop(at + d + 0.3);
+    }
+  }
+
+  /** Souffle qui monte : bruit filtré dont la bande s'élève. */
+  function riser(song, at, dur, peak = 0.04) {
+    const src = ctx.createBufferSource();
+    src.buffer = out.noise;
+    src.loop = true;
+    const f = ctx.createBiquadFilter();
+    f.type = 'bandpass';
+    f.Q.value = 1.6;
+    f.frequency.setValueAtTime(200, at);
+    f.frequency.exponentialRampToValueAtTime(2600, at + dur);
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0.0001, at);
+    env.gain.exponentialRampToValueAtTime(peak, at + dur * 0.95);
+    env.gain.exponentialRampToValueAtTime(0.0001, at + dur + 0.15);
+    src.connect(f).connect(env);
+    route(env, song, 0.3);
+    src.start(at);
+    src.stop(at + dur + 0.2);
+  }
+
+  /** Coupure : la composition se tait un instant, une à trois fois. */
+  function stutter(song, at) {
+    const g = out.buses[song].gain;
+    let t = at;
+    const cuts = 1 + Math.floor(Math.random() * 3);
+    for (let k = 0; k < cuts; k += 1) {
+      const off = 0.04 + Math.random() * 0.07;
+      g.setValueAtTime(0.08 * LEVEL[song], t);
+      g.setValueAtTime(LEVEL[song], t + off);
+      t += off + 0.04 + Math.random() * 0.05;
+    }
+  }
+
+  /* ---------------------------------------------------- composition */
+
+  const pick = (list) => list[Math.floor(Math.random() * list.length)];
+
+  /**
+   * Joue la double-croche n° `s` (16 par mesure) au temps `at`.
+   * @param {string} song
+   */
+  function playStep(song, s, at) {
+    const S = SONGS[song];
+    const sixteenth = 60 / S.bpm / 4;
+    const perChord = 16 * S.barsPerChord;
+    const chord = S.chords[Math.floor(s / perChord) % S.chords.length];
+    const inChord = s % perChord;
+    const inBar = s % 16;
+    const chordDur = sixteenth * perChord;
+
+    if (song === 'creatrice') {
+      if (inChord === 0) {
+        softBass(song, chord.bass, at, chordDur * 0.95);
+        chord.notes.forEach((n, i) => pad(song, n, at + i * 0.08, chordDur * 0.9, { peak: 0.016 }));
+      }
+      // Arpège de cloches : croches, avec des silences, notes de l'accord.
+      if (inBar % 2 === 0 && Math.random() < (inBar % 4 === 0 ? 0.7 : 0.35)) {
+        const n = pick(chord.notes) + (Math.random() < 0.45 ? 12 : 0);
+        bell(song, n, at, { peak: 0.035 + Math.random() * 0.02 });
+      }
+      // De temps en temps, une petite phrase aiguë de données.
+      if (inBar === 8 && Math.random() < 0.25) {
+        for (let k = 0; k < 3; k += 1) {
+          bell(song, pick(chord.notes) + 24, at + k * sixteenth, { peak: 0.012, ratio: 2, index: 0.6, decay: 0.4, echoSend: 0.5 });
         }
       }
-      scheduleBlips();
-    }, 2500 + Math.random() * 4500);
+      // L'horloge du laboratoire, feutrée, sur les temps.
+      if (inBar % 4 === 0) tick(song, at, { peak: 0.008, freq: 3200, q: 4 });
+      return;
+    }
+
+    // --- corrompue
+    // Ostinato de basse en croches : fondamentale, fondamentale, octave, fondamentale…
+    if (inBar % 2 === 0) {
+      const pattern = [0, 0, 12, 0, 0, 1, 12, 0];
+      pulseBass(song, chord.bass + pattern[(inBar / 2) % 8], at, sixteenth * 1.8);
+    }
+    // Clusters dissonants qui enflent sur chaque accord.
+    if (inChord === 0) {
+      chord.notes.forEach((n) => pad(song, n, at, chordDur * 0.85, { type: 'sawtooth', peak: 0.011, cutoff: 1100, attack: 2.4, detune: 14 }));
+      pad(song, chord.notes[chord.notes.length - 1] + 1, at + chordDur * 0.4, chordDur * 0.4, { type: 'sine', peak: 0.012, attack: 1.2 });
+    }
+    // Tic-tac sec sur chaque temps, plus discret entre les temps.
+    if (inBar % 4 === 0) tick(song, at, { peak: 0.03, freq: 4200, q: 10 });
+    else if (inBar % 4 === 2) tick(song, at, { peak: 0.012, freq: 6000, q: 10 });
+    // Battement de cœur, une fois par mesure.
+    if (inBar === 0) heartbeat(song, at);
+    // Frappes métalliques inharmoniques, rares.
+    if (inBar % 4 === 3 && Math.random() < 0.12) {
+      bell(song, pick(chord.notes) + 12, at, { peak: 0.03, ratio: 1.414, index: 4, decay: 2.6, echoSend: 0.2 });
+    }
+    // Une montée toutes les quatre mesures, vers le changement d'accord.
+    if (s % 64 === 32) riser(song, at, sixteenth * 32);
+    // Des coupures.
+    if (inBar === 12 && Math.random() < 0.18) stutter(song, at);
   }
 
-  /** Corrompue : un battement de cœur sourd, deux coups, un peu trop rapide. */
-  function scheduleHeart() {
-    every(() => {
-      if (nodes && playing() && PROFILES[etat].layers.heart) {
-        const t = ctx.currentTime;
-        for (const [at, g] of [[0, 0.32], [0.24, 0.2]]) {
-          const o = ctx.createOscillator();
-          o.type = 'sine';
-          o.frequency.setValueAtTime(70, t + at);
-          o.frequency.exponentialRampToValueAtTime(34, t + at + 0.18);
-          const env = ctx.createGain();
-          env.gain.setValueAtTime(0.0001, t + at);
-          env.gain.exponentialRampToValueAtTime(g, t + at + 0.012);
-          env.gain.exponentialRampToValueAtTime(0.0001, t + at + 0.26);
-          o.connect(env).connect(nodes.heart);
-          o.start(t + at);
-          o.stop(t + at + 0.3);
-        }
-        nodes.heart.gain.setTargetAtTime(1, t, 0.05);
-      } else if (nodes) {
-        nodes.heart.gain.setTargetAtTime(0, ctx.currentTime, 0.2);
-      }
-      scheduleHeart();
-    }, 1050);
+  /** Le séquenceur : planifie les double-croches à venir. */
+  function schedule() {
+    if (!ctx || !playing()) return;
+    const S = SONGS[etat];
+    const sixteenth = 60 / S.bpm / 4;
+    if (nextStep < ctx.currentTime) nextStep = ctx.currentTime + 0.05;
+    while (nextStep < ctx.currentTime + LOOKAHEAD) {
+      playStep(etat, step, nextStep);
+      nextStep += sixteenth;
+      step += 1;
+    }
   }
 
-  /** Corrompue : un souffle et un bourdon grave qui montent pendant huit
-   *  secondes, puis s'éteignent et recommencent — jamais un son tenu. */
-  function scheduleRiser() {
-    every(() => {
-      if (nodes && playing()) {
-        const t = ctx.currentTime;
-        const level = PROFILES[etat].layers.riser;
-        nodes.riserFilter.frequency.cancelScheduledValues(t);
-        nodes.riserFilter.frequency.setValueAtTime(180, t);
-        nodes.riserFilter.frequency.exponentialRampToValueAtTime(2400, t + 8);
-        const drone = PROFILES[etat].layers.drone;
-        for (const [param, peak] of [[nodes.riser.gain, level], [nodes.drone.gain, drone]]) {
-          param.cancelScheduledValues(t);
-          param.setValueAtTime(0.0001, t);
-          if (peak > 0) {
-            param.exponentialRampToValueAtTime(peak, t + 7.6);
-            param.exponentialRampToValueAtTime(0.0001, t + 8.4);
-          }
-        }
-      }
-      scheduleRiser();
-    }, 8500);
+  function startScheduler() {
+    if (timer) return;
+    timer = setInterval(schedule, 25);
+    schedule();
   }
 
-  /** Corrompue : des coupures brèves, à intervalles irréguliers. */
-  function scheduleGlitch() {
-    every(() => {
-      if (nodes && playing() && PROFILES[etat].glitch) {
-        const t = ctx.currentTime;
-        const g = nodes.bus.gain;
-        g.cancelScheduledValues(t);
-        g.setValueAtTime(1, t);
-        let at = t;
-        const cuts = 1 + Math.floor(Math.random() * 3);
-        for (let k = 0; k < cuts; k += 1) {
-          const off = 0.04 + Math.random() * 0.08;
-          g.setValueAtTime(0.05, at);
-          g.setValueAtTime(1, at + off);
-          at += off + 0.03 + Math.random() * 0.06;
-        }
-      }
-      scheduleGlitch();
-    }, 2500 + Math.random() * 6000);
+  function stopScheduler() {
+    clearInterval(timer);
+    timer = 0;
   }
+
+  /* ---------------------------------------------------------- pilotage */
 
   async function update() {
     if (playing()) {
+      clearTimeout(pauseTimer);
       if (!ctx) build();
       if (ctx.state === 'suspended') await ctx.resume().catch(() => {});
-      if (audio.paused) audio.play().catch(() => {});
-      nodes.master.gain.setTargetAtTime(volume * MASTER_MAX, ctx.currentTime, 0.6);
+      out.master.gain.setTargetAtTime(volume * MASTER_MAX, ctx.currentTime, 0.8);
+      startScheduler();
       return;
     }
     if (!ctx) return;
-    nodes.master.gain.setTargetAtTime(0, ctx.currentTime, 0.3);
-    // On attend la fin du fondu avant de mettre en pause : pas de coupure sèche.
-    every(() => {
-      if (!playing()) audio.pause();
-    }, 1800);
+    out.master.gain.setTargetAtTime(0, ctx.currentTime, 0.4);
+    // Les dernières notes s'éteignent, puis le séquenceur s'arrête.
+    clearTimeout(pauseTimer);
+    pauseTimer = setTimeout(() => {
+      if (!playing()) stopScheduler();
+    }, 2000);
   }
 
   // Si le navigateur a refusé de démarrer sans geste, le premier clic suffit.
@@ -361,17 +430,24 @@ export function createAmbiance() {
       const value = next === 'corrompue' ? 'corrompue' : 'creatrice';
       if (value === etat) return;
       etat = value;
-      applyProfile();
+      // Nouvelle composition : on repart en début de grille, en fondu.
+      step = 0;
+      if (out) {
+        const t = ctx.currentTime;
+        for (const [name, bus] of Object.entries(out.buses)) {
+          bus.gain.cancelScheduledValues(t);
+          bus.gain.setTargetAtTime(name === etat ? LEVEL[name] : 0, t, MORPH / 3);
+        }
+      }
     },
     setSilenced(value) {
       silenced = Boolean(value);
       update();
     },
     dispose() {
-      for (const id of timers) clearTimeout(id);
-      timers.clear();
+      stopScheduler();
+      clearTimeout(pauseTimer);
       window.removeEventListener('pointerdown', unlock);
-      audio.pause();
       ctx?.close().catch(() => {});
     },
   };
