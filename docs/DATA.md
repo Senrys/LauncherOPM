@@ -133,7 +133,8 @@ CREATE TABLE ygg_session (
     client_token  varchar(64) NOT NULL,
     issued_at     timestamp NOT NULL DEFAULT now(),
     expires_at    timestamp NOT NULL,
-    invalidated_at timestamp
+    invalidated_at timestamp,
+    origin        varchar(16) NOT NULL DEFAULT 'yggdrasil'  -- 'launcher' : clic sur JOUER (migration 0003)
 );
 CREATE TABLE ygg_join (
     server_id  varchar(64) PRIMARY KEY,

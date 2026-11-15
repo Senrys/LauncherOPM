@@ -872,6 +872,12 @@ class YggSession(Base):
     )
     expires_at: Mapped[datetime] = mapped_column(TS, nullable=False)
     invalidated_at: Mapped[datetime | None] = mapped_column(TS, nullable=True)
+    #: D'où vient la session : ``launcher`` (``POST /api/v1/game/session``, au
+    #: clic sur JOUER) ou ``yggdrasil`` (``/authserver/authenticate``, un launcher
+    #: tiers). Avec ``OPM_JOIN_LAUNCHER_ONLY``, seule la première ouvre le serveur.
+    origin: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="yggdrasil", server_default="yggdrasil"
+    )
 
     user: Mapped[User] = relationship(back_populates="ygg_sessions", lazy="raise")
 

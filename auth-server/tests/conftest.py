@@ -135,6 +135,9 @@ os.environ.update(
         "OPM_PASSWORD_MIN_LENGTH": "12",
         # Le ping du serveur Minecraft n'a rien à écrire pendant les tests.
         "OPM_STATS_WRITE": "false",
+        # La plupart des tests ouvrent leur session par /authserver : le verrou
+        # « launcher seulement » a ses propres tests (test_yggdrasil.py).
+        "OPM_JOIN_LAUNCHER_ONLY": "false",
         # Limitation de débit active : les tests vérifient aussi ce contrat.
         "OPM_RATE_LIMIT_ENABLED": "true",
         "OPM_TRUST_PROXY_HEADERS": "false",

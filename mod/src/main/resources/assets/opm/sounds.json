@@ -1,0 +1,10 @@
+{
+  "music.menu_creatrice": {
+    "category": "music",
+    "sounds": [{ "name": "opm:music/xenodys_creatrice", "stream": true }]
+  },
+  "music.menu_corrompue": {
+    "category": "music",
+    "sounds": [{ "name": "opm:music/xenodys_corrompue", "stream": true }]
+  }
+}

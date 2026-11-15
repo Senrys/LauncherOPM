@@ -1119,11 +1119,11 @@ export async function createXenodys(canvas, stage, frame) {
    * `false` si le launcher revient avant (`comeBack`).
    *
    * @param {any} sfx  components/sfx.js
-   * @param {{progress?: () => any, onAbort?: () => void}} [options]
+   * @param {{progress?: () => any, onAbort?: () => void, onFlash?: () => void}} [options]
    *   `progress` : l'avancement de la préparation (store.game) ; `onAbort` : le
-   *   joueur a cliqué l'orbe pour revenir.
+   *   joueur a cliqué l'orbe pour revenir ; `onFlash` : le passage s'ouvre (l'éclair).
    */
-  function begin(sfx, { progress = null, onAbort = null } = {}) {
+  function begin(sfx, { progress = null, onAbort = null, onFlash = null } = {}) {
     if (cine) return cine.promise;
     if (sfx) sfxRef = sfx;
     if (reduced || !frameBox) return Promise.resolve(true);
@@ -1145,7 +1145,7 @@ export async function createXenodys(canvas, stage, frame) {
     });
     cine = {
       start: performance.now(), lean, leanMap, to, point, corrupted, savedMask, resolve, promise,
-      cues: new Set(), sfx, progress, onAbort, released: false, readyAt: 0, dissolveAt: 0.8,
+      cues: new Set(), sfx, progress, onAbort, onFlash, released: false, readyAt: 0, dissolveAt: 0.8,
     };
     hit.style.left = `${point.x + stage.getBoundingClientRect().left}px`;
     hit.style.top = `${point.y + stage.getBoundingClientRect().top}px`;
@@ -1220,6 +1220,8 @@ export async function createXenodys(canvas, stage, frame) {
       }
     });
     cue('portal', u + 0.1, () => c$.sfx?.play('portal', { etat: c$.corrupted ? 'corrompue' : 'creatrice' }));
+    // Au plus fort de l'éclair : la scène de chargement peut paraître dessous.
+    cue('flashpeak', u + 0.45, () => c$.onFlash?.());
     cue('fade', u + 1.0, () => {
       stage.style.transition = 'opacity .6s ease';
       stage.style.opacity = '0';

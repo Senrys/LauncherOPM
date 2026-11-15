@@ -179,6 +179,17 @@ MOJANG_HAS_JOINED_URL = "https://sessionserver.mojang.com/session/minecraft/hasJ
 MOJANG_TIMEOUT_SECONDS = 5.0
 
 
+#: Origine d'une session délivrée au clic sur JOUER du launcher OPM.
+ORIGIN_LAUNCHER = "launcher"
+#: Origine d'une session ouverte par ``/authserver/authenticate``.
+ORIGIN_YGGDRASIL = "yggdrasil"
+#: Ce que lit le joueur qui tente d'entrer depuis un autre launcher.
+LAUNCHER_ONLY_MESSAGE = (
+    "Rejoignez One Piece Minecraft depuis le launcher OPM : "
+    "le serveur n'accepte que les parties lancées par lui."
+)
+
+
 class YggdrasilError(Exception):
     """Erreur au format Mojang, transportée jusqu'au routeur.
 
@@ -582,8 +593,13 @@ async def issue_session(
     *,
     client_token: str | None = None,
     now: datetime | None = None,
+    origin: str = ORIGIN_YGGDRASIL,
 ) -> tuple[str, YggSession]:
     """Émet un ``accessToken`` de jeu et enregistre la session correspondante.
+
+    ``origin`` dit qui la demande : :data:`ORIGIN_LAUNCHER` pour le bouton JOUER
+    du launcher OPM, :data:`ORIGIN_YGGDRASIL` pour ``/authserver``. C'est elle
+    que ``join`` consulte quand ``OPM_JOIN_LAUNCHER_ONLY`` est actif.
 
     Sémantique Mojang : un même ``clientToken`` ne porte qu'une session vivante.
     Réauthentifier depuis le même client invalide donc la session précédente,
@@ -625,6 +641,7 @@ async def issue_session(
         client_token=token_client,
         issued_at=moment,
         expires_at=claims.expires_at,
+        origin=origin,
     )
     db.add(session_row)
     await db.flush()
@@ -819,7 +836,11 @@ async def refresh(
     ensure_can_play_yggdrasil(user, now=moment)
 
     # L'ancien jeton meurt avec le nouveau : sinon deux sessions vivraient en
-    # parallèle après chaque rafraîchissement.
+    # parallèle après chaque rafraîchissement. Le launcher OPM ne rafraîchit
+    # jamais (il redemande une session à chaque JOUER) : le jeton neuf est donc
+    # d'origine ``yggdrasil``, quelle que soit celle de l'ancien. Un jeton de
+    # lancement copié depuis la ligne de commande du jeu ne peut pas être
+    # prolongé en session « launcher ».
     session_row.invalidated_at = moment
     access_token, new_row = await issue_session(
         db,
@@ -1126,11 +1147,18 @@ async def join(db: AsyncSession, payload: YggJoinIn, *, ip: str | None = None) -
         annoncé n'est pas celui du porteur du jeton.
     """
     moment = utcnow()
-    user, _session_row = await resolve_session(db, payload.access_token, now=moment)
+    user, session_row = await resolve_session(db, payload.access_token, now=moment)
 
     profile_uuid, _name = game_identity(user)
     if payload.selected_profile.lower() != profile_uuid:
         raise YggdrasilError("Le profil annoncé ne correspond pas à cette session.")
+    if get_settings().join_launcher_only and session_row.origin != ORIGIN_LAUNCHER:
+        # Un launcher tiers a ouvert cette session avec le mot de passe du
+        # joueur : le serveur ne s'ouvre qu'au bouton JOUER du launcher OPM.
+        logger.info(
+            "join refusé pour le compte %s : session ouverte hors du launcher.", user.id
+        )
+        raise YggdrasilError(LAUNCHER_ONLY_MESSAGE)
     ensure_can_play_yggdrasil(user, now=moment)
 
     await _purge_join_requests(db, moment)
@@ -1355,7 +1383,9 @@ async def create_game_session(
     await enforce("game.session.account", str(user.id))
     ensure_can_play_api(user)
 
-    access_token, session_row = await issue_session(db, user, client_token=client_token)
+    access_token, session_row = await issue_session(
+        db, user, client_token=client_token, origin=ORIGIN_LAUNCHER
+    )
     await db.commit()
 
     profile_uuid, profile_name = game_identity(user)

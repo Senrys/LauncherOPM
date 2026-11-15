@@ -103,3 +103,12 @@ async def test_sans_table_on_reste_creatrice(launcher_client: AsyncClient, sessi
     response = await launcher_client.get(f"{API_PREFIX}/bootstrap")
     assert response.status_code == 200
     assert response.json()["xenodys"]["etat"] == "creatrice"
+
+
+async def test_la_galerie_de_skins_est_anonyme_et_vide_par_defaut(
+    launcher_client: AsyncClient,
+) -> None:
+    """Sans skin personnalisé en base : une galerie vide, jamais une erreur."""
+    response = await launcher_client.get(f"{API_PREFIX}/skins/gallery")
+    assert response.status_code == 200
+    assert response.json() == {"skins": []}

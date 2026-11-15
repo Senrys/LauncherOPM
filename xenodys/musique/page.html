@@ -1,0 +1,46 @@
+<!doctype html><meta charset="utf-8"><body><script type="module">
+const q = new URLSearchParams(location.search);
+const etat = q.get('etat'); const seconds = Number(q.get('seconds')); const out = q.get('out');
+const fs = require('fs');
+const chunksL = [], chunksR = [];
+let rate = 48000;
+const orig = AudioNode.prototype.connect;
+AudioNode.prototype.connect = function (target, ...rest) {
+  if (target instanceof AudioDestinationNode) {
+    const ctx = this.context; rate = ctx.sampleRate;
+    const rec = ctx.createScriptProcessor(4096, 2, 2);
+    rec.onaudioprocess = (e) => {
+      chunksL.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+      chunksR.push(new Float32Array(e.inputBuffer.getChannelData(1)));
+    };
+    orig.call(this, rec);
+    const mute = ctx.createGain(); mute.gain.value = 0;
+    orig.call(rec, mute); orig.call(mute, target);
+    return target;
+  }
+  return orig.call(this, target, ...rest);
+};
+const { createAmbiance } = await import(new URL('../../launcher/src/assets/js/components/ambiance.js', location.href).href);
+const a = createAmbiance();
+a.setEtat(etat);
+a.setVolume(100);
+a.setSilenced(false);
+a.setEnabled(true);
+console.log('rec start', etat);
+setTimeout(() => {
+  a.dispose();
+  const n = chunksL.reduce((s, c) => s + c.length, 0);
+  const buf = Buffer.alloc(44 + n * 4);
+  buf.write('RIFF', 0); buf.writeUInt32LE(36 + n * 4, 4); buf.write('WAVE', 8); buf.write('fmt ', 12);
+  buf.writeUInt32LE(16, 16); buf.writeUInt16LE(1, 20); buf.writeUInt16LE(2, 22); buf.writeUInt32LE(rate, 24);
+  buf.writeUInt32LE(rate * 4, 28); buf.writeUInt16LE(4, 32); buf.writeUInt16LE(16, 34); buf.write('data', 36); buf.writeUInt32LE(n * 4, 40);
+  let o = 44;
+  for (let c = 0; c < chunksL.length; c++) for (let i = 0; i < chunksL[c].length; i++) {
+    buf.writeInt16LE(Math.max(-32768, Math.min(32767, Math.round(chunksL[c][i] * 32767))), o); o += 2;
+    buf.writeInt16LE(Math.max(-32768, Math.min(32767, Math.round(chunksR[c][i] * 32767))), o); o += 2;
+  }
+  fs.writeFileSync(out, buf);
+  console.log('rec done', etat, n / rate, 's');
+  window.__done = true;
+}, seconds * 1000 + 1500);
+</script>

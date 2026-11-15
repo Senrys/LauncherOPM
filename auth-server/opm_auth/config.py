@@ -204,6 +204,12 @@ class Settings(BaseSettings):
     #: entrent alors sur le serveur. À laisser FAUX en mode « hybride imposé »
     #: (``docs/DATA.md`` §8).
     ygg_mojang_fallback: bool = False
+    #: N'ouvre le serveur Minecraft qu'aux sessions délivrées par le launcher OPM
+    #: (``POST /api/v1/game/session``, au clic sur JOUER). Une session obtenue par
+    #: ``/authserver/authenticate`` — un launcher tiers compatible
+    #: authlib-injector — reste valable pour le reste du protocole, mais son
+    #: ``join`` est refusé. Le repli Mojang, lui, doit rester désactivé.
+    join_launcher_only: bool = True
 
     # -------------------------------------- 9. Statistiques du serveur Minecraft
     #: Autorise l'écriture de la fréquentation dans ``statistiques`` (id = 1).

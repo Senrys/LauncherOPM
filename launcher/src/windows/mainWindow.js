@@ -254,6 +254,51 @@ function setOnTop(on) {
   }
 }
 
+/** Bornes d'avant `coverScreen(true)`, rendues à `coverScreen(false)`. */
+let coverBounds = null;
+
+/**
+ * La scène de chargement (mode ouvert) : la fenêtre transparente s'étend à tout
+ * l'écran, au-dessus des fenêtres en plein écran comprises — la fenêtre du jeu
+ * s'ouvre derrière elle, où qu'elle s'ouvre. `false` rend la place d'avant.
+ * @param {boolean} on
+ */
+function coverScreen(on) {
+  if (!win || win.isDestroyed() || mode !== 'ouvert') return;
+  try {
+    if (on) {
+      if (coverBounds) return;
+      coverBounds = win.getBounds();
+      win.setBounds(screen.getDisplayMatching(coverBounds).bounds);
+      // Sans `skipTransformProcessType`, macOS cacherait un instant la fenêtre
+      // et l'icône du Dock à chaque appel.
+      win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
+    } else {
+      if (!coverBounds) return;
+      win.setVisibleOnAllWorkspaces(false, { skipTransformProcessType: true });
+      win.setBounds(coverBounds);
+      coverBounds = null;
+    }
+  } catch {
+    // Sans conséquence : au pire, la fenêtre du jeu se devine sur les bords.
+  }
+}
+
+/**
+ * Les minuteries d'une fenêtre masquée sont ralenties par Chromium : la musique
+ * (un séquenceur à minuterie) bégaierait pendant le chargement du jeu, quand
+ * elle doit continuer. `false` pour ce moment-là.
+ * @param {boolean} on
+ */
+function setThrottling(on) {
+  if (!win || win.isDestroyed()) return;
+  try {
+    win.webContents.setBackgroundThrottling(Boolean(on));
+  } catch {
+    /* sans conséquence */
+  }
+}
+
 function recreate() {
   const old = getWindow();
   const bounds = old ? old.getBounds() : null;
@@ -428,4 +473,6 @@ module.exports = {
   dragStart,
   dragEnd,
   setOnTop,
+  coverScreen,
+  setThrottling,
 };
