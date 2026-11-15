@@ -75,6 +75,14 @@ const SOURCES = {
     label: 'la cagnotte',
     load: () => api.donations(),
   },
+  // Le renderer l'interroge toutes les 60 s : un cache plus court que ça ne
+  // servirait à rien, plus long retarderait la bascule décidée par le staff.
+  xenodys: {
+    file: 'xenodys.json',
+    ttl: 45_000,
+    label: "l'état de Xenodys",
+    load: () => api.xenodys(),
+  },
 };
 
 /* ------------------------------------------------------------------ état interne */
@@ -333,7 +341,18 @@ async function donateCheckout(amountCents) {
   return { checkout_url: parsed.toString() };
 }
 
+/**
+ * État de Xenodys (créatrice ou corrompue). Mis en cache comme le reste : hors
+ * ligne, le launcher garde le dernier état connu au lieu de revenir au cyan.
+ * @param {{fresh?: boolean}} [options]
+ * @returns {Promise<object>}
+ */
+function xenodys(options = {}) {
+  return read('xenodys', { fresh: Boolean(options.fresh) });
+}
+
 module.exports = {
+  xenodys,
   news,
   status,
   nextEvent,

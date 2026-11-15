@@ -25,6 +25,7 @@ import { FALLBACK_BODY, bodyDataUrl, headDataUrl, preloadSkin, skinImage } from 
 import { toast } from './components/toast.js';
 import { confirmModal } from './components/modal.js';
 import { Popover, closeAllPopovers } from './components/popover.js';
+import * as xenodys from './utils/xenodys.js';
 
 /** Pont exposé par le preload (docs/IPC.md). */
 const opm = window.opm;
@@ -113,6 +114,7 @@ const ui = {
   splash: $('[data-screen="splash"]'),
   splashTrack: $('[data-el="splash-track"]'),
   splashFill: $('[data-el="splash-fill"]'),
+  splashVoice: $('[data-el="splash-voice"]'),
   shell: $('[data-screen="app"]'),
   login: $('[data-screen="login"]'),
   panelHost: $('[data-el="panel-host"]'),
@@ -630,10 +632,20 @@ async function boot() {
     // `network.watch` tient le compteur d'échecs d'où `online` est dérivé :
     // plus aucune écriture directe de cette clé, ici ou ailleurs.
     const bootstrap = await network.watch(opm.auth.bootstrap());
-    store.set({ bootstrap, maintenance: bootstrap?.maintenance ?? null });
+    store.set({
+      bootstrap,
+      maintenance: bootstrap?.maintenance ?? null,
+      xenodys: xenodys.normalize(bootstrap?.xenodys),
+    });
     applyRailLinks(bootstrap?.links);
   } catch (error) {
     log('warn', `Serveur d'authentification injoignable : ${error?.message ?? error}`);
+    // Hors ligne : le dernier état de Xenodys connu sur cette machine (cache du
+    // processus principal) plutôt que le cyan par défaut — une panne ne doit pas
+    // « guérir » Xenodys en pleine invasion.
+    opm.content.xenodys()
+      .then((value) => store.set({ xenodys: xenodys.normalize(value) }))
+      .catch(() => {});
     toast({
       kind: 'error',
       title: "Serveur d'authentification injoignable",
@@ -712,6 +724,7 @@ async function start() {
   wireStaticActions();
   setupBackground();
   wireMainProcessEvents();
+  wireXenodys();
 
   try {
     await boot();
@@ -741,6 +754,76 @@ async function start() {
   // que de laisser l'écran sur une décision déjà périmée.
   const settled = decideRoute(store.get().account);
   if (settled.screen !== store.get().screen) await routeTo(settled);
+}
+
+/* ========================================================================== */
+/*  Xenodys — l'état du monde                                                 */
+/* ========================================================================== */
+
+/** Toutes les 60 s : le staff peut corrompre Xenodys à tout moment, en jeu. */
+const XENODYS_POLL_MS = 60_000;
+
+/**
+ * Xenodys, créatrice ou corrompue, décidée par le staff (docs/XENODYS.md).
+ *
+ * - Le thème suit `store.xenodys` : `<html data-xenodys>` et toute la palette
+ *   (base/xenodys.css). Au démarrage on pose l'état sans effet ; une bascule
+ *   en cours de session, elle, se voit — un court parasitage, puis une annonce.
+ * - L'état arrive avec `/bootstrap`, puis est relu toutes les 60 s, en sautant
+ *   le cache : les launchers ouverts basculent en moins d'une minute.
+ * - Hors ligne, le dernier état connu reste : une panne ne ramène pas au cyan
+ *   en pleine invasion, ni l'inverse.
+ */
+function wireXenodys() {
+  // Le cyan d'abord : c'est l'état normal du monde, et celui des pages tant
+  // que le serveur n'a pas répondu.
+  xenodys.applyTheme('creatrice');
+  sayOnSplash('creatrice');
+
+  let known = null;
+  store.subscribe((state, changed) => {
+    if (!changed.has('xenodys') || !state.xenodys) return;
+    const next = state.xenodys;
+    const previous = known;
+    known = next;
+
+    // Première valeur : on la pose sans spectacle. Ensuite seulement, une
+    // vraie bascule s'annonce.
+    const shifted = previous !== null && previous.etat !== next.etat;
+    xenodys.applyTheme(next.etat, { animate: shifted });
+    if (state.screen === 'splash') sayOnSplash(next.etat);
+
+    if (shifted) {
+      toast({
+        kind: next.etat === 'corrompue' ? 'error' : 'info',
+        title: next.etat === 'corrompue' ? 'Xenodys est corrompue' : 'Xenodys est revenue',
+        // L'annonce du staff, si elle existe ; sinon, Xenodys parle elle-même.
+        message: next.message ?? xenodys.line('shift', next.etat),
+      });
+    }
+  });
+
+  setInterval(async () => {
+    try {
+      const value = await opm.content.xenodys({ fresh: true });
+      const next = xenodys.normalize(value);
+      const current = store.get().xenodys;
+      if (!current || current.etat !== next.etat || current.message !== next.message) {
+        store.set({ xenodys: next });
+      }
+    } catch {
+      // Serveur injoignable : on garde le dernier état connu, sans bruit — le
+      // reste du launcher signale déjà la panne.
+    }
+  }, XENODYS_POLL_MS);
+}
+
+/**
+ * Une phrase de Xenodys sur l'écran de démarrage.
+ * @param {'creatrice'|'corrompue'} etat
+ */
+function sayOnSplash(etat) {
+  if (ui.splashVoice) setText(ui.splashVoice, xenodys.line('splash', etat));
 }
 
 /* ========================================================================== */

@@ -36,6 +36,7 @@ import { network, store } from '../utils/state.js';
 import { FALLBACK_BODY, bodyDataUrl, skinImage } from '../utils/skin.js';
 import { toast } from '../components/toast.js';
 import { createCharacter } from '../components/character3d.js';
+import * as xenodys from '../utils/xenodys.js';
 
 /** Rafraîchissement du statut du serveur. */
 const STATUS_INTERVAL = 30_000;
@@ -59,6 +60,13 @@ const UNKNOWN = '—';
  * sous le libellé « VOTRE PERSONNAGE ».
  */
 const DEFAULT_CHARACTER = FALLBACK_BODY;
+
+/** Xenodys reprend la parole toutes les 45 s quand rien ne se passe. */
+const VOICE_IDLE_MS = 45_000;
+/** Durée du fondu entre deux phrases (base/xenodys.css). */
+const VOICE_FADE_MS = 320;
+/** États du jeu pendant lesquels les fichiers sont préparés. */
+const VOICE_WORKING = new Set(['check', 'download', 'extract', 'patch']);
 
 /** Étiquettes des actualités : libellé affiché et modificateur de style. */
 const KINDS = {
@@ -208,6 +216,15 @@ export default class Home {
       this.paintPlayer();
     }));
 
+    // Xenodys réagit à ce qui se passe : préparation des fichiers, lancement,
+    // panne, maintenance — et à sa propre corruption.
+    this.offs.push(store.subscribe((state, changed) => {
+      if (changed.has('game') || changed.has('online') || changed.has('maintenance')
+        || changed.has('xenodys')) {
+        this.voiceReact(state, changed.has('xenodys'));
+      }
+    }));
+
     await this.loadAccount();
     await this.refresh({ newsMaxAge: 0, tilesMaxAge: 0 });
   }
@@ -217,12 +234,14 @@ export default class Home {
     this.startTimers();
     this.tickCountdown();
     this.character?.setPaused(false);
+    this.voiceStart();
     await this.refresh({ newsMaxAge: NEWS_TTL, tilesMaxAge: 5_000 });
   }
 
   /** Le panneau est masqué : plus aucun minuteur ne tourne, ni le rendu 3D. */
   async hide() {
     this.stopTimers();
+    this.voiceStop();
     // Une boucle WebGL qui tourne derrière un autre onglet, c'est du GPU pour
     // rien — et un ventilateur qui s'emballe sur les portables.
     this.character?.setPaused(true);
@@ -231,6 +250,7 @@ export default class Home {
   /** Relâche minuteurs, abonnements et la scène 3D. */
   dispose() {
     this.stopTimers();
+    this.voiceStop();
     for (const off of this.offs) off();
     this.offs = [];
     this.staleAt = {};
@@ -272,6 +292,8 @@ export default class Home {
 
       character: $('[data-el="character"]', root),
       character3d: $('[data-el="character-3d"]', root),
+      voice: $('[data-el="xenodys-voice"]', root),
+      voiceLine: $('[data-bind="xenodys-line"]', root),
       playerName: $('[data-bind="player-name"]', root),
       playerSub: $('[data-bind="player-sub"]', root),
 
@@ -781,6 +803,76 @@ export default class Home {
     });
 
     this.paintPlayer3d(account, seq);
+  }
+
+  /* ------------------------------------------------------ voix de Xenodys */
+
+  /**
+   * Le moment que vit le joueur, du plus important au plus calme : c'est lui
+   * qui choisit ce que dit Xenodys (utils/xenodys.js).
+   * @param {Object} state
+   * @returns {string}
+   */
+  voiceMoment(state) {
+    if (state.online === false) return 'offline';
+    if (state.maintenance?.active) return 'maintenance';
+    const game = state.game ?? {};
+    if (game.state === 'launching') return 'launch';
+    if (game.running) return 'playing';
+    if (VOICE_WORKING.has(game.state)) return 'download';
+    return 'idle';
+  }
+
+  /** Le panneau s'affiche : un accueil la première fois, puis la parole au fil de l'eau. */
+  voiceStart() {
+    if (!this.refs.voiceLine) return;
+    const state = store.get();
+    const moment = this.voiceMoment(state);
+    this.voiceSay(this.voiceGreeted || moment !== 'idle' ? moment : 'welcome');
+    this.voiceGreeted = true;
+    this.voiceStop();
+    this.voiceTimer = setInterval(() => {
+      // N'interrompt pas un message de circonstance : seulement au calme.
+      if (this.voiceMoment(store.get()) === 'idle') this.voiceSay('idle');
+    }, VOICE_IDLE_MS);
+  }
+
+  voiceStop() {
+    if (this.voiceTimer) clearInterval(this.voiceTimer);
+    this.voiceTimer = null;
+  }
+
+  /**
+   * Réaction à un changement d'état. Un changement de moment fait parler
+   * Xenodys aussitôt ; une bascule créatrice/corrompue aussi, dans sa
+   * nouvelle voix.
+   * @param {Object} state
+   * @param {boolean} etatChanged
+   */
+  voiceReact(state, etatChanged) {
+    if (!this.refs.voiceLine) return;
+    const moment = this.voiceMoment(state);
+    if (!etatChanged && moment === this.voiceCurrent) return;
+    this.voiceSay(etatChanged && moment === 'idle' ? 'welcome' : moment);
+  }
+
+  /**
+   * Fait dire une phrase à Xenodys, avec un court fondu.
+   * @param {string} moment
+   */
+  voiceSay(moment) {
+    const node = this.refs.voiceLine;
+    const host = this.refs.voice;
+    if (!node || !host) return;
+    this.voiceCurrent = moment === 'welcome' ? 'idle' : moment;
+    const etat = store.get().xenodys?.etat ?? 'creatrice';
+    const text = xenodys.line(moment, etat);
+    host.dataset.fading = '';
+    clearTimeout(this.voiceFade);
+    this.voiceFade = setTimeout(() => {
+      setText(node, text);
+      delete host.dataset.fading;
+    }, VOICE_FADE_MS);
   }
 
   /* ----------------------------------------------------------- scène 3D */

@@ -84,6 +84,8 @@ const INITIAL = {
   online: true,
   bootstrap: null,
   maintenance: null,
+  /** État de Xenodys, `{etat, depuis, message}` (utils/xenodys.js). */
+  xenodys: null,
   config: null,
   accounts: [],
   account: null,
