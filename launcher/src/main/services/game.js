@@ -943,6 +943,12 @@ function finish(run, event, note) {
   // Avant tout le reste : la partie est finie, le serveur doit le savoir.
   void releaseSession(run);
 
+  if (run.instanceDir && run.sceneEpoch) {
+    void bridge.readDisconnect(run.instanceDir, run.sceneEpoch).then((reason) => {
+      if (reason) logger.warn(`Connexion au serveur interrompue : ${reason}`);
+    });
+  }
+
   taskbar(-1);
   restoreWindow(run);
 

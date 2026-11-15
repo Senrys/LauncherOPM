@@ -957,8 +957,15 @@ function wireCinematic(xen) {
     if (OVER.has(g) && phase !== 'idle') {
       // Pendant l'attente (préparation), le launcher revient tout de suite ;
       // une fois le passage ouvert, on laisse la cinématique finir.
-      if (phase === 'gone' || !xen.released) comeBack();
-      else returnPending = true;
+      // Passage déjà joué (la scène a pu être réduite avant la fin du
+      // chargement) : rien à attendre. Sinon, jamais plus de quelques secondes.
+      if (phase === 'gone' || !xen.released || cineDone) comeBack();
+      else {
+        returnPending = true;
+        setTimeout(() => {
+          if (returnPending && phase !== 'idle') comeBack();
+        }, 4000);
+      }
     }
     if (g === 'error') xen.react('fail');
   });

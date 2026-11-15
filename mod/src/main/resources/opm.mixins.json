@@ -4,6 +4,7 @@
   "package": "fr.onepieceminecraft.opm.mixin",
   "compatibilityLevel": "JAVA_21",
   "client": [
+    "DisconnectedScreenAccessor",
     "GuiGraphicsMixin",
     "LoadingOverlayAccessor",
     "MinecraftMixin",

@@ -324,6 +324,25 @@ async function skipOnboarding(instanceDir) {
   await fsp.writeFile(file, next, 'utf8');
 }
 
+/**
+ * Le dernier message de déconnexion écrit par le mod (`opm/deconnexion.txt`),
+ * s'il date de cette partie : ce que le joueur a lu à l'écran quand le serveur
+ * l'a refusé ou coupé.
+ * @param {string} instanceDir
+ * @param {number} since  début de la partie (ms)
+ * @returns {Promise<string|null>}
+ */
+async function readDisconnect(instanceDir, since) {
+  try {
+    const text = await fsp.readFile(path.join(instanceDir, 'opm', 'deconnexion.txt'), 'utf8');
+    const [stamp, ...rest] = text.split('\n');
+    if (!(Number(stamp) >= since)) return null;
+    return rest.join(' ').trim().slice(0, 500) || null;
+  } catch {
+    return null;
+  }
+}
+
 /* ------------------------------------------------------------------ journal */
 
 /**
@@ -490,6 +509,7 @@ module.exports = {
   LAUNCHER_SHARE,
   resetSignals,
   readSignals,
+  readDisconnect,
   readLoadStats,
   writeLoadStats,
   fingerprint,
