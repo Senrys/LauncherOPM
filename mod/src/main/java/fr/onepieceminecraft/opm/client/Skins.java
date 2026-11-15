@@ -22,21 +22,23 @@ import net.minecraft.resources.ResourceLocation;
 
 /**
  * Les skins que les assistants « impriment » pendant le chargement : la galerie
- * transmise par le launcher (skins de joueurs OPM, anonymes) et, en dernier, le
- * skin du joueur lui-même. Chaque skin devient une planche animée du joueur en
- * volume (client/PlayerRaster), tourné de 30° comme dans le launcher.
+ * transmise par le launcher (skins de joueurs OPM, anonymes), **dans son ordre**
+ * — le même que la scène du launcher, pour que le relais ne se voie pas — et le
+ * skin du joueur lui-même. Chaque skin devient une texture, posée sur le modèle
+ * 3D du joueur (`joueur` / `joueur_fin`, client/Choreo).
  *
  * Téléchargés hors du fil de rendu ; les textures sont créées sur lui.
  */
 public final class Skins {
-    public record Printed(ResourceLocation texture, boolean own) {}
+    /** Un skin prêt : sa texture, et des bras fins ou larges. */
+    public record Printed(ResourceLocation texture, boolean own, boolean slim) {}
 
     private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(4))
             .followRedirects(HttpClient.Redirect.NORMAL).build();
     private static final ConcurrentLinkedQueue<Object[]> READY = new ConcurrentLinkedQueue<>();
     private static final List<Printed> PRINTED = Collections.synchronizedList(new ArrayList<>());
+    private static int gallerySize;
     private static Printed own;
-    private static Printed ownFear;
     private static int[] ownPixels;
     private static boolean started;
     private static boolean fallbackAsked;
@@ -49,11 +51,11 @@ public final class Skins {
         if (started) return;
         started = true;
         Thread t = new Thread(() -> {
-            List<OpmSession.Skin> list = new ArrayList<>(session.gallery);
-            Collections.shuffle(list);
-            for (OpmSession.Skin s : list.subList(0, Math.min(16, list.size()))) {
-                byte[] png = fetch(s.url());
-                if (png != null) READY.add(new Object[]{png, s.slim(), false});
+            List<OpmSession.Skin> list = session.gallery.subList(0, Math.min(16, session.gallery.size()));
+            gallerySize = list.size();
+            for (int i = 0; i < list.size(); i++) {
+                byte[] png = fetch(list.get(i).url());
+                READY.add(new Object[]{png, list.get(i).slim(), false, i});
             }
             String uuid = session.playerUuid != null && session.playerUuid.matches("[0-9a-fA-F-]{32,36}")
                     ? session.playerUuid.replace("-", "") : null;
@@ -71,7 +73,7 @@ public final class Skins {
                             JsonObject skin = tex.getAsJsonObject("textures").getAsJsonObject("SKIN");
                             boolean slim = skin.has("metadata") && "slim".equals(skin.getAsJsonObject("metadata").get("model").getAsString());
                             byte[] png = fetch(skin.get("url").getAsString());
-                            if (png != null) READY.add(new Object[]{png, slim, true});
+                            if (png != null) READY.add(new Object[]{png, slim, true, -1});
                         }
                     }
                 } catch (Exception e) {
@@ -113,36 +115,54 @@ public final class Skins {
     public static void pump() {
         Object[] item;
         while ((item = READY.poll()) != null) {
-            try (NativeImage skin = NativeImage.read(new ByteArrayInputStream((byte[]) item[0]))) {
-                NativeImage sheet = PlayerRaster.sheet(skin, (Boolean) item[1]);
-                ResourceLocation id = ResourceLocation.fromNamespaceAndPath(Opm.ID, "dyn/skin_" + (counter++));
-                Minecraft.getInstance().getTextureManager().register(id, new DynamicTexture(sheet));
-                Printed p = new Printed(id, (Boolean) item[2]);
-                if (p.own()) {
-                    own = p;
-                    // Ses pixels (première image), pour le voir se défaire à la connexion.
-                    int[] px = new int[PlayerRaster.W * PlayerRaster.H];
-                    for (int y = 0; y < PlayerRaster.H; y++) {
-                        for (int x = 0; x < PlayerRaster.W; x++) px[y * PlayerRaster.W + x] = sheet.getPixelRGBA(x, y);
+            int index = (Integer) item[3];
+            if (item[0] == null) {
+                set(index, null);
+                continue;
+            }
+            try {
+                NativeImage skin = NativeImage.read(new ByteArrayInputStream((byte[]) item[0]));
+                boolean slim = (Boolean) item[1];
+                if ((Boolean) item[2]) {
+                    // Ses pixels (rendu en volume, première image), pour le voir se défaire
+                    // en pixels à la connexion (client/ConnectFx).
+                    try (NativeImage sheet = PlayerRaster.sheet(skin, slim)) {
+                        int[] px = new int[PlayerRaster.W * PlayerRaster.H];
+                        for (int y = 0; y < PlayerRaster.H; y++) {
+                            for (int x = 0; x < PlayerRaster.W; x++) px[y * PlayerRaster.W + x] = sheet.getPixelRGBA(x, y);
+                        }
+                        ownPixels = px;
                     }
-                    ownPixels = px;
-                    // Le même, sous l'emprise de Xenodys corrompue (écran titre).
-                    ResourceLocation fear = ResourceLocation.fromNamespaceAndPath(Opm.ID, "dyn/skin_" + (counter++));
-                    Minecraft.getInstance().getTextureManager().register(fear,
-                            new DynamicTexture(PlayerRaster.sheet(skin, (Boolean) item[1], PlayerRaster.FEAR)));
-                    ownFear = new Printed(fear, true);
-                } else {
-                    PRINTED.add(p);
                 }
+                ResourceLocation id = ResourceLocation.fromNamespaceAndPath(Opm.ID, "dyn/skin_" + (counter++));
+                Minecraft.getInstance().getTextureManager().register(id, new DynamicTexture(skin));
+                Printed p = new Printed(id, (Boolean) item[2], slim);
+                if (p.own()) own = p;
+                else set(index, p);
             } catch (Exception e) {
                 Opm.LOG.debug("Skin illisible", e);
+                if (index >= 0) set(index, null);
             }
         }
     }
 
-    public static List<Printed> gallery() {
+    private static void set(int index, Printed p) {
+        if (index < 0) return;
         synchronized (PRINTED) {
-            return List.copyOf(PRINTED);
+            while (PRINTED.size() <= index) PRINTED.add(null);
+            PRINTED.set(index, p);
+        }
+    }
+
+    /** Taille de la galerie annoncée par le launcher (certains skins peuvent manquer). */
+    public static int gallerySize() {
+        return gallerySize;
+    }
+
+    /** Le skin n° `index` de la galerie, s'il est arrivé (sinon `null`). */
+    public static Printed galleryAt(int index) {
+        synchronized (PRINTED) {
+            return index >= 0 && index < PRINTED.size() ? PRINTED.get(index) : null;
         }
     }
 
@@ -167,7 +187,7 @@ public final class Skins {
                 if (own != null) return;
                 try (var in = Minecraft.getInstance().getResourceManager()
                         .open(ResourceLocation.withDefaultNamespace("textures/entity/player/wide/steve.png"))) {
-                    READY.add(new Object[]{in.readAllBytes(), false, true});
+                    READY.add(new Object[]{in.readAllBytes(), false, true, -1});
                 } catch (Exception e) {
                     Opm.LOG.debug("Apparence par défaut indisponible", e);
                 }
@@ -180,10 +200,6 @@ public final class Skins {
     /** Les pixels (ABGR) de la première image du joueur, W × H, ou `null`. */
     public static int[] ownPixels() {
         return ownPixels;
-    }
-
-    public static Printed ownFear() {
-        return ownFear;
     }
 
 }

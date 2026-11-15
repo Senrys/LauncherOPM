@@ -49,7 +49,8 @@ public final class Opm {
             // L'écran titre d'OPM ; et ni solo ni liste de serveurs : on ne joue
             // que sur One Piece Minecraft, depuis le launcher.
             if (next instanceof TitleScreen || next instanceof JoinMultiplayerScreen || next instanceof SelectWorldScreen) {
-                event.setNewScreen(new OpmTitleScreen());
+                event.setNewScreen("1".equals(System.getProperty("opm.debug.scene", ""))
+                        ? new fr.onepieceminecraft.opm.client.ScenePreview() : new OpmTitleScreen());
             }
         });
         NeoForge.EVENT_BUS.addListener(ScreenEvent.Init.Post.class, event -> {

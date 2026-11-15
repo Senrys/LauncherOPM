@@ -79,7 +79,7 @@ function applyBoxUv(geometry, [u, v], [w, h, d], tw, th) {
  * @param {{Mesh: any, Box: any, Group: any}} T
  * @param {any} material
  */
-function buildModel(T, material, doc = GEO) {
+export function buildModel(T, material, doc = GEO) {
   const geo = doc['minecraft:geometry'][0];
   const { texture_width: tw, texture_height: th } = geo.description;
   const bones = new Map();
@@ -99,7 +99,9 @@ function buildModel(T, material, doc = GEO) {
       const [sx, sy, sz] = cube.size;
       const from = [-(ox + sx), oy, oz];
       const center = [from[0] + sx / 2, from[1] + sy / 2, from[2] + sz / 2];
-      const geometry = new T.Box(sx, sy, sz);
+      // Calques extérieurs (skins) : le pavé gonflé, les UV inchangées.
+      const inf = cube.inflate ?? 0;
+      const geometry = new T.Box(sx + 2 * inf, sy + 2 * inf, sz + 2 * inf);
       applyBoxUv(geometry, cube.uv, cube.size, tw, th);
       const mesh = new T.Mesh(geometry, material);
 
@@ -172,7 +174,7 @@ function sample({ times, values, smooth }, t) {
   });
 }
 
-function compile(name, doc = ANIMATIONS, prefix = 'animation.xenodys') {
+export function compile(name, doc = ANIMATIONS, prefix = 'animation.xenodys') {
   const def = doc.animations[`${prefix}.${name}`];
   const bones = {};
   for (const [bone, channels] of Object.entries(def.bones)) {
@@ -186,7 +188,7 @@ function compile(name, doc = ANIMATIONS, prefix = 'animation.xenodys') {
 
 /** Applique une pose : le repos, puis l'animation au temps `t`, puis des
  *  décalages éventuels (en degrés, convention Bedrock), par os. */
-function pose(bones, anim, t, extra = null) {
+export function pose(bones, anim, t, extra = null) {
   for (const bone of bones.values()) {
     bone.group.position.copy(bone.rest.position);
     bone.group.rotation.set(...bone.rest.rotation);

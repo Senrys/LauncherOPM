@@ -919,7 +919,7 @@ function wireCinematic(xen) {
       // La musique continue jusqu'à ce que le jeu la reprenne (au plus 4 min).
       holdMusic(true, 240_000);
       sceneExpected = true;
-      scene?.setGallery(event.gallery);
+      scene?.setGallery(event.gallery, event.epoch);
     }
     if (event?.type === 'loading') scene?.progress(event.ratio, event.step);
     if (event?.type === 'loaded') {
