@@ -10,7 +10,10 @@
  *   - filtre en peigne (un écho de quelques millisecondes, réinjecté, dont la
  *     longueur ondule) : une résonance de machine ;
  *   - quantification (« bitcrusher ») : le grain numérique ;
- *   - le tout mêlé au son d'origine, qui reste reconnaissable.
+ *   - une pulsation mécanique (le volume battu par un oscillateur carré) ;
+ *   - un léger ralenti : la musique descend, plus grave ;
+ *   - le tout mêlé au son d'origine, qui reste reconnaissable ;
+ *   - et dessous, le bourdonnement grave de la machine.
  *
  * Corrompue, la machine prend le dessus : plus d'anneau, plus de grain, la
  * musique ralentit et descend, et des coupures brèves la hachent.
@@ -24,8 +27,8 @@ const TRACKS = {
   sea: 'assets/audio/wave.ogg',
 };
 
-/** Part de la mer dans le mélange : nettement sous la musique. */
-const SEA_LEVEL = 0.35;
+/** Part de la mer dans le mélange : un murmure, loin sous la musique. */
+const SEA_LEVEL = 0.12;
 /** Volume maximal réel (100 % du réglage) : une ambiance, pas un concert. */
 const MASTER_MAX = 0.6;
 /** Constante de temps des fondus, en secondes. */
@@ -33,8 +36,14 @@ const FADE = 0.6;
 
 /** Les deux visages de la chaîne. */
 const PROFILES = {
-  creatrice: { dry: 0.62, ring: 0.22, ringHz: 38, comb: 0.3, feedback: 0.5, crush: 0.1, rate: 1, cutoff: 9000, glitch: false },
-  corrompue: { dry: 0.42, ring: 0.42, ringHz: 71, comb: 0.42, feedback: 0.68, crush: 0.3, rate: 0.95, cutoff: 5200, glitch: true },
+  creatrice: {
+    dry: 0.5, ring: 0.34, ringHz: 47, comb: 0.42, feedback: 0.62, crush: 0.16, steps: 12,
+    rate: 0.97, cutoff: 7600, gate: 0.18, gateHz: 3.2, hum: 0.07, humHz: [55, 82.5], glitch: false,
+  },
+  corrompue: {
+    dry: 0.34, ring: 0.52, ringHz: 71, comb: 0.5, feedback: 0.76, crush: 0.34, steps: 7,
+    rate: 0.92, cutoff: 4600, gate: 0.36, gateHz: 6.4, hum: 0.11, humHz: [52, 77.6], glitch: true,
+  },
 };
 
 /** Courbe en escalier : le signal ne prend plus que `steps` valeurs. */
@@ -89,7 +98,29 @@ export function createAmbiance() {
     const tone = ctx.createBiquadFilter();
     tone.type = 'lowpass';
     tone.Q.value = 0.7;
-    bus.connect(tone).connect(master);
+    // La pulsation : un gain battu par un oscillateur carré.
+    const gate = ctx.createGain();
+    const gateLfo = ctx.createOscillator();
+    gateLfo.type = 'square';
+    const gateDepth = ctx.createGain();
+    gateLfo.connect(gateDepth).connect(gate.gain);
+    gateLfo.start();
+    bus.connect(tone).connect(gate).connect(master);
+
+    // Le bourdonnement de la machine : deux scies graves, très filtrées.
+    const humGain = ctx.createGain();
+    humGain.gain.value = 0;
+    const humFilter = ctx.createBiquadFilter();
+    humFilter.type = 'lowpass';
+    humFilter.frequency.value = 240;
+    humFilter.connect(humGain).connect(master);
+    const hums = [0, 1].map(() => {
+      const o = ctx.createOscillator();
+      o.type = 'sawtooth';
+      o.connect(humFilter);
+      o.start();
+      return o;
+    });
 
     const dry = ctx.createGain();
     music.connect(dry).connect(bus);
@@ -130,7 +161,7 @@ export function createAmbiance() {
     seaGain.gain.value = SEA_LEVEL;
     sea.connect(seaGain).connect(master);
 
-    nodes = { master, bus, tone, dry, carrier, ringWet, feedback, combWet, crusher, crushWet };
+    nodes = { master, bus, tone, dry, carrier, ringWet, feedback, combWet, crusher, crushWet, gate, gateLfo, gateDepth, humGain, hums };
     applyProfile(true);
   }
 
@@ -146,7 +177,12 @@ export function createAmbiance() {
     set(nodes.feedback.gain, p.feedback);
     set(nodes.crushWet.gain, p.crush);
     set(nodes.tone.frequency, p.cutoff);
-    nodes.crusher.curve = staircase(p.glitch ? 8 : 14);
+    set(nodes.gate.gain, 1 - p.gate);
+    set(nodes.gateDepth.gain, p.gate);
+    set(nodes.gateLfo.frequency, p.gateHz);
+    set(nodes.humGain.gain, p.hum);
+    nodes.hums.forEach((o, i) => set(o.frequency, p.humHz[i]));
+    nodes.crusher.curve = staircase(p.steps);
     elements.music.playbackRate = p.rate;
     // Le ralenti doit aussi faire descendre la hauteur : la voix devient grave.
     elements.music.preservesPitch = false;
