@@ -61,6 +61,8 @@
   <div class="opm-xeno-stage" data-el="xeno-stage" aria-hidden="true">
     <canvas data-el="xeno-canvas"></canvas>
   </div>
+  <!-- La ligne de scan qui construit le cadre à l'ouverture (components/intro.js). -->
+  <div class="opm-buildline" aria-hidden="true"></div>
   <!-- Devant le cadre : ce qui l'incruste dans le décor (bords tramés, cristaux). -->
   <canvas class="opm-surround opm-surround--front" data-el="surround-front" aria-hidden="true"></canvas>
 
@@ -70,13 +72,10 @@
   <div class="opm-app" data-el="frame">
 
   <!-- ======================================================================
-       FOND — vidéo, repli dégradé, puis les deux voiles (valeurs en CSS)
+       FOND — la salle de simulation (components/lab.js), puis les voiles
        ================================================================== -->
   <div class="opm-bg" aria-hidden="true">
-    <video class="opm-bg__video" data-el="bg-video"
-           src="assets/videos/opmback2.mp4"
-           muted loop autoplay playsinline preload="auto"
-           disablepictureinpicture tabindex="-1"></video>
+    <canvas class="opm-bg__lab" data-el="bg-lab"></canvas>
     <div class="opm-bg__fallback" data-el="bg-fallback"></div>
     <!-- Les circuits de Xenodys, incrustés dans l'image, et la teinte de son état. -->
     <canvas class="opm-bg__circuits" data-el="bg-circuits"></canvas>

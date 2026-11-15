@@ -18,9 +18,18 @@
  * assistants l'accompagnent : l'un se cache au coin bas-gauche du cadre,
  * l'autre se tient près d'elle. Corrompue : `corrupted_lean`, et les
  * textures rouges et violettes. L'état suit `<html data-xenodys>`.
+ *
+ * Elle vit : elle arrive une fois le cadre construit (`arrive`), suit la
+ * souris du regard, cligne des yeux, regarde le bouton JOUER qu'on survole
+ * (`attend`), réagit à un lancement raté (`react`), et sa bascule d'un état à
+ * l'autre part de son cœur (`shift`). Ses mains, elles, ne bougent jamais.
+ * La cinématique du lancement : `begin` (clic), `release` (le jeu démarre),
+ * `comeBack` (le launcher revient).
  */
 
 import { ANIMATIONS, ASSISTANT_ANIMATIONS, ASSISTANT_GEO, GEO } from '../data/xenodys-model.js';
+import { liveCharacter } from './character3d.js';
+import { rebuildFrame } from './intro.js';
 
 const NEAREST = 1003;
 const DEG = Math.PI / 180;
@@ -254,7 +263,7 @@ export async function createXenodys(canvas, stage, frame) {
     });
 
   /** Les textures d'un modèle, dans ses deux états, et son matériau. */
-  async function skinned(name) {
+  async function skinned(name, { blink = false } = {}) {
     const skins = {};
     for (const etat of ['creatrice', 'corrompue']) {
       const [map, glow] = await Promise.all([
@@ -262,6 +271,14 @@ export async function createXenodys(canvas, stage, frame) {
         load(`assets/xenodys/${name}_${etat}_glowmask.png`),
       ]);
       skins[etat] = { map, glow };
+      if (blink) {
+        // Les paupières closes : la même texture, le regard éteint.
+        const [bmap, bglow] = await Promise.all([
+          load(`assets/xenodys/${name}_${etat}_blink.png`),
+          load(`assets/xenodys/${name}_${etat}_blink_glowmask.png`),
+        ]).catch(() => [null, null]);
+        if (bmap && bglow) skins[`${etat}_blink`] = { map: bmap, glow: bglow };
+      }
     }
     const material = new T.Material({ map: skins.creatrice.map, alphaTest: 0.5 });
     if ('emissiveMap' in material) {
@@ -269,10 +286,22 @@ export async function createXenodys(canvas, stage, frame) {
       material.emissive?.set?.(0xffffff);
       material.emissiveIntensity = 1;
     }
-    const setEtat = (etat) => {
-      material.map = skins[etat].map;
-      if ('emissiveMap' in material) material.emissiveMap = skins[etat].glow;
+    let current = 'creatrice';
+    let closed = false;
+    const show = () => {
+      const sk = (closed && skins[`${current}_blink`]) || skins[current];
+      material.map = sk.map;
+      if ('emissiveMap' in material) material.emissiveMap = sk.glow;
       material.needsUpdate = true;
+    };
+    const setEtat = (etat) => {
+      current = etat;
+      show();
+    };
+    const setBlink = (on) => {
+      if (closed === Boolean(on)) return;
+      closed = Boolean(on);
+      show();
     };
     const dispose = () => {
       for (const sk of Object.values(skins)) {
@@ -281,10 +310,10 @@ export async function createXenodys(canvas, stage, frame) {
       }
       material.dispose();
     };
-    return { material, setEtat, dispose };
+    return { material, setEtat, setBlink, dispose };
   }
 
-  const xenSkin = await skinned('xenodys');
+  const xenSkin = await skinned('xenodys', { blink: true });
   const botSkin = await skinned('xenodys_assistant');
 
   // Xenodys, de trois quarts, tournée vers le launcher.
@@ -363,8 +392,8 @@ export async function createXenodys(canvas, stage, frame) {
 
   /** La pose de Xenodys : animation, corrections des bras, mains de face
    *  (recalculées si `reface`, sinon celles mémorisées). */
-  function poseXen(t, reface = false) {
-    pose(xen.bones, anims[etat], t, reach);
+  function poseXen(t, reface = false, head = null) {
+    pose(xen.bones, anims[etat], t, head ? { ...reach, head } : reach);
     if (reface) faceHands();
     else for (const [name, q] of handQuats) xen.bones.get(name).group.quaternion.copy(q);
   }
@@ -446,6 +475,11 @@ export async function createXenodys(canvas, stage, frame) {
       }
     }
     reach[name] = best.r;
+    newton(name, at, target, passes);
+  }
+
+  /** Affine un bras par Newton, à partir de `reach[name]`. */
+  function newton(name, at, target, passes) {
     for (let pass = 0; pass < passes; pass += 1) {
       const r = [...reach[name]];
       const p0 = at(r);
@@ -503,15 +537,56 @@ export async function createXenodys(canvas, stage, frame) {
       tilt.position.y -= (headTarget.y - scaled((hb.minY + hb.maxY) / 2, o.y)) / unit;
     }
 
-    solveArm('arm_left', () => {
+    solveArm('arm_left', GRIP_POINT.arm_left, gripTarget('arm_left'));
+    solveArm('arm_right', GRIP_POINT.arm_right, gripTarget('arm_right'));
+  }
+
+  /** Le point de chaque main qui se pose sur le cadre, à l'écran. */
+  const GRIP_POINT = {
+    arm_left: () => {
       const b = boxOf(handL);
       return { x: b.minX, y: (b.minY + b.maxY) / 2 };
-    }, { x: edge - GRIP, y: frameBox.y + frameBox.h * 0.45 });
-
-    solveArm('arm_right', () => {
+    },
+    arm_right: () => {
       const b = boxOf(handR);
       return { x: (b.minX + b.maxX) / 2, y: b.maxY };
-    }, { x: edge - 46, y: frameBox.y + 30 });
+    },
+  };
+
+  /** Où chaque main agrippe : le bord droit, le coin haut-droit. */
+  function gripTarget(name) {
+    const edge = frameBox.x + frameBox.w;
+    return name === 'arm_left'
+      ? { x: edge - GRIP, y: frameBox.y + frameBox.h * 0.45 }
+      : { x: edge - 46, y: frameBox.y + 30 };
+  }
+
+  /**
+   * Les bras « à l'approche » : la main au-dessus de sa prise, à l'extérieur
+   * du cadre, d'où elle vient s'y poser. `lift` : de combien de pixels.
+   * Calculés depuis la pose finale (Newton seul : la solution est voisine).
+   */
+  function approachReach(lift) {
+    const out = {};
+    const saved = { arm_left: [...reach.arm_left], arm_right: [...reach.arm_right] };
+    for (const name of ['arm_right', 'arm_left']) {
+      const g = gripTarget(name);
+      const target = name === 'arm_right'
+        ? { x: g.x + lift * 0.35, y: g.y - lift }
+        : { x: g.x + lift * 0.8, y: g.y - lift * 0.45 };
+      const at = (r) => {
+        reach[name] = r;
+        poseXen(0, false);
+        refresh();
+        return GRIP_POINT[name]();
+      };
+      newton(name, at, target, 8);
+      out[name] = [...reach[name]];
+      reach[name] = saved[name];
+    }
+    poseXen(0, false);
+    refresh();
+    return out;
   }
 
   /** Place un assistant : hauteur voulue, et un point d'ancrage (le bas de ses pieds). */
@@ -548,16 +623,61 @@ export async function createXenodys(canvas, stage, frame) {
     fitBot(bots[1], Math.min(120, frameBox.h * 0.17), { x: edge + Math.max(46, (W - edge) * 0.62), y: frameBox.y + frameBox.h });
     poseXen(0);
     refresh();
-    mask(renderHands());
+    masks.both = mask(renderHands());
+    masks.right = mask(renderHands(handR));
+    masks.none = mask(null);
+    approach.creatrice = approachReach(Math.min(70, H * 0.08));
+    approach.corrompue = approachReach(Math.min(150, H * 0.18));
+    measure();
+    setMask(maskKind);
+  }
+
+  /* ------------------------------------------------ repères à l'écran */
+
+  /** Ce que la vie de Xenodys doit savoir de sa pose : où sont sa tête, son
+   *  cœur, ses mains, sa place et celle des assistants. */
+  const marks = { head: { x: 0, y: 0 }, chest: { x: 0, y: 0 }, hands: [], yawPx: 1, pitchPx: 1 };
+  let home = null;
+  const headMesh = () => meshesOf(xen.bones.get('head').group).find((o) => o.geometry.parameters?.width === 12);
+  /** Un point devant le visage : c'est lui qui suit le regard. */
+  const facePoint = () => {
+    const m = headMesh();
+    return toPx(m.localToWorld(new V3(0, 0, -16)));
+  };
+  function measure() {
+    home = transformNow();
+    for (const bot of bots) bot.home = bot.holder.position.clone();
+    const hb = boxOf([headMesh()]);
+    marks.head = { x: (hb.minX + hb.maxX) / 2, y: (hb.minY + hb.maxY) / 2 };
+    marks.chest = toPx(worldOf(xen.bones.get('chest').group));
+    const L = boxOf(handL);
+    const R = boxOf(handR);
+    marks.hands = [
+      { x: L.minX + 6, y: (L.minY + L.maxY) / 2 },
+      { x: (R.minX + R.maxX) / 2, y: R.maxY - 6 },
+    ];
+    // De combien de pixels le regard bouge pour un degré de rotation de la
+    // tête (le signe compte : il dépend de sa pose).
+    const f0 = facePoint();
+    poseXen(0, false, [0, 6, 0]);
+    refresh();
+    const fy = facePoint();
+    poseXen(0, false, [6, 0, 0]);
+    refresh();
+    const fp = facePoint();
+    marks.yawPx = (fy.x - f0.x) / 6 || 1;
+    marks.pitchPx = (fp.y - f0.y) / 6 || 1;
+    poseXen(0);
+    refresh();
   }
 
   /**
    * La silhouette exacte de ses mains : un rendu où tout le reste est caché.
    * C'est elle, et non un rectangle, qui perce le masque sur le cadre.
    */
-  function renderHands() {
+  function renderHands(meshes = [...handL, ...handR]) {
     const hidden = [];
-    const keep = new Set([...handL, ...handR]);
+    const keep = new Set(meshes);
     viewer.scene.traverse((o) => {
       if (o.isMesh && o.visible && !keep.has(o)) {
         o.visible = false;
@@ -620,9 +740,20 @@ export async function createXenodys(canvas, stage, frame) {
     g.beginPath();
     g.rect(f.x, f.y, f.w, f.h);
     g.clip();
-    g.drawImage(hands, 0, 0);
+    if (hands) g.drawImage(hands, 0, 0);
     g.restore();
-    stage.style.maskImage = `url(${c.toDataURL('image/png')})`;
+    return `url(${c.toDataURL('image/png')})`;
+  }
+
+  /** Les trois masques de la pose : sans les mains (elle arrive), la main
+   *  droite seule posée, les deux mains. */
+  const masks = { none: '', right: '', both: '' };
+  /** Les bras à l'approche de leur prise (voir `approachReach`), selon l'état. */
+  const approach = { creatrice: null, corrompue: null };
+  let maskKind = 'both';
+  function setMask(kind) {
+    maskKind = kind;
+    stage.style.maskImage = masks[kind];
     stage.style.maskSize = '100% 100%';
     stage.style.maskRepeat = 'no-repeat';
   }
@@ -630,13 +761,14 @@ export async function createXenodys(canvas, stage, frame) {
   const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
   let fitTimer = 0;
 
-  /* ---------------------------------------------------- la cinématique */
+  /* ------------------------------------- outils de la cinématique */
 
-  // Au lancement du jeu : elle lâche le cadre, vole devant lui, nous tourne
-  // le dos, recueille le launcher qui rétrécit entre ses mains jusqu'à n'être
-  // plus qu'un orbe, puis ouvre grand les bras — le passage vers le monde
+  // Au clic sur JOUER : elle lâche le cadre, vole devant lui, nous tourne le
+  // dos, recueille le launcher qui rétrécit entre ses mains jusqu'à n'être
+  // plus qu'un orbe — le joueur s'y engouffre, en pixels. Elle attend la fin
+  // de la préparation, puis ouvre grand les bras : le passage vers le monde
   // s'ouvre (lumière cyan, ou déchirure rouge et violette si elle est
-  // corrompue). Au retour du jeu, le launcher réapparaît.
+  // corrompue). Au retour du jeu, le launcher se reconstruit et elle revient.
   const cineAnims = { fly: compile('fly'), cradle: compile('cradle'), unveil: compile('unveil') };
   let cine = null;
 
@@ -818,32 +950,230 @@ export async function createXenodys(canvas, stage, frame) {
   }
 
   const surroundCanvases = () => [...document.querySelectorAll('.opm-surround')];
+  const fxColors = () => FX[(cine ? cine.corrupted : etat === 'corrompue') ? 'corrompue' : 'creatrice'];
+
+  /* ------------------------------------- le joueur se défait en pixels */
+
+  // Le personnage de l'accueil (components/character3d.js) et l'aura de ses circuits.
+  const characterEls = () => [
+    document.querySelector('[data-el="character-3d"]'),
+    document.querySelector('[data-el="character-aura"]'),
+  ].filter(Boolean);
 
   /**
-   * Joue la cinématique. Résolue quand le launcher a disparu et que le passage
-   * est ouvert (environ 4,6 s). `sfx` : components/sfx.js, facultatif.
+   * Découpe une image du personnage en cellules du calque des effets : une
+   * particule par cellule pleine, qui part (de haut en bas) vers l'orbe.
+   * @returns {{x: number, y: number, c: string, delay: number, dur: number, bend: number}[]}
    */
-  function launch(sfx) {
-    if (cine || reduced || !frameBox) return Promise.resolve();
+  function cellsOf(image, rect, every = 1) {
+    const sr = stage.getBoundingClientRect();
+    const cw = Math.max(1, Math.round(rect.width / FX_P));
+    const chh = Math.max(1, Math.round(rect.height / FX_P));
+    const small = document.createElement('canvas');
+    small.width = cw;
+    small.height = chh;
+    const g = small.getContext('2d');
+    g.imageSmoothingEnabled = true;
+    g.drawImage(image, 0, 0, cw, chh);
+    const data = g.getImageData(0, 0, cw, chh).data;
+    const ox = (rect.left - sr.left) / FX_P;
+    const oy = (rect.top - sr.top) / FX_P;
+    const cells = [];
+    for (let y = 0; y < chh; y += every) {
+      for (let x = 0; x < cw; x += every) {
+        const i = (y * cw + x) * 4;
+        if (data[i + 3] < 110) continue;
+        cells.push({
+          x: ox + x,
+          y: oy + y,
+          c: `rgb(${data[i]}, ${data[i + 1]}, ${data[i + 2]})`,
+          delay: (y / chh) * 0.45 + Math.random() * 0.18,
+          dur: 0.5 + Math.random() * 0.25,
+          bend: (Math.random() - 0.5) * 30,
+          vx: (Math.random() - 0.5) * 70,
+          vy: -20 - Math.random() * 50,
+        });
+      }
+    }
+    return cells;
+  }
+
+  /** Prend l'image du personnage et le cache : ses pixels prennent le relais. */
+  function dissolvePlayer(c$) {
+    const cap = liveCharacter()?.capture?.();
+    if (!cap) return;
+    c$.particles = cellsOf(cap.body, cap.rect);
+    c$.shards = cap.jar ? cellsOf(cap.jar, cap.rect, 2) : [];
+    for (const el of characterEls()) el.style.visibility = 'hidden';
+    c$.sfx?.play(c$.shards.length ? 'shatter' : 'dissolve');
+    if (c$.shards.length) setTimeout(() => c$.sfx?.play('dissolve'), 120);
+  }
+
+  function revealPlayer() {
+    for (const el of characterEls()) el.style.visibility = '';
+  }
+
+  /** Dessine les particules du joueur (vers l'orbe) et les éclats du bocal (qui tombent). */
+  function drawParticles(c$, t) {
+    const tx = c$.point.x / FX_P;
+    const ty = c$.point.y / FX_P;
+    const col = fxColors();
+    for (const p of c$.particles ?? []) {
+      const k = (t - c$.dissolveAt - p.delay) / p.dur;
+      if (k >= 1) continue;
+      if (k <= 0) {
+        fxCtx.fillStyle = p.c;
+        fxCtx.fillRect(Math.round(p.x), Math.round(p.y), 1, 1);
+        continue;
+      }
+      const e = ease(k);
+      // Une courbe : la particule s'écarte un peu, puis file vers l'orbe.
+      const mx = (p.x + tx) / 2 + p.bend;
+      const my = Math.min(p.y, ty) - 12;
+      const x = (1 - e) * (1 - e) * p.x + 2 * (1 - e) * e * mx + e * e * tx;
+      const y = (1 - e) * (1 - e) * p.y + 2 * (1 - e) * e * my + e * e * ty;
+      fxCtx.fillStyle = k < 0.35 ? p.c : k < 0.75 ? col.glow : col.core;
+      fxCtx.fillRect(Math.round(x), Math.round(y), 1, 1);
+    }
+    for (const p of c$.shards ?? []) {
+      const s = t - c$.dissolveAt - p.delay * 0.2;
+      if (s <= 0 || s > 1.1) {
+        if (s <= 0) {
+          fxCtx.fillStyle = p.c;
+          fxCtx.fillRect(Math.round(p.x), Math.round(p.y), 1, 1);
+        }
+        continue;
+      }
+      if (s > 0.6 && (1.1 - s) / 0.5 < bayer(Math.round(p.x), Math.round(p.y))) continue;
+      const x = p.x + p.vx * s * 0.6;
+      const y = p.y + p.vy * s * 0.6 + 60 * s * s;
+      fxCtx.fillStyle = p.c;
+      fxCtx.fillRect(Math.round(x), Math.round(y), 1 + (Math.abs(p.bend) > 10 ? 1 : 0), 1);
+    }
+  }
+
+  /* --------------------------------------- l'attente : l'orbe, l'anneau */
+
+  // La cible du clic sur l'orbe, et l'étiquette de la préparation.
+  const hit = document.createElement('button');
+  hit.type = 'button';
+  hit.className = 'opm-cine-hit';
+  hit.hidden = true;
+  hit.dataset.hit = '';
+  hit.setAttribute('aria-label', 'Revenir au launcher');
+  const hitLabel = document.createElement('span');
+  hitLabel.className = 'opm-cine-hit__label';
+  hit.appendChild(hitLabel);
+  document.body.appendChild(hit);
+  hit.addEventListener('click', () => cine?.onAbort?.());
+
+  const PHASE_LABEL = {
+    check: 'Vérification',
+    download: 'Téléchargement',
+    extract: 'Extraction',
+    patch: 'Préparation',
+    launching: 'Ouverture',
+  };
+  let labelText = '';
+  function updateLabel(game) {
+    const name = PHASE_LABEL[game?.state] ?? 'Préparation';
+    const pct = game && (game.state === 'check' || game.state === 'download') ? ` ${Math.floor((game.ratio ?? 0) * 100)} %` : '…';
+    const text = `${name}${pct}`;
+    if (text === labelText) return;
+    labelText = text;
+    hitLabel.innerHTML = '';
+    hitLabel.append(text);
+    const small = document.createElement('small');
+    small.textContent = 'cliquer pour revenir';
+    hitLabel.appendChild(small);
+  }
+
+  /** L'anneau de la préparation : rempli selon l'avancement, ou un arc qui tourne. */
+  function drawRing(cx, cy, t, game, col, corrupted) {
+    const R = 14;
+    const N = 44;
+    const known = game && (game.state === 'check' || game.state === 'download');
+    const frac = known ? Math.min(1, Math.max(0, game.ratio ?? 0)) : 0;
+    const head = Math.floor(t * 18) % N;
+    for (let i = 0; i < N; i += 1) {
+      const a = -Math.PI / 2 + (i / N) * Math.PI * 2;
+      let r = R;
+      if (corrupted && Math.random() < 0.08) r += Math.random() < 0.5 ? -1 : 1;
+      const x = Math.round(cx + Math.cos(a) * r);
+      const y = Math.round(cy + Math.sin(a) * r);
+      const lit = known ? i / N < frac : (i - head + N) % N < 9;
+      fxCtx.fillStyle = lit ? (i % 4 === 0 ? col.core : col.glow) : col.deep;
+      fxCtx.fillRect(x, y, 1, 1);
+    }
+  }
+
+  /* -------------------------------------------------- la cinématique */
+
+  /**
+   * Commence la cinématique, au clic sur JOUER : elle quitte le cadre, vole
+   * devant lui, recueille le launcher qui rétrécit en orbe ; le joueur se
+   * défait en pixels et s'y engouffre. Puis elle attend, l'orbe entre les
+   * mains, que la préparation soit finie (`release`).
+   *
+   * Résolue à `true` quand le passage est ouvert et le launcher parti ; à
+   * `false` si le launcher revient avant (`comeBack`).
+   *
+   * @param {any} sfx  components/sfx.js
+   * @param {{progress?: () => any, onAbort?: () => void}} [options]
+   *   `progress` : l'avancement de la préparation (store.game) ; `onAbort` : le
+   *   joueur a cliqué l'orbe pour revenir.
+   */
+  function begin(sfx, { progress = null, onAbort = null } = {}) {
+    if (cine) return cine.promise;
+    if (sfx) sfxRef = sfx;
+    if (reduced || !frameBox) return Promise.resolve(true);
     clearTimeout(fitTimer);
+    if (arr) finishArrival();
+    if (wave) endWave();
     const lean = transformNow();
     const leanMap = sampleMap(anims[etat], time % anims[etat].length, reach);
     const { to, point } = frontPlacement(lean);
     const corrupted = etat === 'corrompue';
     const savedMask = stage.style.maskImage;
-    handQuats.clear();
     fxResize();
     fx.style.opacity = '1';
     stage.style.maskImage = edgeMask();
     sfx?.play('servo');
-    return new Promise((resolve) => {
-      cine = { start: performance.now(), lean, leanMap, to, point, corrupted, savedMask, resolve, cues: new Set(), sfx };
+    let resolve;
+    const promise = new Promise((r) => {
+      resolve = r;
     });
+    cine = {
+      start: performance.now(), lean, leanMap, to, point, corrupted, savedMask, resolve, promise,
+      cues: new Set(), sfx, progress, onAbort, released: false, readyAt: 0, dissolveAt: 0.8,
+    };
+    hit.style.left = `${point.x + stage.getBoundingClientRect().left}px`;
+    hit.style.top = `${point.y + stage.getBoundingClientRect().top}px`;
+    return promise;
   }
+
+  /** La préparation est finie, le jeu démarre : le passage s'ouvre. */
+  function release() {
+    if (!cine || cine.released) return;
+    cine.released = true;
+    cine.readyAt = (performance.now() - cine.start) / 1000;
+    hit.hidden = true;
+  }
+
+  /** Les deux d'un coup : le jeu démarre déjà. */
+  function launch(sfx) {
+    const p = begin(sfx);
+    release();
+    return p;
+  }
+
+  /** L'orbe est formé à cet instant ; le passage ne s'ouvre pas avant. */
+  const ORB_READY = 2.9;
 
   function cineFrame() {
     const c$ = cine;
     const t = (performance.now() - c$.start) / 1000;
+    const u = c$.released ? Math.max(ORB_READY, c$.readyAt) : Infinity;
     const cue = (name, at, fn) => {
       if (t >= at && !c$.cues.has(name)) {
         c$.cues.add(name);
@@ -855,22 +1185,25 @@ export async function createXenodys(canvas, stage, frame) {
     const shrinkBots = 1 - segment(t, 0, 0.35);
     for (const bot of bots) bot.holder.visible = shrinkBots > 0.02;
 
-    // Poses : penchée → vol → coupe → bras ouverts.
+    // Poses : penchée → vol → coupe (elle attend là) → bras ouverts.
     const fly = sampleMap(cineAnims.fly, t);
     const cradle = sampleMap(cineAnims.cradle, t);
-    const unveil = sampleMap(cineAnims.unveil, t);
     if (t < 0.4) poseBlend(c$.leanMap, fly, ease(segment(t, 0, 0.4)));
     else if (t < 1.75) poseBlend(fly, cradle, ease(segment(t, 1.3, 1.75)));
-    else poseBlend(cradle, unveil, ease(segment(t, 2.9, 3.3)));
+    else if (t < u) poseBlend(cradle, cradle, 0);
+    else poseBlend(cradle, sampleMap(cineAnims.unveil, t), ease(segment(t, u, u + 0.4)));
 
     // Le vol : de sa place derrière le cadre jusque devant lui.
     applyTransform(c$.lean, c$.to, ease(segment(t, 0.3, 1.5)));
-    if (c$.corrupted && t < 3.6 && Math.random() < 0.18) {
+    // L'attente : elle flotte, l'orbe entre les mains.
+    if (t > 1.5 && t < u) tilt.position.y += Math.sin((t - 1.5) * 1.6) * 0.25;
+    if (c$.corrupted && t < u + 0.6 && Math.random() < 0.18) {
       tilt.position.x += (Math.random() - 0.5) * 1.6;
       tilt.position.y += (Math.random() - 0.5) * 1.2;
     }
 
     cue('whoosh', 0.35, () => c$.sfx?.play('whoosh'));
+    cue('dissolve', c$.dissolveAt, () => dissolvePlayer(c$));
     cue('shrink', 1.6, () => {
       c$.sfx?.play('shrink');
       const fr = frame.getBoundingClientRect();
@@ -886,65 +1219,591 @@ export async function createXenodys(canvas, stage, frame) {
         s.style.opacity = '0';
       }
     });
-    cue('portal', 3.0, () => c$.sfx?.play('portal', { etat: c$.corrupted ? 'corrompue' : 'creatrice' }));
-    cue('fade', 3.9, () => {
-      stage.style.transition = 'opacity .7s ease';
+    cue('portal', u + 0.1, () => c$.sfx?.play('portal', { etat: c$.corrupted ? 'corrompue' : 'creatrice' }));
+    cue('fade', u + 1.0, () => {
+      stage.style.transition = 'opacity .6s ease';
       stage.style.opacity = '0';
     });
+
+    // L'attente : l'anneau, l'étiquette, et l'orbe qu'on peut cliquer.
+    const waiting = t >= ORB_READY && !c$.released;
+    if (waiting && hit.hidden) hit.hidden = false;
+    const game = c$.progress?.() ?? null;
+    if (waiting) updateLabel(game);
 
     // Les effets.
     fxCtx.clearRect(0, 0, fx.width, fx.height);
     const col = FX[c$.corrupted ? 'corrompue' : 'creatrice'];
     const cx = c$.point.x / FX_P;
     const cy = c$.point.y / FX_P;
-    if (t >= 1.6 && t < 3.2) {
-      const r = 1.5 + 8 * ease(segment(t, 1.6, 2.9));
+    drawParticles(c$, t);
+    if (t >= 1.6 && t < u + 0.2) {
+      let r = 1.5 + 8 * ease(segment(t, 1.6, ORB_READY));
+      if (t > ORB_READY) r += 0.8 * Math.sin((t - ORB_READY) * 4);
       const flicker = c$.corrupted ? (Math.random() < 0.2 ? 0.3 : 1) : 0.85 + 0.15 * Math.sin(t * 20);
       drawOrb(cx, cy, r, col, flicker);
     }
-    if (t >= 3.0) drawPortal(t - 3.0, cx, cy, c$.corrupted ? 'corrompue' : 'creatrice');
-    if (t >= 3.25 && t < 4.6) {
+    if (waiting) drawRing(cx, cy, t, game, col, c$.corrupted);
+    if (t >= u + 0.1) drawPortal(t - (u + 0.1), cx, cy, c$.corrupted ? 'corrompue' : 'creatrice');
+    if (t >= u + 0.35 && t < u + 1.6) {
       // Un éclair qui couvre la fin : le monde s'ouvre.
-      const k = 1 - segment(t, 3.35, 4.6);
-      const a = (t < 3.35 ? segment(t, 3.25, 3.35) : k) * (c$.corrupted && Math.random() < 0.3 ? 0.4 : 0.85);
+      const k = 1 - segment(t, u + 0.45, u + 1.6);
+      const a = (t < u + 0.45 ? segment(t, u + 0.35, u + 0.45) : k) * (c$.corrupted && Math.random() < 0.3 ? 0.4 : 0.85);
       fxCtx.fillStyle = `rgba(${col.flash}, ${a.toFixed(3)})`;
       fxCtx.fillRect(0, 0, fx.width, fx.height);
     }
 
-    if (t >= 4.6 && !c$.cues.has('done')) {
+    if (t >= u + 1.6 && !c$.cues.has('done')) {
       c$.cues.add('done');
       fx.style.opacity = '0';
-      c$.resolve();
+      c$.resolve(true);
     }
   }
 
-  /** Le launcher revient : le cadre regrandit depuis ses mains, Xenodys
-   *  reprend sa place derrière lui et ses assistants aussi. */
+  /**
+   * Le launcher revient — après une partie, après un échec, ou parce que le
+   * joueur a cliqué l'orbe : tout est remis en place, sans transition, le
+   * cadre se reconstruit, puis Xenodys arrive à nouveau.
+   */
   function comeBack(sfx) {
+    if (sfx) sfxRef = sfx;
     if (!cine) return;
     const c$ = cine;
     cine = null;
+    c$.resolve(false);
+    hit.hidden = true;
     fxCtx.clearRect(0, 0, fx.width, fx.height);
     fx.style.opacity = '0';
     applyTransform(c$.lean, c$.lean, 0);
-    for (const bot of bots) bot.holder.visible = true;
-    sfx?.play('power');
-    frame.style.transition = 'transform .9s cubic-bezier(.2,.8,.2,1), opacity .35s ease, filter .9s ease';
+    frame.style.transition = 'none';
     frame.style.transform = '';
     frame.style.filter = '';
     frame.style.opacity = '';
-    for (const s of surroundCanvases()) s.style.opacity = '';
-    stage.style.transition = 'opacity 1.2s ease .5s';
-    stage.style.opacity = '';
-    setTimeout(() => {
+    for (const s of surroundCanvases()) {
+      s.style.transition = 'none';
+      s.style.opacity = '';
+    }
+    stage.style.transition = 'none';
+    stage.style.opacity = '0';
+    stage.style.maskImage = c$.savedMask;
+    revealPlayer();
+    // Un tour d'affichage pour que rien ne glisse, puis la reconstruction.
+    requestAnimationFrame(() => {
       frame.style.transition = '';
-      stage.style.transition = '';
-      stage.style.maskImage = c$.savedMask;
+      for (const s of surroundCanvases()) s.style.transition = '';
+      // JOUER cliqué entre-temps : la nouvelle cinématique a la main.
+      if (cine) return;
       fit();
-    }, 950);
+      hideForArrival();
+      sfx?.play('build');
+      rebuildFrame().then(() => {
+        if (!cine) arrive(sfx);
+      });
+    });
+  }
+
+  /* --------------------------------------------------- l'arrivée */
+
+  // À l'ouverture (et au retour d'une partie), le cadre se construit d'abord ;
+  // puis elle arrive. Créatrice : elle descend du haut, lente, le halo d'abord,
+  // se penche, pose la main droite sur le coin, puis la gauche sur le bord —
+  // un « clac » à chaque contact, le cadre qui tressaille ; ses assistants
+  // suivent. Corrompue : elle surgit en glitch, apparaît à deux ou trois
+  // endroits, se fige, et ses mains frappent le cadre — des fissures partent de
+  // ses doigts.
+  let arr = null;
+  let fitPending = false;
+  /** Réactions et clignements : une seule chose à la fois. */
+  let pendingReaction = null;
+
+  const lerp3 = (a, b, k) => [0, 1, 2].map((i) => a[i] + (b[i] - a[i]) * k);
+
+  /** Le corps tressaille : un contact, un impact. */
+  function shake(px, ms) {
+    if (reduced) return;
+    const k = [
+      { transform: 'translate(0, 0)' },
+      { transform: `translate(${px}px, ${Math.round(px * 1.3)}px)` },
+      { transform: `translate(${-px}px, ${-Math.round(px * 0.6)}px)` },
+      { transform: `translate(${Math.round(px / 2)}px, 0)` },
+      { transform: 'translate(0, 0)' },
+    ];
+    document.body.animate(k, { duration: ms, easing: 'steps(5, end)' });
+  }
+
+  /** Avant l'arrivée : rien d'elle ni des assistants ne se voit. */
+  function hideForArrival() {
+    stage.style.transition = 'none';
+    stage.style.opacity = '0';
+    for (const bot of bots) bot.holder.visible = false;
+  }
+
+  /** Les fissures (corrompue) : des chemins de pixels qui partent des doigts. */
+  function makeCracks() {
+    const out = [];
+    for (const h of marks.hands) {
+      for (let n = 0; n < 5; n += 1) {
+        let x = h.x / FX_P;
+        let y = h.y / FX_P;
+        // Vers l'extérieur du cadre : à droite, ou vers le haut pour la main du coin.
+        let dx = 0.6 + Math.random() * 0.6;
+        let dy = (Math.random() - 0.5) * 1.6;
+        if (h === marks.hands[1]) {
+          dx = (Math.random() - 0.3) * 1.4;
+          dy = -0.6 - Math.random() * 0.6;
+        }
+        const path = [];
+        const len = 16 + Math.floor(Math.random() * 20);
+        for (let s = 0; s < len; s += 1) {
+          path.push([Math.round(x), Math.round(y)]);
+          x += dx + (Math.random() - 0.5) * 0.9;
+          y += dy + (Math.random() - 0.5) * 0.9;
+        }
+        out.push(path);
+      }
+    }
+    return out;
+  }
+
+  function drawCracks(cracks, k, fade) {
+    const col = FX.corrompue;
+    for (const path of cracks) {
+      const n = Math.floor(path.length * k);
+      for (let i = 0; i < n; i += 1) {
+        const [x, y] = path[i];
+        if (fade < 1 && fade < bayer(x, y)) continue;
+        fxCtx.fillStyle = i < 3 ? col.core : i % 5 === 0 ? col.deep : col.glow;
+        fxCtx.fillRect(x, y, 1, 1);
+      }
+    }
+  }
+
+  /**
+   * Joue l'arrivée. Résolue quand elle agrippe le cadre et que ses assistants
+   * sont à leur place.
+   */
+  function arrive(sfx) {
+    if (sfx) sfxRef = sfx;
+    if (cine || !frameBox || !home) return Promise.resolve();
+    stage.dataset.ready = '';
+    if (reduced) {
+      stage.style.transition = '';
+      stage.style.opacity = '';
+      for (const bot of bots) bot.holder.visible = true;
+      setMask('both');
+      return Promise.resolve();
+    }
+    if (arr) finishArrival();
+    const corrupted = etat === 'corrompue';
+    let resolve;
+    const promise = new Promise((r) => {
+      resolve = r;
+    });
+    const unit = unitAt(holder) || 1;
+    arr = {
+      start: performance.now(),
+      corrupted,
+      sfx,
+      resolve,
+      unit,
+      cues: new Set(),
+      reach: { arm_right: [...reach.arm_right], arm_left: [...reach.arm_left] },
+      // Corrompue : trois apparitions furtives, ailleurs, avant de se figer.
+      ghosts: [
+        { dx: -0.2 * W, dy: 0.1 * H, from: 0.05, to: 0.2 },
+        { dx: 0.12 * W, dy: -0.22 * H, from: 0.32, to: 0.43 },
+        { dx: -0.06 * W, dy: 0.04 * H, from: 0.55, to: 0.63 },
+      ],
+      cracks: null,
+      length: corrupted ? 2.7 : 3.3,
+    };
+    for (const bot of bots) bot.holder.visible = false;
+    setMask('none');
+    stage.style.transition = 'none';
+    stage.style.opacity = corrupted ? '0' : '1';
+    fxResize();
+    return promise;
+  }
+
+  /** Termine l'arrivée d'un coup : la pose finale, tout le monde en place. */
+  function finishArrival() {
+    const a$ = arr;
+    if (!a$) return;
+    arr = null;
+    applyTransform(home, home, 0);
+    for (const bot of bots) {
+      bot.holder.visible = true;
+      if (bot.home) bot.holder.position.copy(bot.home);
+    }
+    stage.style.opacity = '';
+    stage.style.transform = '';
+    stage.style.transition = '';
+    setMask('both');
+    if (!cine) {
+      fxCtx.clearRect(0, 0, fx.width, fx.height);
+      fx.style.opacity = '0';
+    }
+    a$.resolve();
+    if (fitPending) {
+      fitPending = false;
+      fit();
+    }
+    if (pendingReaction) {
+      const kind = pendingReaction;
+      pendingReaction = null;
+      setTimeout(() => react(kind), 250);
+    }
+  }
+
+  /** Les doigts de chaque main (phalanges et pouce). */
+  const FINGERS = {
+    arm_right: [...xen.bones.keys()].filter((n) => /^(finger|thumb)_right/.test(n)),
+    arm_left: [...xen.bones.keys()].filter((n) => /^(finger|thumb)_left/.test(n)),
+  };
+
+  /** Défait la courbure des doigts de l'animation : `open` 1, la main ouverte. */
+  function openFingers(extra, anim, at, name, open) {
+    if (open <= 0) return;
+    for (const f of FINGERS[name]) {
+      const ch = anim.bones[f]?.rotation;
+      if (!ch) continue;
+      extra[f] = sample(ch, at).map((v) => -v * open);
+    }
+  }
+
+  /**
+   * Un bras qui vient agripper le cadre : il approche (la main ouverte, au-
+   * dessus de sa prise, qui se tourne peu à peu vers le cadre), se pose, et
+   * les doigts se referment au contact. Renvoie l'ouverture des doigts.
+   * @param {{a0: number, a1: number, c: number}} k  début, fin de l'approche, contact
+   */
+  function grabPhase(t, name, from, k) {
+    const app = approach[etat]?.[name] ?? arr.reach[name];
+    const final = arr.reach[name];
+    const go = ease(segment(t, k.a0, k.a1));
+    // La pose : vers l'approche, puis — en accélérant — sur la prise.
+    const land = segment(t, k.a1, k.c) ** 2;
+    const r = t < k.a1 ? lerp3(from, app, go) : lerp3(app, final, land);
+    const open = Math.min(segment(t, k.a0, k.a0 + 0.3), 1 - ease(segment(t, k.c - 0.06, k.c + 0.16)));
+    const turn = ease(segment(t, k.a0 + 0.1, k.a1 + 0.05));
+    return { r, open, turn };
+  }
+
+  /** Oriente les mains : de leur pose animée vers la prise (`turn` de 0 à 1). */
+  function turnHands(turns) {
+    for (const [name, q] of handQuats) {
+      const k = turns[name === 'hand_left' ? 'arm_left' : 'arm_right'] ?? 1;
+      const bone = xen.bones.get(name).group;
+      if (k >= 1) bone.quaternion.copy(q);
+      else bone.quaternion.slerp(q, k);
+    }
+  }
+
+  /** Le léger fléchissement du corps quand une main prend appui (en pixels). */
+  const dipAt = (t, c) => (t > c && t < c + 0.35 ? 3 * Math.sin(Math.PI * segment(t, c, c + 0.35)) : 0);
+
+  function arriveFrame(dt) {
+    const a$ = arr;
+    const t = (performance.now() - a$.start) / 1000;
+    const cue = (name, at, fn) => {
+      if (t >= at && !a$.cues.has(name)) {
+        a$.cues.add(name);
+        fn();
+      }
+    };
+    const anim = anims[etat];
+    const at = time % anim.length;
+
+    if (!a$.corrupted) {
+      // --- créatrice : elle descend.
+      const down = 1 - (1 - segment(t, 0, 1.5)) ** 3;
+      applyTransform(home, home, 0);
+      tilt.position.y += ((H * 0.95) / a$.unit) * (1 - down);
+      tilt.rotation.z = home.tiltZ * ease(segment(t, 0.5, 1.6));
+      holder.rotation.y = home.rotY + 0.35 * (1 - ease(segment(t, 0.4, 1.6)));
+      // La main droite d'abord (le coin du haut), puis la gauche (le bord).
+      const KR = { a0: 1.0, a1: 1.55, c: 1.8 };
+      const KL = { a0: 1.45, a1: 2.0, c: 2.25 };
+      const gR = grabPhase(t, 'arm_right', [0, 0, 0], KR);
+      const gL = grabPhase(t, 'arm_left', [0, 0, 0], KL);
+      const extra = { arm_right: gR.r, arm_left: gL.r };
+      openFingers(extra, anim, at, 'arm_right', gR.open);
+      openFingers(extra, anim, at, 'arm_left', gL.open);
+      // Elle suit sa main du regard pendant qu'elle la pose.
+      const glance = Math.sin(Math.PI * segment(t, 0.9, 2.4));
+      extra.head = [-7 * (Math.sign(marks.pitchPx) || 1) * glance, 8 * (Math.sign(marks.yawPx) || 1) * glance, 0];
+      poseBlend(sampleMap(cineAnims.fly, t), sampleMap(anim, at, extra), ease(segment(t, 0.5, 1.4)));
+      turnHands({ arm_right: gR.turn, arm_left: gL.turn });
+      tilt.position.y -= (dipAt(t, KR.c) + dipAt(t, KL.c)) / a$.unit;
+      cue('clampR', 1.8, () => {
+        a$.sfx?.play('clamp');
+        shake(2, 160);
+        setMask('right');
+      });
+      cue('clampL', 2.25, () => {
+        a$.sfx?.play('clamp');
+        shake(2, 160);
+        setMask('both');
+      });
+      // Les assistants : le curieux accourt de la gauche, le fidèle de la droite,
+      // en sautillant, et s'arrête net (un petit bruit de pas).
+      const [peek, idle] = bots;
+      if (t >= 2.35 && peek.home) {
+        peek.holder.visible = true;
+        const k = 1 - (1 - segment(t, 2.35, 3.0)) ** 2;
+        const u = unitAt(peek.holder) || 1;
+        peek.holder.position.copy(peek.home);
+        peek.holder.position.x -= ((frameBox.x + 140) / u) * (1 - k);
+        peek.holder.position.y += (Math.abs(Math.sin(k * Math.PI * 5)) * 10 * (1 - k)) / u;
+      }
+      if (t >= 2.55 && idle.home) {
+        idle.holder.visible = true;
+        const k = 1 - (1 - segment(t, 2.55, 3.15)) ** 2;
+        const u = unitAt(idle.holder) || 1;
+        idle.holder.position.copy(idle.home);
+        idle.holder.position.x += ((W - marks.head.x + 80) / u) * (1 - k);
+        idle.holder.position.y += (Math.abs(Math.sin(k * Math.PI * 4)) * 8 * (1 - k)) / u;
+      }
+      cue('land', 3.15, () => a$.sfx?.play('land'));
+    } else {
+      // --- corrompue : elle surgit en glitch.
+      applyTransform(home, home, 0);
+      const ghost = a$.ghosts.find((g) => t >= g.from && t < g.to);
+      let visible = t >= 0.78;
+      if (ghost) {
+        visible = Math.random() < 0.85;
+        tilt.position.x += ghost.dx / a$.unit;
+        tilt.position.y -= ghost.dy / a$.unit;
+      }
+      a$.ghosts.forEach((g, i) => cue(`ghost${i}`, g.from, () => a$.sfx?.play('glitch')));
+      cue('lock', 0.78, () => a$.sfx?.play('glitch'));
+      stage.style.opacity = visible ? '1' : '0';
+      stage.style.transform = t < 0.95 && Math.random() < 0.3 ? `translateX(${Math.round((Math.random() - 0.5) * 10)}px)` : '';
+      // Les bras levés au-dessus de leur prise, les doigts écartés en griffes,
+      // puis qui s'abattent sur le cadre ; les doigts se referment au choc.
+      const slam = segment(t, 0.9, 1.05) ** 3;
+      const app = approach.corrompue ?? a$.reach;
+      const extra = {
+        arm_right: lerp3(app.arm_right, a$.reach.arm_right, slam),
+        arm_left: lerp3(app.arm_left, a$.reach.arm_left, slam),
+      };
+      const open = 1 - ease(segment(t, 1.0, 1.12));
+      openFingers(extra, anim, at, 'arm_right', open);
+      openFingers(extra, anim, at, 'arm_left', open);
+      pose(xen.bones, anim, at, extra);
+      turnHands({});
+      if (t > 1.05 && t < 1.4) tilt.position.y -= (6 * Math.sin(Math.PI * segment(t, 1.05, 1.4))) / a$.unit;
+      cue('slam', 1.05, () => {
+        a$.sfx?.play('slam');
+        shake(7, 280);
+        setMask('both');
+        a$.cracks = makeCracks();
+        fx.style.opacity = '1';
+      });
+      // Les assistants grésillent avant d'apparaître.
+      if (t >= 1.3) {
+        const settled = t >= 1.9;
+        for (const bot of bots) bot.holder.visible = settled || Math.random() < 0.5;
+        cue('bots', 1.3, () => a$.sfx?.play('glitch'));
+      }
+      if (a$.cracks) {
+        fxCtx.clearRect(0, 0, fx.width, fx.height);
+        drawCracks(a$.cracks, segment(t, 1.05, 1.5), 1 - segment(t, 1.9, 2.6));
+      }
+    }
+    animateBots(dt, !a$.corrupted && t < 3.2);
+    if (t >= a$.length) finishArrival();
+  }
+
+  /* -------------------------------------------- le regard, les réactions */
+
+  // Sa tête suit doucement la souris (jamais ses mains) ; elle cligne des
+  // yeux ; au survol de JOUER, elle se penche et regarde le bouton ; un
+  // lancement raté : elle détourne la tête, méprisante (corrompue : un rire
+  // haché, qui grésille).
+  const look = { yaw: 0, pitch: 0, glow: 1 };
+  let cursor = null;
+  let cursorAt = 0;
+  let attended = null;
+  let reaction = null;
+  let blinkIn = 2 + Math.random() * 3;
+  let blinkLeft = 0;
+  let blinkSecond = false;
+
+  window.addEventListener('mousemove', (e) => {
+    const sr = stage.getBoundingClientRect();
+    cursor = { x: e.clientX - sr.left, y: e.clientY - sr.top };
+    cursorAt = performance.now();
+  }, { passive: true });
+  document.documentElement.addEventListener('mouseleave', () => {
+    cursor = null;
+  });
+
+  /** Regarde un élément (le bouton JOUER survolé), ou plus rien. */
+  function attend(el) {
+    attended = el ?? null;
+  }
+
+  /** Une réaction à un lancement raté ; attend la fin d'une arrivée. */
+  function react(kind = 'fail') {
+    if (reduced) return;
+    if (cine || arr) {
+      pendingReaction = kind;
+      return;
+    }
+    const corrupted = etat === 'corrompue';
+    reaction = { kind: corrupted ? 'laugh' : 'deny', t: 0, length: corrupted ? 1.7 : 2.4 };
+    sfxRef?.play(reaction.kind);
+  }
+  let sfxRef = null;
+
+  const clamp = (v, a = -1, b = 1) => Math.min(b, Math.max(a, v));
+
+  /** Le regard de cette image : en degrés (convention Bedrock), lissé. */
+  function lookStep(dt) {
+    let yaw = 0;
+    let pitch = 0;
+    let glow = 1;
+    const sy = Math.sign(marks.yawPx) || 1;
+    const sp = Math.sign(marks.pitchPx) || 1;
+    let target = null;
+    if (attended?.isConnected) {
+      const r = attended.getBoundingClientRect();
+      const sr = stage.getBoundingClientRect();
+      target = { x: r.left + r.width / 2 - sr.left, y: r.top + r.height / 2 - sr.top };
+      glow = 1.6;
+    } else if (cursor && performance.now() - cursorAt < 10_000) {
+      target = cursor;
+    }
+    if (target) {
+      yaw = clamp((target.x - marks.head.x) / (W * 0.45)) * 16 * sy;
+      pitch = clamp((target.y - marks.head.y) / (H * 0.45)) * 10 * sp;
+      if (attended) pitch += 6 * sp;
+    }
+    let jitter = [0, 0];
+    if (reaction) {
+      reaction.t += dt;
+      const k = Math.min(segment(reaction.t, 0, 0.3), 1 - segment(reaction.t, reaction.length - 0.5, reaction.length));
+      if (reaction.kind === 'deny') {
+        // Elle détourne la tête, vers l'extérieur, le menton levé.
+        yaw = yaw * (1 - k) + 24 * sy * k;
+        pitch = pitch * (1 - k) - 9 * sp * k;
+      } else {
+        // Le rire : la tête qui hoche, saccadée ; l'image qui saute.
+        pitch = pitch * (1 - k) + (Math.sin(reaction.t * 26) * 5 - 5) * sp * k;
+        jitter = [Math.sin(reaction.t * 47) * 3 * k, 0];
+        stage.style.transform = Math.random() < 0.25 * k ? `translateX(${Math.round((Math.random() - 0.5) * 8)}px)` : '';
+        for (const bot of bots) bot.holder.visible = Math.random() > 0.15 * k;
+      }
+      glow = reaction.kind === 'laugh' ? 1.4 + Math.random() * 0.6 * k : glow;
+      if (reaction.t >= reaction.length) {
+        reaction = null;
+        stage.style.transform = '';
+        for (const bot of bots) bot.holder.visible = true;
+      }
+    }
+    const f = Math.min(1, dt * 3.2);
+    look.yaw += (yaw - look.yaw) * f;
+    look.pitch += (pitch - look.pitch) * f;
+    look.glow += (glow - look.glow) * Math.min(1, dt * 4);
+    if ('emissiveIntensity' in xenSkin.material) xenSkin.material.emissiveIntensity = look.glow;
+    return [look.pitch + jitter[1], look.yaw + jitter[0], 0];
+  }
+
+  function blinkStep(dt) {
+    if (blinkLeft > 0) {
+      blinkLeft -= dt;
+      if (blinkLeft <= 0) xenSkin.setBlink(false);
+      return;
+    }
+    blinkIn -= dt;
+    if (blinkIn > 0) return;
+    xenSkin.setBlink(true);
+    blinkLeft = 0.11;
+    // Corrompue, parfois : un second clignement, trop vite.
+    if (!blinkSecond && etat === 'corrompue' && Math.random() < 0.4) {
+      blinkSecond = true;
+      blinkIn = 0.25;
+    } else {
+      blinkSecond = false;
+      blinkIn = 2.5 + Math.random() * 4;
+    }
+  }
+
+  /* ---------------------------------------------- la bascule de l'état */
+
+  /**
+   * Xenodys change d'état pendant que le launcher est ouvert : la corruption
+   * (ou la lumière) part de son cœur et s'étend ; `apply` bascule le thème au
+   * moment où l'onde couvre la fenêtre.
+   */
+  let wave = null;
+  function shift(next, apply) {
+    if (reduced || cine || arr || !frameBox) {
+      apply?.();
+      return;
+    }
+    fxResize();
+    fx.style.opacity = '1';
+    wave = { start: performance.now(), etat: next === 'corrompue' ? 'corrompue' : 'creatrice', apply, applied: false };
+    sfxRef?.play(next === 'corrompue' ? 'corrupt' : 'purify');
+  }
+
+  /** Le thème bascule quand l'onde a couvert l'essentiel de la fenêtre, dans un éclair. */
+  const WAVE_APPLY = 0.8;
+  function waveFrame() {
+    const t = (performance.now() - wave.start) / 1000;
+    fxCtx.clearRect(0, 0, fx.width, fx.height);
+    drawPortal(t / 1.7, marks.chest.x / FX_P, marks.chest.y / FX_P, wave.etat);
+    if (!wave.applied && t >= WAVE_APPLY) {
+      wave.applied = true;
+      wave.apply?.();
+    }
+    if (t >= WAVE_APPLY && t < WAVE_APPLY + 0.4) {
+      const a = 0.7 * (1 - (t - WAVE_APPLY) / 0.4);
+      fxCtx.fillStyle = `rgba(${FX[wave.etat].flash}, ${a.toFixed(3)})`;
+      fxCtx.fillRect(0, 0, fx.width, fx.height);
+    }
+    if (t >= 1.9) endWave();
+  }
+
+  function endWave() {
+    if (!wave) return;
+    if (!wave.applied) wave.apply?.();
+    wave = null;
+    fxCtx.clearRect(0, 0, fx.width, fx.height);
+    fx.style.opacity = '0';
   }
 
   /* ---------------------------------------------------------- vie */
+
+  function animateBots(dt, placing = false) {
+    for (const bot of bots) {
+      bot.time += dt;
+      const base = botAnims[bot.role];
+      pose(bot.bones, base, bot.time % base.length);
+      if (placing || bot.role !== 'idle' || reduced) continue;
+      if (!bot.wave) {
+        bot.nextWave -= dt;
+        if (bot.nextWave <= 0) bot.wave = { t: 0 };
+      } else {
+        bot.wave.t += dt;
+        const w = botAnims.wave;
+        for (const [name, channels] of Object.entries(w.bones)) {
+          const bone = bot.bones.get(name);
+          if (!bone || !channels.rotation) continue;
+          const r = sample(channels.rotation, bot.wave.t);
+          bone.group.rotation.x += -r[0] * DEG;
+          bone.group.rotation.y += -r[1] * DEG;
+          bone.group.rotation.z += r[2] * DEG;
+        }
+        if (bot.wave.t >= w.length) {
+          bot.wave = null;
+          bot.nextWave = 14 + Math.random() * 20;
+        }
+      }
+    }
+  }
 
   const applySkin = () => {
     xenSkin.setEtat(etat);
@@ -953,6 +1812,8 @@ export async function createXenodys(canvas, stage, frame) {
   };
   applySkin();
   fit();
+  // Rien ne se voit avant son arrivée (`arrive`, après la construction du cadre).
+  hideForArrival();
 
   viewer.animation = new lib.FunctionAnimation((_player, _progress, delta) => {
     const dt = reduced ? 0 : Math.min(0.1, Math.max(0, delta || 0));
@@ -961,33 +1822,14 @@ export async function createXenodys(canvas, stage, frame) {
       cineFrame();
       return;
     }
-    poseXen(time % anims[etat].length);
-    for (const bot of bots) {
-      bot.time += dt;
-      const base = botAnims[bot.role];
-      pose(bot.bones, base, bot.time % base.length);
-      if (bot.role === 'idle' && !reduced) {
-        if (!bot.wave) {
-          bot.nextWave -= dt;
-          if (bot.nextWave <= 0) bot.wave = { t: 0 };
-        } else {
-          bot.wave.t += dt;
-          const w = botAnims.wave;
-          for (const [name, channels] of Object.entries(w.bones)) {
-            const bone = bot.bones.get(name);
-            if (!bone || !channels.rotation) continue;
-            const r = sample(channels.rotation, bot.wave.t);
-            bone.group.rotation.x += -r[0] * DEG;
-            bone.group.rotation.y += -r[1] * DEG;
-            bone.group.rotation.z += r[2] * DEG;
-          }
-          if (bot.wave.t >= w.length) {
-            bot.wave = null;
-            bot.nextWave = 14 + Math.random() * 20;
-          }
-        }
-      }
+    if (arr) {
+      arriveFrame(dt);
+      return;
     }
+    if (wave) waveFrame();
+    blinkStep(dt);
+    poseXen(time % anims[etat].length, false, lookStep(dt));
+    animateBots(dt);
   });
 
   const observer = new MutationObserver(() => {
@@ -1004,6 +1846,10 @@ export async function createXenodys(canvas, stage, frame) {
     clearTimeout(fitTimer);
     fitTimer = setTimeout(() => {
       if (cine) return;
+      if (arr) {
+        fitPending = true;
+        return;
+      }
       const r = stage.getBoundingClientRect();
       if (r.width > 0 && r.height > 0) viewer.setSize(r.width, r.height);
       fit();
@@ -1017,22 +1863,30 @@ export async function createXenodys(canvas, stage, frame) {
   };
   document.addEventListener('visibilitychange', onVisibility);
 
-  stage.dataset.ready = '';
-
-
   return {
     viewer,
     bones: xen.bones,
     holder,
     bots,
+    begin,
+    release,
     launch,
     comeBack,
+    arrive,
+    attend,
+    react,
+    shift,
     /** Une cinématique est-elle en cours (ou le launcher encore « parti ») ? */
     get busy() {
       return cine !== null;
     },
+    /** La préparation est-elle finie (le passage s'ouvre) ? */
+    get released() {
+      return cine?.released ?? false;
+    },
     dispose() {
       fx.remove();
+      hit.remove();
       clearTimeout(fitTimer);
       observer.disconnect();
       sizer.disconnect();

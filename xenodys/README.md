@@ -12,6 +12,7 @@ xenodys/
     └── textures/
         ├── xenodys_creatrice.png    + xenodys_creatrice_glowmask.png
         ├── xenodys_corrompue.png    + xenodys_corrompue_glowmask.png
+        ├── xenodys_*_blink.png      + _blink_glowmask (paupières closes : le clignement)
         └── xenodys_assistant_*.png  (les assistants, mêmes déclinaisons)
 ```
 

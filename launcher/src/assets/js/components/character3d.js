@@ -16,10 +16,37 @@
  * grand bocal se referme sur lui, et il a peur — il tremble, se protège le
  * visage, jette des regards affolés.
  *
+ * Le bocal descend sur lui quand Xenodys bascule, et remonte quand elle revient.
+ *
+ * `liveCharacter()` donne le personnage affiché : la cinématique du lancement
+ * (components/xenodys3d.js) en prend une image, calque par calque, pour le
+ * défaire en pixels.
+ *
  * `prefers-reduced-motion` : pas de respiration, pas de tremblement.
  */
 
 import { buildJar, buildPlatform } from './socle.js';
+
+/** Hauteur d'où tombe le bocal, en unités de la scène. */
+const JAR_DROP = 20;
+
+/** Le personnage actuellement affiché (un seul à la fois : l'accueil). */
+let live = null;
+
+/** @returns {null | {capture: () => any}} */
+export function liveCharacter() {
+  return live;
+}
+
+/** Rebond en fin de course (le bocal touche le socle). */
+function bounceOut(x) {
+  const n = 7.5625;
+  const d = 2.75;
+  if (x < 1 / d) return n * x * x;
+  if (x < 2 / d) return n * (x -= 1.5 / d) * x + 0.75;
+  if (x < 2.5 / d) return n * (x -= 2.25 / d) * x + 0.9375;
+  return n * (x -= 2.625 / d) * x + 0.984375;
+}
 
 /** Réduction du personnage, pour qu'on le voie en entier avec son socle. */
 const PLATFORM_SCALE = 0.8;
@@ -151,16 +178,37 @@ export function createCharacter(canvas, { width, height, zoom = 0.86 }) {
   // Le bocal : seulement quand Xenodys est corrompue.
   const jar = buildJar(T);
   jar.root.position.y = FLOOR;
-  jar.root.scale.setScalar(0.001);
+  jar.root.scale.setScalar(0.8);
   jar.root.visible = false;
   viewer.scene.add(jar.root);
+  // Son fondu (il apparaît en tombant) : l'opacité d'origine de chaque matériau.
+  const jarMaterials = new Map();
+  jar.root.traverse((o) => {
+    if (o.isMesh && !jarMaterials.has(o.material)) {
+      jarMaterials.set(o.material, { opacity: o.material.opacity ?? 1, transparent: o.material.transparent });
+    }
+  });
+  const fadeJar = (k) => {
+    for (const [m, base] of jarMaterials) {
+      m.transparent = base.transparent || k < 1;
+      m.opacity = base.opacity * k;
+    }
+  };
 
   const root$ = document.documentElement;
   let corrupted = false;
+  /** 0 : le bocal est loin (au-dessus, invisible) ; 1 : posé sur le socle. */
+  let jarIn = 0;
+  let first = true;
   const followEtat = () => {
     platform.setEtat(root$.dataset.xenodys);
     corrupted = root$.dataset.xenodys === 'corrompue';
-    if (corrupted) jar.root.visible = true;
+    // Au démarrage, rien ne tombe : l'état est déjà là.
+    if (first) {
+      jarIn = corrupted ? 1 : 0;
+      fear = jarIn;
+      first = false;
+    }
   };
   followEtat();
   const etatObserver = new MutationObserver(followEtat);
@@ -171,16 +219,56 @@ export function createCharacter(canvas, { width, height, zoom = 0.86 }) {
   viewer.animation = new lib.FunctionAnimation((_p, _progress, delta) => {
     const dt = reduced ? 0 : Math.min(0.1, Math.max(0, delta || 0));
     clock += dt;
-    // Peur et bocal arrivent, ou repartent, en une demi-seconde.
+    // Le bocal tombe sur le socle (avec un rebond) ou remonte en s'effaçant ;
+    // la peur vient quand il se referme.
     const target = corrupted ? 1 : 0;
+    jarIn += reduced ? target - jarIn : Math.max(-dt * 1.4, Math.min(dt * 1.4, target - jarIn));
+    const fall = corrupted ? bounceOut(jarIn) : jarIn * jarIn * (3 - 2 * jarIn);
+    jar.root.position.y = FLOOR + JAR_DROP * (1 - fall);
+    fadeJar(Math.min(1, jarIn * 2.5));
+    jar.root.visible = jarIn > 0.002;
+    const fearTarget = corrupted ? (jarIn > 0.6 ? 1 : 0) : 0;
     const step = reduced ? 1 : dt * 2;
-    fear += Math.max(-step, Math.min(step, target - fear));
-    const s = Math.max(0.001, fear < 1 ? 1 - (1 - fear) ** 3 : 1);
-    jar.root.scale.set(0.8, 0.8 * s, 0.8);
-    jar.root.visible = fear > 0.002;
+    fear += Math.max(-step, Math.min(step, fearTarget - fear));
     jar.update(dt);
     breathe(reduced ? 0 : clock);
   });
+
+  /**
+   * Une image du personnage, en deux calques : lui et son socle, puis le bocal
+   * seul (s'il est là). Canevas 2D à la taille du rendu, et la place du
+   * canevas à l'écran. `null` s'il n'est pas affiché.
+   */
+  function capture() {
+    const rect = canvas.getBoundingClientRect();
+    if (canvas.hidden || rect.width < 2 || rect.height < 2) return null;
+    const grab = () => {
+      viewer.render();
+      const c = document.createElement('canvas');
+      c.width = canvas.width;
+      c.height = canvas.height;
+      c.getContext('2d').drawImage(canvas, 0, 0);
+      return c;
+    };
+    const jarShown = jar.root.visible;
+    jar.root.visible = false;
+    const body = grab();
+    let glass = null;
+    if (jarShown) {
+      player.visible = false;
+      platform.root.visible = false;
+      jar.root.visible = true;
+      glass = grab();
+      player.visible = true;
+      platform.root.visible = true;
+    }
+    jar.root.visible = jarShown;
+    viewer.render();
+    return { rect, body, jar: glass };
+  }
+
+  const handle = { capture };
+  live = handle;
 
   return {
     viewer,
@@ -202,6 +290,7 @@ export function createCharacter(canvas, { width, height, zoom = 0.86 }) {
     },
 
     dispose() {
+      if (live === handle) live = null;
       etatObserver.disconnect();
       platform.dispose();
       jar.dispose();

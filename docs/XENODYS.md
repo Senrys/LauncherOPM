@@ -99,8 +99,23 @@ demande de réduire les animations.
   son coin haut-droit (les boutons de la fenêtre s'en écartent) ; seuls ses doigts passent
   devant. Les mains ne bougent pas. Deux assistants l'accompagnent : l'un se cache au
   coin bas-gauche du cadre et passe la tête, l'autre se tient près d'elle et salue.
-- **Les circuits dans la vidéo** (`components/circuits.js`) : des pistes qui se dessinent
-  par moments dans l'image, fondues en dégradé tramé, et un voile de teinte selon l'état.
+- **Son arrivée** : à l'ouverture, le cadre se construit d'abord, ligne à ligne
+  (`components/intro.js`), puis elle arrive. Créatrice : elle descend du haut, se penche ;
+  chaque main approche ouverte, se pose sur sa prise et se referme (un « clac », le cadre
+  qui tressaille) ; ses assistants accourent. Corrompue : elle surgit en glitch à deux ou
+  trois endroits, se fige, et ses mains griffues s'abattent sur le cadre — des fissures
+  partent de ses doigts. Rejouée au retour d'une partie.
+- **Sa vie** : sa tête suit la souris (jamais ses mains) ; elle cligne des yeux (textures
+  `*_blink`) ; au survol de JOUER, elle regarde le bouton et ses lumières s'avivent ; un
+  lancement raté : elle détourne la tête avec mépris (corrompue : un rire haché). Quand
+  son état bascule launcher ouvert, l'onde part de son cœur et le thème change à son
+  passage ; la grille du fond se casse un instant, le bocal tombe sur le joueur (ou
+  remonte).
+- **Le fond : une salle de simulation** (`components/lab.js`) : sol quadrillé en
+  perspective, mur de calibration, impulsions de données, balayage de scan, repères ; la
+  grille bat sur les temps de la musique. Corrompue : magenta, pans décalés, cases
+  éteintes, scan d'alerte. Par-dessus, les circuits de Xenodys (`components/circuits.js`)
+  et un voile de teinte selon l'état.
 - **La musique** (`components/ambiance.js`, réglages `launcher.ambiance` et
   `launcher.volume`) : composée en direct par le launcher, sans fichier audio — une
   musique générative sur une grille d'accords. Créatrice : un laboratoire calme (ré
@@ -115,8 +130,12 @@ demande de réduire les animations.
   exposé sur un socle de circuit imprimé en voxels, tourné vers la droite, il respire ; les
   circuits de Xenodys se dessinent autour de lui. Corrompue : il est enfermé dans un bocal
   d'expérience, et il a peur.
-- **La cinématique du lancement** (fenêtre ouverte) : quand le jeu démarre, Xenodys lâche
-  le cadre, vole devant lui, nous tourne le dos ; le launcher rétrécit entre ses mains
-  jusqu'à n'être qu'un orbe ; elle ouvre les bras et une onde de lumière (ou de blocs
-  rouges et violets) envahit la fenêtre. La fenêtre ne se masque qu'ensuite. Au retour du
-  jeu, le launcher regrandit depuis ses mains.
+- **La cinématique du lancement** (fenêtre ouverte) : dès le clic sur JOUER, Xenodys lâche
+  le cadre, vole devant lui, nous tourne le dos ; le joueur se défait en pixels et file
+  entre ses mains (corrompue : son bocal éclate) ; le launcher rétrécit jusqu'à n'être
+  qu'un orbe. Pendant la préparation des fichiers, l'orbe attend : un anneau et une
+  étiquette en disent l'avancement, et le cliquer ramène le launcher. Quand le jeu
+  démarre, elle ouvre les bras et une onde de lumière (ou de blocs rouges et violets)
+  envahit la fenêtre. Le launcher reste au premier plan pendant ce temps (la fenêtre du
+  jeu s'ouvre derrière lui) et ne se masque qu'à la fin. Au retour du jeu, le cadre se
+  reconstruit et elle revient.

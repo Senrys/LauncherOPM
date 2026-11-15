@@ -82,17 +82,9 @@
   --sh-play:          0 12px 30px rgba(240, 80, 110, .32);
 }
 
-/* La vidéo de fond (la mer) prend la teinte de l'invasion. Par-dessus : les
-   circuits de Xenodys (components/circuits.js), mêlés en « screen », et un
-   voile de teinte qui baigne l'image dans la couleur de son état. */
-.opm-bg__video {
-  transition: filter 1.2s ease;
-}
-
-:root[data-xenodys="corrompue"] .opm-bg__video {
-  filter: hue-rotate(115deg) saturate(1.35) contrast(1.06) brightness(.82);
-}
-
+/* Par-dessus la salle de simulation (components/lab.js, qui prend seule les
+   couleurs de l'état) : les circuits de Xenodys (components/circuits.js),
+   mêlés en « screen », et un voile de teinte qui baigne la pièce. */
 .opm-bg__circuits {
   position: absolute;
   inset: 0;

@@ -643,6 +643,7 @@ function onData(run, raw) {
     taskbar(2);
     logger.info('Démarrage de la machine virtuelle Java…');
     cinematicStart();
+    cinematicArm();
     emit({ type: 'launching' });
     armStartFallback(run);
   }
@@ -848,6 +849,7 @@ function finish(run, event, note) {
   if (run.finished) return;
   run.finished = true;
   clearStartFallback(run);
+  cinematicEnd();
 
   // Avant tout le reste : la partie est finie, le serveur doit le savoir.
   void releaseSession(run);
@@ -883,6 +885,7 @@ function abort(run, note) {
     clearStartFallback(run);
     void releaseSession(run);
   }
+  cinematicEnd();
   current = null;
   release();
   taskbar(-1);
@@ -898,29 +901,45 @@ function abort(run, note) {
 
 /**
  * La cinématique du lancement (fenêtre ouverte) : Xenodys emporte le launcher
- * dans ses mains. Elle commence quand la machine virtuelle démarre ; la
- * fenêtre n'est masquée qu'une fois la cinématique jouée — le renderer
- * l'annonce —, et au plus tard après CINEMATIC_MAX_MS.
+ * dans ses mains. Elle commence au clic sur JOUER (`prepare`) : le launcher
+ * n'est plus qu'un orbe pendant la préparation des fichiers ; le passage ne
+ * s'ouvre qu'au démarrage de la machine virtuelle (`launching`).
+ *
+ * À partir de là, le launcher reste au premier plan : la fenêtre du jeu s'ouvre
+ * DERRIÈRE lui, et n'apparaît qu'une fois la cinématique jouée — le renderer
+ * l'annonce —, au plus tard après CINEMATIC_MAX_MS. La fenêtre n'est masquée
+ * qu'à ce moment.
  */
-const CINEMATIC_MAX_MS = 9_000;
+const CINEMATIC_MAX_MS = 7_000;
 let cinematic = null;
 
+/** Ouvre l'attente de la cinématique (sans délai de garde : la préparation peut être longue). */
 function cinematicStart() {
   if (cinematic || mainWindow.windowMode() !== 'ouvert') return;
   let resolve;
   const done = new Promise((r) => {
     resolve = r;
   });
-  const timer = setTimeout(cinematicEnd, CINEMATIC_MAX_MS);
-  cinematic = { done, resolve, timer };
+  cinematic = { done, resolve, timer: 0 };
+}
+
+/** Le jeu démarre : premier plan, et délai de garde. */
+function cinematicArm() {
+  if (!cinematic || cinematic.timer) return;
+  cinematic.timer = setTimeout(cinematicEnd, CINEMATIC_MAX_MS);
+  mainWindow.setOnTop(true);
 }
 
 /** Fin de la cinématique, annoncée par le renderer (ou par le délai de garde). */
 function cinematicEnd() {
   if (!cinematic) return;
   clearTimeout(cinematic.timer);
-  cinematic.resolve();
+  const { done, resolve } = cinematic;
   cinematic = null;
+  resolve();
+  // Après le masquage de la fenêtre (enchaîné plus tôt sur `done`) : le jeu
+  // ne passe jamais devant la fin de l'animation.
+  done.then(() => mainWindow.setOnTop(false));
 }
 
 /** Masque le launcher pendant la partie, si le joueur l'a demandé. */
@@ -1045,6 +1064,11 @@ async function launch(instanceName) {
     // `client_token`, et donc le devoir de le rendre, quoi qu'il arrive ensuite.
     run = createRun('lancement', config);
     current = run;
+
+    // Fenêtre ouverte : Xenodys emporte le launcher dès le clic, pendant la
+    // préparation des fichiers (voir `cinematicStart`).
+    cinematicStart();
+    emit({ type: 'prepare' });
 
     // Le compte est figé au cas où le joueur en changerait pendant qu'il joue.
     const account = await currentAccount();

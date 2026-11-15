@@ -93,9 +93,6 @@ const ASAR_UNPACK = [
   '**/*.so',
   '**/*.so.*',
   '**/*.exe',
-  // La vidéo de fond est lue en flux par <video> : la sortir de l'asar évite les
-  // sautes de lecture liées aux requêtes de plage sur une archive.
-  'src/assets/videos/**',
 ];
 
 /* ------------------------------------------------------------------ console */

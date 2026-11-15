@@ -507,7 +507,7 @@ def casque(p, pal, rng, face):
             p.px(p.w // 2 + 1, y, pal["glow"][1], lum=True)
 
 
-def visage(p, pal, etat):
+def visage(p, pal, etat, cligne=False):
     """Face nord de la tête (12 × 12). Un visage neutre, hautain : des yeux bien
     écartés, mi-clos sous des paupières lourdes, un reflet, des sourcils
     arqués — et pas de bouche. Le visage est une machine : coutures de plaques
@@ -528,6 +528,11 @@ def visage(p, pal, etat):
         "HckSSSSSSkcH",
         "JJSSSSSSSSJJ",
     ]
+    if cligne:
+        # Paupières closes : un seul trait de cils, le regard éteint.
+        motif[6] = "HSSSSSSSSSSH"
+        motif[7] = "HLLLSSSSLLLH"
+        motif[8] = "HSkSSSSSSkSH"
     couleurs = {
         "H": pal["hair"][1], "h": pal["hair"][2], "S": s_[0], "B": pal["lash"], "L": pal["lash"],
         "W": e[0], "k": s_[1], "J": pal["joint"][1],
@@ -597,9 +602,12 @@ def buste(p, pal, rng, face):
         p.px(p.w // 2, p.h // 2, pal["glow"][1], lum=True)
 
 
+CLIGNE = False  # vrai pendant la peinture des textures « yeux fermés »
+
+
 def tete(p, pal, rng, face, etat):
     if face == "north":
-        visage(p, pal, etat)
+        visage(p, pal, etat, CLIGNE)
     elif face == "down":
         for y in range(p.h):
             for x in range(p.w):
@@ -700,13 +708,16 @@ def ranger(bones: list[Bone], largeur: int = 256) -> tuple[int, int]:
     return largeur, hauteur
 
 
-def textures(bones, tw, th, etat):
+def textures(bones, tw, th, etat, cligne=False):
+    global CLIGNE
+    CLIGNE = cligne
     img = Image.new("RGBA", (tw, th), (0, 0, 0, 0))
     glow = Image.new("RGBA", (tw, th), (0, 0, 0, 0))
     rng = random.Random(0x0DE5 + (7 if etat == "corrompue" else 0))
     for b in bones:
         for c in b.cubes:
             peindre(c, img, glow, PALETTES[etat], etat, rng)
+    CLIGNE = False
     return img, glow
 
 
@@ -1010,6 +1021,12 @@ def ecrire(nom, bones, anims, identifiant, largeur):
         for cible in (SORTIE_GECKO / "textures", SORTIE_LAUNCHER_PNG):
             img.save(cible / f"{nom}_{etat}.png")
             glow.save(cible / f"{nom}_{etat}_glowmask.png")
+        if nom == "xenodys":
+            # Le clignement : la même texture, paupières closes (launcher et jeu).
+            img, glow = textures(bones, tw, th, etat, cligne=True)
+            for cible in (SORTIE_GECKO / "textures", SORTIE_LAUNCHER_PNG):
+                img.save(cible / f"{nom}_{etat}_blink.png")
+                glow.save(cible / f"{nom}_{etat}_blink_glowmask.png")
     nb = sum(len(b.cubes) for b in bones)
     print(f"{nom} : {len(bones)} os, {nb} cubes, texture {tw} × {th}.")
     return geometrie
