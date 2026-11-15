@@ -102,11 +102,12 @@ demande de réduire les animations.
 - **Les circuits dans la vidéo** (`components/circuits.js`) : des pistes qui se dessinent
   par moments dans l'image, fondues en dégradé tramé, et un voile de teinte selon l'état.
 - **La musique** (`components/ambiance.js`, réglages `launcher.ambiance` et
-  `launcher.volume`) : `ambiance2` du site, remixée en direct. Créatrice : calme, comme
-  dans une simulation (ralentie, feutrée, grande réverbération, nappe d'accords, « pings »
-  de données). Corrompue : tendue, sous pression (voix mécanique dure, bourdon dissonant,
-  battement de cœur, souffle qui monte, coupures). Silence pendant une partie et quand le
-  launcher est réduit.
+  `launcher.volume`) : composée en direct par le launcher, sans fichier audio — une
+  musique générative sur une grille d'accords. Créatrice : un laboratoire calme (ré
+  lydien, ~70 BPM ; nappes, basse ronde, cloches de verre en écho, pings de données).
+  Corrompue : étrange, tendue, stressante (do phrygien, ~96 BPM ; ostinato de basse,
+  clusters dissonants, frappes métalliques, tic-tac, battement de cœur, montées,
+  coupures). Fondu de l'une à l'autre ; silence pendant une partie et launcher réduit.
 - **Les sons de l'interface** (`components/sfx.js`, réglage `launcher.sfx`) : petits
   bruits mécaniques et électroniques synthétisés (survol, clic, onglet, interrupteur,
   cinématique).

@@ -144,7 +144,8 @@ type LauncherConfig = {
     keep_console: boolean         // « Garder la console de jeu ouverte »
     auto_update: boolean          // « Mises à jour automatiques »
     rp_notifications: boolean     // « Notifications d'événements RP »
-    ambiance: boolean             // musique de Xenodys (ambiance2 + la mer)
+    ambiance: boolean             // musique de Xenodys, composée en direct (components/ambiance.js)
+    sfx: boolean                  // sons de l'interface (components/sfx.js)
     window_open: boolean          // fenêtre ouverte : décor et Xenodys autour du cadre
     volume: number                // 0–100, pas de 5
     auto_launch: boolean          // case « LANCEMENT AUTO » de la barre du bas
