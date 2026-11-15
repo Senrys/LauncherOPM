@@ -53,7 +53,8 @@ export function createVideoCircuits(canvas, { anchor = null } = {}) {
   const corrupted = () => root.dataset.xenodys === 'corrompue';
 
   function measure() {
-    const r = canvas.getBoundingClientRect();
+    // Taille de mise en page : le cadre peut être réduit (transform) pendant la cinématique.
+    const r = { width: canvas.offsetWidth, height: canvas.offsetHeight };
     W = Math.max(1, Math.ceil(r.width / P));
     H = Math.max(1, Math.ceil(r.height / P));
     canvas.width = W;

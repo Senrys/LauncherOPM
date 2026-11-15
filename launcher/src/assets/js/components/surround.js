@@ -511,7 +511,17 @@ export function createSurround({ back, front, frame, stage }) {
     }
     bctx.imageSmoothingEnabled = false;
     fctx.imageSmoothingEnabled = false;
-    const r = frame.getBoundingClientRect();
+    // La boîte de mise en page, pas celle affichée : pendant la cinématique, le
+    // cadre est réduit dans l'orbe (transform), et la fenêtre change justement
+    // de taille à ce moment-là. Mesurer l'orbe donnerait un cadre minuscule —
+    // contour et décor reconstruits de travers jusqu'au prochain redimensionnement.
+    let left = 0;
+    let top = 0;
+    for (let el = frame; el; el = el.offsetParent) {
+      left += el.offsetLeft;
+      top += el.offsetTop;
+    }
+    const r = { left, top, width: frame.offsetWidth, height: frame.offsetHeight };
     fb = { x: Math.round(r.left / P), y: Math.round(r.top / P), w: Math.round(r.width / P), h: Math.round(r.height / P) };
     build();
   }

@@ -90,7 +90,8 @@ export function createLab(canvas, { pulse = () => 0 } = {}) {
   let nextScan = 3;
 
   function resize() {
-    const r = canvas.getBoundingClientRect();
+    // Taille de mise en page : le cadre peut être réduit (transform) pendant la cinématique.
+    const r = { width: canvas.offsetWidth, height: canvas.offsetHeight };
     const nw = Math.max(1, Math.ceil(r.width / P));
     const nh = Math.max(1, Math.ceil(r.height / P));
     if (nw === w && nh === h) return;
