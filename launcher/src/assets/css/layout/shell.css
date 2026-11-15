@@ -15,19 +15,9 @@
    1. FENÊTRE
    ========================================================================== */
 
-.opm-app {
-  position: relative;
-  width: 100vw;
-  height: 100vh;
-  overflow: hidden;
-
-  /* Cadre de la maquette (l. 34) : c'est ce rayon qui donne son sens au coin
-     haut-droit du bouton de fermeture (--r-xl-alt, layout/titlebar.css). La
-     fenêtre Electron n'étant pas transparente (windows/mainWindow.js), la
-     découpe laisse voir sa couleur de fond dans les quatre coins — un liseré
-     sombre sur du sombre, jamais un trou. */
-  border-radius: var(--r-2xl);
-}
+/* Le cadre lui-même (position, taille, rayon, ombre) est décrit dans
+   layout/frame.css : selon le mode de la fenêtre, il la remplit ou flotte au
+   milieu d'une fenêtre transparente. */
 
 /* ============================================================================
    2. FOND — vidéo, repli, voiles

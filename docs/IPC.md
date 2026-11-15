@@ -144,7 +144,8 @@ type LauncherConfig = {
     keep_console: boolean         // « Garder la console de jeu ouverte »
     auto_update: boolean          // « Mises à jour automatiques »
     rp_notifications: boolean     // « Notifications d'événements RP »
-    music: boolean                // « Ambiance sonore du launcher »
+    ambiance: boolean             // musique de Xenodys (ambiance2 + la mer)
+    window_open: boolean          // fenêtre ouverte : décor et Xenodys autour du cadre
     volume: number                // 0–100, pas de 5
     auto_launch: boolean          // case « LANCEMENT AUTO » de la barre du bas
     download_multi: number        // téléchargements simultanés (défaut 5)
@@ -212,6 +213,22 @@ type LogLine = { ts: string, level: 'info'|'warn'|'error'|'game', text: string }
 
 ---
 
+## Fenêtre ouverte (`opm.window`)
+
+En mode « fenêtre ouverte » (réglage `launcher.window_open`, Windows et macOS),
+la fenêtre est transparente et plus grande que le launcher : le décor de
+Xenodys occupe la marge (windows/mainWindow.js, layout/frame.css).
+
+| Méthode | Canal | Rôle |
+|---|---|---|
+| `window.setPassthrough(bool)` | `window:passthrough` | La marge vide laisse passer les clics jusqu'au bureau (`setIgnoreMouseEvents`, mouvements toujours transmis). Sans effet en mode compact. |
+| `window.resizeFrame(w, h)` | `window:resize-frame` | Nouvelle taille du cadre (poignée dessinée par le launcher), bornée par 1100 × 700 et par l'écran. |
+| `window.maximize()` | `window:maximize` | En mode ouvert, le cadre prend toute la zone de travail ; `window:maximized` est émis comme en mode compact. |
+
+Le mode est transmis à la page dans son adresse (`?fenetre=ouvert&mt=…`), lu
+avant le premier rendu par `assets/js/frame.js`. Changer `launcher.window_open`
+recrée la fenêtre (sauf pendant une partie : effet au prochain démarrage).
+
 ## Skin du personnage (`opm.textures`)
 
 Le skin enregistré ici est **celui du personnage sur One Piece Minecraft** : c'est
@@ -233,6 +250,7 @@ Nommage : `domaine:action`. Tout ce qui renvoie une valeur utilise `invoke/handl
 ```
 window:minimize      window:maximize        window:close        window:hide
 window:show          window:is-maximized    window:progress     window:maximized (→ renderer)
+window:passthrough   window:resize-frame
 
 app:version          app:platform           app:open-external   app:open-path
 app:game-dir         app:memory             app:pick-java       app:panel

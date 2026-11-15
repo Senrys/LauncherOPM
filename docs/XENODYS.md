@@ -33,7 +33,7 @@ d'emblée la ligne à l'état `creatrice`.
 ## Qui écrit : le staff, depuis le jeu
 
 ```
-/xenodys corrompue L'ennemi a pris le Nexus. Tenez vos positions.
+/xenodys corrompue L'ennemi a pris le contrôle de Xenodys. Tenez vos positions.
 /xenodys creatrice
 /xenodys            → affiche l'état actuel
 ```
@@ -48,7 +48,7 @@ peut pas modifier la requête SQL.
 `xenodys` de `GET /api/v1/bootstrap` :
 
 ```json
-{ "etat": "corrompue", "depuis": "2026-11-15T20:14:03", "message": "L'ennemi a pris le Nexus." }
+{ "etat": "corrompue", "depuis": "2026-11-15T20:14:03", "message": "L'ennemi a pris le contrôle de Xenodys." }
 ```
 
 Relu toutes les 60 secondes : les launchers ouverts basculent en moins d'une
@@ -85,3 +85,21 @@ Au moment où l'état change pendant que la page est ouverte, le launcher joue
 un court parasitage (1,5 s), puis affiche l'annonce du staff — ou, à défaut,
 une phrase de Xenodys. Jamais au premier affichage, jamais si le système
 demande de réduire les animations.
+
+## Dans le launcher
+
+- **Fenêtre ouverte** (réglage `launcher.window_open`, Windows et macOS, écran assez
+  grand) : la fenêtre est transparente et plus grande que le launcher. Autour du cadre, un
+  décor en pixel art (`components/surround.js`) : nappe sombre tramée, mer, circuits (ou
+  fissures), cubes, bords du cadre qui s'effritent. Les clics sur la marge vide traversent
+  jusqu'au bureau. Sinon, mode compact : la fenêtre classique.
+- **Xenodys elle-même** (`components/xenodys3d.js`) : le modèle de `xenodys/`, immense,
+  derrière le launcher, penchée vers lui (`lean` / `corrupted_lean`) ; elle regarde le
+  joueur, et sa main agrippe le bord du cadre — ses doigts seuls passent devant.
+- **Les circuits dans la vidéo** (`components/circuits.js`) : des pistes qui se dessinent
+  par moments dans l'image, fondues en dégradé tramé, et un voile de teinte selon l'état.
+- **La musique** (`components/ambiance.js`, réglages `launcher.ambiance` et
+  `launcher.volume`) : `ambiance2` du site, passée par une voix mécanique (modulation en
+  anneau, filtre en peigne, quantification), et `wave` (la mer) plus bas. Corrompue : plus
+  de machine, plus grave, des coupures. Silence pendant une partie et quand le launcher est
+  réduit.

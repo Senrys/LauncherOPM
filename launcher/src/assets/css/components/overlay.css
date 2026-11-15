@@ -306,7 +306,7 @@
 
   pointer-events: auto;
   width: 320px;
-  max-width: calc(100vw - 52px);
+  max-width: calc(var(--frame-w) - 52px);
   padding: 12px 14px;
   border: 1px solid var(--line-dark);
   border-left: 3px solid var(--toast-accent);

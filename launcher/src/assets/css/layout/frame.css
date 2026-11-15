@@ -1,0 +1,155 @@
+/* ============================================================================
+   OPM LAUNCHER — CADRE DE LA FENÊTRE
+   --------------------------------------------------------------------------
+   `<html data-fenetre="compact">` : la fenêtre EST le launcher. Le cadre
+   remplit la fenêtre, comme avant.
+
+   `<html data-fenetre="ouvert">` : la fenêtre est transparente et plus grande
+   que le launcher (windows/mainWindow.js). Le cadre est posé au milieu, avec
+   une marge tout autour (--frame-mt/mr/mb/ml, posées par assets/js/frame.js) :
+   c'est là que vivent le décor de Xenodys (components/surround.js) et
+   Xenodys elle-même, qui déborde du cadre. Les clics sur la marge vide
+   traversent jusqu'au bureau (components/frame.js).
+
+   Le cadre porte `transform` : il devient ainsi le bloc conteneur de tout ce
+   qui est en `position: fixed` à l'intérieur (connexion, modales,
+   notifications), qui reste dans le launcher au lieu de s'étaler sur la marge.
+   ========================================================================== */
+
+:root {
+  --frame-mt: 0px;
+  --frame-mr: 0px;
+  --frame-mb: 0px;
+  --frame-ml: 0px;
+  /* Hauteur et largeur réelles du cadre, pour remplacer 100vh / 100vw. */
+  --frame-h: calc(100vh - var(--frame-mt) - var(--frame-mb));
+  --frame-w: calc(100vw - var(--frame-ml) - var(--frame-mr));
+}
+
+html,
+.opm-body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+.opm-body { background: var(--abyss); }
+
+/* Mode ouvert : rien n'est peint hors du cadre, sauf le décor. */
+:root[data-fenetre="ouvert"],
+:root[data-fenetre="ouvert"] .opm-body {
+  background: transparent;
+}
+
+/* Le décor, derrière le cadre, sur toute la fenêtre. */
+.opm-surround {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  pointer-events: none;
+  /* Le décor est dessiné en basse résolution (1 pixel = 4 px) puis agrandi
+     sans lissage : de vrais gros pixels, comme un sprite (components/surround.js). */
+  image-rendering: pixelated;
+}
+
+/* Devant le cadre, sous Xenodys. */
+.opm-surround--front { z-index: 2; }
+
+:root:not([data-fenetre="ouvert"]) .opm-surround { display: none; }
+
+/* Le cadre : le launcher lui-même. */
+.opm-app {
+  position: absolute;
+  top: var(--frame-mt);
+  right: var(--frame-mr);
+  bottom: var(--frame-mb);
+  left: var(--frame-ml);
+  z-index: 1;
+  overflow: hidden;
+  border-radius: var(--r-2xl);
+  transform: translateZ(0);
+  /* `isolation` garde les mélanges de couleurs du fond à l'intérieur du cadre. */
+  isolation: isolate;
+}
+
+/* Mode ouvert : ni rayon ni ombre lisse. Le cadre reçoit un masque en escalier
+   (coins pixelisés, encoches) et se fond dans la nappe tramée du décor. */
+:root[data-fenetre="ouvert"] .opm-app {
+  border-radius: 0;
+}
+
+/* Fenêtre agrandie en mode ouvert : la marge reste, le cadre grandit. */
+
+/* Poignée de redimensionnement (mode ouvert seulement : une fenêtre
+   transparente ne se redimensionne pas par ses bords). */
+.opm-grip {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  z-index: 95;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: nwse-resize;
+  -webkit-app-region: no-drag;
+  opacity: .55;
+  transition: opacity .2s ease;
+}
+
+.opm-grip::before {
+  content: "";
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 9px;
+  height: 9px;
+  background:
+    linear-gradient(135deg, transparent 45%, var(--aqua) 45%, var(--aqua) 55%, transparent 55%),
+    linear-gradient(135deg, transparent 75%, var(--aqua) 75%, var(--aqua) 85%, transparent 85%);
+}
+
+.opm-grip:hover,
+.opm-grip[data-dragging] { opacity: 1; }
+
+:root:not([data-fenetre="ouvert"]) .opm-grip { display: none; }
+
+/* Xenodys, immense, DERRIÈRE le cadre : penchée vers lui depuis la marge de
+   droite, elle regarde le joueur et agrippe son bord (components/xenodys3d.js
+   calcule sa taille, sa place et le masque). La scène couvre toute la fenêtre
+   et ne capte pas la souris. Un halo net garde l'esprit pixel. */
+.opm-xeno-stage {
+  position: absolute;
+  inset: 0;
+  /* Au-dessus du cadre, mais masquée sur lui (components/xenodys3d.js) :
+     elle paraît derrière, et seuls ses doigts passent devant son bord. */
+  z-index: 3;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 1.4s ease, filter 1.2s ease;
+  filter:
+    drop-shadow(0 0 1px rgba(145, 217, 209, .9))
+    drop-shadow(0 0 18px rgba(145, 217, 209, .35));
+}
+
+.opm-xeno-stage[data-etat="corrompue"] {
+  filter:
+    drop-shadow(1px 0 0 rgba(240, 80, 110, .9))
+    drop-shadow(-1px 0 0 rgba(199, 125, 255, .8))
+    drop-shadow(0 0 18px rgba(240, 80, 110, .4));
+}
+
+.opm-xeno-stage[data-ready] { opacity: 1; }
+
+.opm-xeno-stage canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+
+:root:not([data-fenetre="ouvert"]) .opm-xeno-stage { display: none; }
+

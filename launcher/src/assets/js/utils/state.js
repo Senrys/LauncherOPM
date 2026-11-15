@@ -87,6 +87,8 @@ const INITIAL = {
   /** État de Xenodys, `{etat, depuis, message}` (utils/xenodys.js). */
   xenodys: null,
   config: null,
+  /** Volume en cours de réglage (curseur des paramètres), avant écriture. */
+  volumePreview: null,
   accounts: [],
   account: null,
   instances: [],

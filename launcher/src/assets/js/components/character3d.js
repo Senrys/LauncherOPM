@@ -30,6 +30,8 @@
  * `prefers-reduced-motion` : ni scènes ni rotation, seulement la respiration.
  */
 
+import { buildPixelProps } from './pixelprops.js';
+
 /* ------------------------------------------------------------------ réglages */
 
 /** Rotation de repos, en radians par seconde : un tour complet en un peu plus de deux minutes. */
@@ -105,7 +107,7 @@ function swings(start, count) {
     rax.push([t, -1.1], [t + 0.15, -1.15], [t + 0.35, high ? -2.25 : -1.95], [t + 0.5, -0.75], [t + 0.6, -0.75], [t + 0.95, -1.1]);
     raz.push([t, 0], [t + 0.35, high ? -0.2 : -0.45], [t + 0.5, high ? 0.12 : 0.2], [t + 0.95, 0]);
     by.push([t, 0], [t + 0.35, -0.12], [t + 0.5, 0.15], [t + 0.95, 0]);
-    wrist.push([t, 0.75], [t + 0.15, -0.9], [t + 0.5, -0.9], [t + 0.6, 0.6], [t + 0.95, 0.75]);
+    wrist.push([t, 0.75], [t + 0.15, -0.5], [t + 0.5, -0.5], [t + 0.6, 0.6], [t + 0.95, 0.75]);
     t += 1.05;
   }
   return { rax, raz, by, wrist };
@@ -143,7 +145,9 @@ const SCENES = {
     weight: 1,
     duration: 4.4,
     tracks: {
-      mug: [[0, 0], [0.45, 1], [3.9, 1], [4.4, 0]],
+      // La chope n'apparaît que bras levé, et disparaît avant qu'il ne retombe :
+      // jamais contre le torse.
+      mug: [[0, 0], [0.3, 0], [0.65, 1], [3.75, 1], [4.05, 0]],
       rightArmX: [[0, 0], [0.6, -1.3], [1.1, -1.35], [1.6, -1.75], [2.9, -1.75], [3.4, -1.3], [3.8, -1.3], [4.4, 0]],
       rightArmZ: [[0, 0], [0.6, 0.12], [1.6, 0.2], [2.9, 0.2], [3.4, 0.12], [4.4, 0]],
       headX: [[0, 0], [1.6, 0], [1.85, -0.3], [2.9, -0.3], [3.3, 0.06], [3.7, 0], [4.4, 0]],
@@ -219,102 +223,27 @@ const SCENES = {
 
 /**
  * Récupère les classes Three.js que skinview3d a déjà chargées.
- * @param {any} player
+ * @param {any} viewer
  * @param {any} lib  le global skinview3d
  */
-function threeOf(player, lib) {
-  const mesh = player.skin.head.innerLayer;
+function threeOf(viewer, lib) {
+  // La classe de texture n'existe qu'une fois un skin chargé : un skin vide,
+  // aussitôt remplacé par le vrai, suffit à la faire naître.
+  if (!viewer.skinTexture) {
+    const blank = document.createElement('canvas');
+    blank.width = 64;
+    blank.height = 64;
+    viewer.loadSkin(blank);
+  }
+  const mesh = viewer.playerObject.skin.head.innerLayer;
   return {
     Mesh: mesh.constructor,
     Box: mesh.geometry.constructor,
     Material: mesh.material.constructor,
+    Texture: viewer.skinTexture.constructor,
     // BodyPart hérite directement de Group.
     Group: Object.getPrototypeOf(lib.BodyPart.prototype).constructor,
   };
-}
-
-/**
- * Fabrique de pavés colorés.
- * @param {ReturnType<typeof threeOf>} T
- */
-function voxels(T) {
-  const materials = new Map();
-  const material = (color) => {
-    if (!materials.has(color)) materials.set(color, new T.Material({ color }));
-    return materials.get(color);
-  };
-  const box = (w, h, d, color, x = 0, y = 0, z = 0) => {
-    const mesh = new T.Mesh(new T.Box(w, h, d), material(color));
-    mesh.position.set(x, y, z);
-    return mesh;
-  };
-  const group = (...children) => {
-    const g = new T.Group();
-    for (const child of children) g.add(child);
-    return g;
-  };
-  return { box, group, materials };
-}
-
-/**
- * Épée, tenue par la poignée. Elle pointe vers +z : bras au repos, elle est
- * horizontale vers l'avant ; bras levé, elle se dresse.
- */
-function buildSword(V) {
-  return V.group(
-    V.box(1.5, 1.5, 0.8, '#3b2a1a', 0, 0, -1.9), // pommeau
-    V.box(1, 1, 3.6, '#6b4423', 0, 0, 0.25), // poignée, du pommeau à la garde
-    V.box(5.2, 1.2, 1.2, '#c9a227', 0, 0, 2.6), // garde
-    V.box(1.4, 0.45, 8, '#dfe4e8', 0, 0, 7.2), // lame
-    V.box(0.35, 0.5, 7.9, '#aeb6bd', 0.55, 0, 7.2), // fil (plus court que la lame : extrémités décalées)
-    V.box(0.8, 0.45, 1, '#dfe4e8', 0, 0, 11.7), // pointe
-  );
-}
-
-/**
- * Chope en bois cerclée de fer, mousse débordante. Construite debout (+y),
- * puis basculée d'un quart de tour : dans la main d'un bras tendu vers
- * l'avant, elle se retrouve droite.
- */
-function buildMug(V) {
-  const mug = V.group(
-    V.box(3.6, 4.6, 3.6, '#8a5a2b', 0, 0, 0), // fût
-    V.box(3.8, 0.55, 3.8, '#5d646b', 0, 1.5, 0), // cerclage haut
-    V.box(3.8, 0.55, 3.8, '#5d646b', 0, -1.5, 0), // cerclage bas
-    V.box(3.7, 0.9, 3.7, '#f4efe1', 0, 2.65, 0), // mousse
-    V.box(1.6, 0.7, 1.6, '#f4efe1', 0.6, 3.3, -0.3), // mousse qui déborde
-    V.box(0.8, 3, 1, '#6b4423', 2.25, 0, 0), // anse
-  );
-  mug.rotation.x = Math.PI / 2;
-  const holder = V.group(mug);
-  return holder;
-}
-
-/**
- * Coffre au couvercle articulé : `lid` pivote sur l'arête arrière.
- * @returns {{root: any, lid: any}}
- */
-function buildChest(V) {
-  // Chaque garniture dépasse un peu de la caisse qu'elle habille : deux faces
-  // exactement superposées « scintillent » (z-fighting) à l'écran.
-  const lid = V.group(
-    V.box(7, 1.9, 5.6, '#7a4a20', 0, 0.95, 2.8),
-    V.box(7.2, 0.55, 5.8, '#4a2d12', 0, 0.22, 2.8),
-    V.box(1, 1.2, 0.5, '#c9a227', 0, 0.2, 5.75), // serrure
-  );
-  lid.position.set(0, 2.25, -2.8); // charnière : arête arrière, en haut du coffre
-  const body = V.group(
-    V.box(7, 4.5, 5.6, '#8a5a2b', 0, 0, 0),
-    V.box(7.2, 0.55, 5.8, '#4a2d12', 0, -2.0, 0),
-    V.box(0.6, 4.6, 5.9, '#4a2d12', -3.25, 0, 0),
-    V.box(0.6, 4.6, 5.9, '#4a2d12', 3.25, 0, 0),
-    lid,
-  );
-  // L'origine est au SOL : quand le coffre apparaît en grandissant, il pousse
-  // depuis le plancher au lieu de s'enfoncer dessous.
-  body.position.y = 2.25;
-  const root = V.group(body);
-  return { root, lid };
 }
 
 /* ------------------------------------------------------------------ personnage */
@@ -347,13 +276,12 @@ export function createCharacter(canvas, { width, height, zoom = 0.86 }) {
   }
 
   const player = viewer.playerObject;
-  const T = threeOf(player, lib);
-  const V = voxels(T);
+  const T = threeOf(viewer, lib);
 
-  // Accessoires, invisibles tant qu'une scène ne les montre pas.
-  const sword = buildSword(V);
-  const mug = buildMug(V);
-  const chest = buildChest(V);
+  // Accessoires en pixel art (components/pixelprops.js), invisibles tant
+  // qu'une scène ne les montre pas.
+  const props = buildPixelProps(T);
+  const { sword, mug, chest } = props;
   for (const prop of [sword, mug, chest.root]) prop.visible = false;
   player.skin.rightArm.add(sword, mug);
   player.skin.add(chest.root);
@@ -364,7 +292,7 @@ export function createCharacter(canvas, { width, height, zoom = 0.86 }) {
   /** Place les accessoires selon le modèle de bras (le poing n'est pas au même endroit). */
   const placeProps = () => {
     const handX = slim ? -0.5 : -1;
-    sword.position.set(handX, -9.6, 0.6);
+    sword.position.set(handX, -9.6, 0); // poignée centrée dans le poing
     mug.position.set(handX, -9.8, 1.6);
     chest.root.position.set(-10, -24, 0);
     chest.root.rotation.y = 0.45;
@@ -509,7 +437,7 @@ export function createCharacter(canvas, { width, height, zoom = 0.86 }) {
     },
 
     dispose() {
-      for (const material of V.materials.values()) material.dispose?.();
+      props.dispose();
       viewer.dispose();
     },
   };

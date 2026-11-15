@@ -107,6 +107,14 @@ const opm = {
     hide: () => ipcRenderer.send('window:hide'),
     show: () => ipcRenderer.send('window:show'),
     isMaximized: () => call('window:is-maximized'),
+    /** Mode ouvert : laisser passer les clics de la marge vide jusqu'au bureau. */
+    setPassthrough: (passthrough) => ipcRenderer.send('window:passthrough', passthrough === true),
+    /** Mode ouvert : nouvelle taille du cadre du launcher, en pixels. */
+    resizeFrame: (width, height) =>
+      ipcRenderer.send('window:resize-frame', {
+        width: assertNumber(width, 'width'),
+        height: assertNumber(height, 'height'),
+      }),
     onMaximizeChange: (cb) => subscribe('window:maximized', cb, 'onMaximizeChange'),
     /** -1 éteint la barre de progression, 2 la met en indéterminé, sinon un ratio 0 → 1. */
     setProgress: (ratio) => ipcRenderer.send('window:progress', assertNumber(ratio, 'ratio')),
