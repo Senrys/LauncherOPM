@@ -82,14 +82,47 @@
   --sh-play:          0 12px 30px rgba(240, 80, 110, .32);
 }
 
-/* La vidéo de fond (la mer) prend la teinte de l'invasion. Provisoire : l'étape
-   « circuits » apportera une retouche plus fine, avec incrustations. */
+/* La vidéo de fond (la mer) prend la teinte de l'invasion. Par-dessus : les
+   circuits de Xenodys (components/circuits.js), mêlés en « screen », et un
+   voile de teinte qui baigne l'image dans la couleur de son état. */
 .opm-bg__video {
   transition: filter 1.2s ease;
 }
 
 :root[data-xenodys="corrompue"] .opm-bg__video {
   filter: hue-rotate(115deg) saturate(1.35) contrast(1.06) brightness(.82);
+}
+
+.opm-bg__circuits {
+  position: absolute;
+  inset: 0;
+  /* Au-dessus des voiles : la lumière des circuits n'est pas assombrie. */
+  z-index: 3;
+  width: 100%;
+  height: 100%;
+  mix-blend-mode: screen;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
+/* La teinte : un dégradé de la couleur de Xenodys, plus dense en bas et à
+   droite, fondu dans l'image (« soft-light » : il colore sans voiler). */
+.opm-bg__tint {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  mix-blend-mode: soft-light;
+  background:
+    radial-gradient(120% 90% at 85% 80%, rgba(95, 245, 230, .55), transparent 70%),
+    linear-gradient(180deg, transparent 30%, rgba(29, 92, 81, .45));
+  transition: opacity 1.2s ease;
+}
+
+:root[data-xenodys="corrompue"] .opm-bg__tint {
+  background:
+    radial-gradient(120% 90% at 85% 80%, rgba(240, 80, 110, .6), transparent 70%),
+    linear-gradient(180deg, rgba(106, 31, 143, .25), rgba(106, 31, 143, .5));
 }
 
 /* ------------------------------------------------------------ la bascule */
@@ -155,7 +188,8 @@
 /* Sur l'accueil, en haut à gauche de la scène du personnage. */
 .opm-scene__voice {
   position: absolute;
-  top: 18px;
+  /* Sous le badge de statut du serveur, qui occupe le coin haut-droit. */
+  top: 64px;
   left: 0;
   z-index: 3;
 }

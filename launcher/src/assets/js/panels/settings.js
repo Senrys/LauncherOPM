@@ -266,6 +266,8 @@ export default class SettingsPanel {
 
       ramFill: $('[data-el="ram-fill"]', this.root),
       ramMin: $('[data-el="ram-min"]', this.root),
+      volume: $('[data-el="volume"]', this.root),
+      volumeLabel: $('[data-bind="volume"]', this.root),
       ramMax: $('[data-el="ram-max"]', this.root),
       ramNote: $('[data-el="ram-note"]', this.root),
       ramMinValues: $$('[data-bind="ram-min"]', this.root),
@@ -446,6 +448,16 @@ export default class SettingsPanel {
       this.save(key, next);
     });
 
+    // Volume de la musique : appliqué en direct, écrit après une courte pause.
+    if (this.el.volume) {
+      on(this.el.volume, 'input', () => {
+        const value = Number(this.el.volume.value);
+        if (this.el.volumeLabel) this.el.volumeLabel.textContent = String(value);
+        this.ctx.store.set({ volumePreview: value });
+        this.save('launcher.volume', value);
+      });
+    }
+
     // Curseurs de mémoire : l'invariant min ≤ max est tenu des deux côtés.
     if (this.el.ramMin) {
       on(this.el.ramMin, 'input', () => this.onRamInput('min'));
@@ -548,6 +560,12 @@ export default class SettingsPanel {
 
     // Les champs libres ne sont réécrits que lorsqu'ils ne sont pas en cours de
     // saisie (cf. isEditing) : la valeur retenue les rejoindra à leur validation.
+    if (this.el.volume && !isEditing(this.el.volume)) {
+      const volume = config.launcher?.volume ?? 40;
+      this.el.volume.value = String(volume);
+      if (this.el.volumeLabel) this.el.volumeLabel.textContent = String(volume);
+    }
+
     if (this.el.jvmArgs && !isEditing(this.el.jvmArgs)) {
       this.el.jvmArgs.value = config.java?.args ?? '';
     }

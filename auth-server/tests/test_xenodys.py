@@ -55,14 +55,14 @@ async def test_une_bascule_en_base_est_servie_au_launcher(
 ) -> None:
     async with sessions() as session:
         session.add(
-            Xenodys(id=1, etat="corrompue", message="L'ennemi a pris le Nexus.", par="Senrys")
+            Xenodys(id=1, etat="corrompue", message="L'ennemi a pris le contrôle de Xenodys.", par="Senrys")
         )
         await session.commit()
 
     response = await launcher_client.get(f"{API_PREFIX}/xenodys")
     body = response.json()
     assert body["etat"] == "corrompue"
-    assert body["message"] == "L'ennemi a pris le Nexus."
+    assert body["message"] == "L'ennemi a pris le contrôle de Xenodys."
     assert body["depuis"] is not None
     # « par » est une trace pour le staff, pas une information publique.
     assert "par" not in body

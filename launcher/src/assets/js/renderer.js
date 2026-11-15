@@ -26,6 +26,11 @@ import { toast } from './components/toast.js';
 import { confirmModal } from './components/modal.js';
 import { Popover, closeAllPopovers } from './components/popover.js';
 import * as xenodys from './utils/xenodys.js';
+import { isOpen as isOpenWindow, wireFrame } from './components/frame.js';
+import { createSurround } from './components/surround.js';
+import { createXenodys } from './components/xenodys3d.js';
+import { createAmbiance } from './components/ambiance.js';
+import { createVideoCircuits } from './components/circuits.js';
 
 /** Pont exposé par le preload (docs/IPC.md). */
 const opm = window.opm;
@@ -725,6 +730,9 @@ async function start() {
   setupBackground();
   wireMainProcessEvents();
   wireXenodys();
+  wireOpenWindow();
+  wireAmbiance();
+  wireVideoCircuits();
 
   try {
     await boot();
@@ -774,6 +782,73 @@ const XENODYS_POLL_MS = 60_000;
  * - Hors ligne, le dernier état connu reste : une panne ne ramène pas au cyan
  *   en pleine invasion, ni l'inverse.
  */
+/**
+ * La musique de Xenodys (components/ambiance.js). Suit les réglages
+ * `launcher.ambiance` et `launcher.volume`, l'état de Xenodys, et se tait
+ * pendant une partie ou quand le launcher est réduit.
+ */
+function wireAmbiance() {
+  let ambiance;
+  try {
+    ambiance = createAmbiance();
+  } catch (err) {
+    console.error('opm : musique indisponible.', err);
+    return;
+  }
+  const PLAYING = new Set(['launching', 'running']);
+  const apply = (state) => {
+    const launcher = state.config?.launcher;
+    if (launcher) {
+      ambiance.setEnabled(launcher.ambiance !== false);
+      ambiance.setVolume(state.volumePreview ?? launcher.volume);
+    }
+    ambiance.setEtat(state.xenodys?.etat ?? 'creatrice');
+    ambiance.setSilenced(document.hidden || PLAYING.has(state.game?.state));
+  };
+  store.subscribe((state, changed) => {
+    if (changed.has('config') || changed.has('volumePreview') || changed.has('xenodys') || changed.has('game')) apply(state);
+  });
+  on(document, 'visibilitychange', () => apply(store.get()));
+  apply(store.get());
+}
+
+/** Les circuits de Xenodys, incrustés dans la vidéo de fond (components/circuits.js). */
+function wireVideoCircuits() {
+  const canvas = $('[data-el="bg-circuits"]');
+  if (!canvas) return;
+  try {
+    createVideoCircuits(canvas);
+  } catch (err) {
+    console.error('opm : circuits de la vidéo indisponibles.', err);
+  }
+}
+
+/**
+ * Fenêtre ouverte : clics traversants, poignée, décor autour du cadre. Sans
+ * effet en mode compact (assets/js/frame.js a déjà tranché).
+ */
+function wireOpenWindow() {
+  if (!isOpenWindow()) return;
+  try {
+    wireFrame(opm.window);
+    const back = $('[data-el="surround"]');
+    const front = $('[data-el="surround-front"]');
+    const frame = $('[data-el="frame"]');
+    if (back && front && frame) {
+      createSurround({ back, front, frame, stage: $('[data-el="xeno-stage"]') });
+    }
+    // Xenodys elle-même, derrière le cadre, qu'elle domine depuis la droite.
+    const stage = $('[data-el="xeno-stage"]');
+    const canvas = $('[data-el="xeno-canvas"]');
+    if (stage && canvas && window.skinview3d) {
+      createXenodys(canvas, stage, frame).catch((err) => console.error('opm : Xenodys indisponible.', err));
+    }
+  } catch (err) {
+    // Le décor est un plus : le launcher doit rester utilisable sans lui.
+    console.error('opm : décor de la fenêtre ouverte indisponible.', err);
+  }
+}
+
 function wireXenodys() {
   // Le cyan d'abord : c'est l'état normal du monde, et celui des pages tant
   // que le serveur n'a pas répondu.

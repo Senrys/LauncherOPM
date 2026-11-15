@@ -28,6 +28,7 @@ const content = require('./services/content');
 const updater = require('./services/updater');
 const accounts = require('./auth/accounts');
 const api = require('./auth/api');
+const mainWindow = require('../windows/mainWindow');
 
 /** Panneaux HTML que le renderer a le droit de demander. */
 const PANELS = new Set(['home', 'settings', 'donation', 'login']);
@@ -460,12 +461,7 @@ function register(windowGetter) {
     if (win) win.minimize();
   });
 
-  listen('window:maximize', () => {
-    const win = getWindow();
-    if (!win) return;
-    if (win.isMaximized()) win.unmaximize();
-    else win.maximize();
-  });
+  listen('window:maximize', () => mainWindow.toggleMaximize());
 
   listen('window:close', () => {
     const win = getWindow();
@@ -485,9 +481,17 @@ function register(windowGetter) {
     win.focus();
   });
 
-  handle('window:is-maximized', () => {
-    const win = getWindow();
-    return Boolean(win && win.isMaximized());
+  handle('window:is-maximized', () => mainWindow.isMaximized());
+
+  // Mode ouvert : la marge transparente laisse passer les clics jusqu'au bureau.
+  listen('window:passthrough', (passthrough) => mainWindow.setPassthrough(passthrough === true));
+
+  // Mode ouvert : la poignée dessinée par le launcher redimensionne son cadre.
+  listen('window:resize-frame', (size) => {
+    if (!size || typeof size !== 'object') return;
+    const { width, height } = size;
+    if (!Number.isFinite(width) || !Number.isFinite(height)) return;
+    mainWindow.resizeFrame(width, height);
   });
 
   // -1 = barre de progression éteinte, 2 = indéterminée, sinon un ratio 0 → 1.
@@ -582,8 +586,25 @@ function register(windowGetter) {
   /* ------------------------------------------------------- CONFIGURATION */
 
   handle('config:get', () => store.getConfig());
-  handle('config:set', (patch) => store.setConfig(needObject(patch, 'patch')));
-  handle('config:reset', () => store.resetConfig());
+  handle('config:set', (patch) => {
+    const before = store.getConfig().launcher.window_open;
+    const saved = store.setConfig(needObject(patch, 'patch'));
+    // Ouvert ou compact se décide à la création de la fenêtre : on la recrée,
+    // juste après avoir répondu au renderer qui va disparaître.
+    // Pas pendant une partie : le changement prendra effet au prochain démarrage.
+    if (saved?.launcher?.window_open !== before && !game.ownsTaskbar()) {
+      setTimeout(() => mainWindow.recreate(), 120);
+    }
+    return saved;
+  });
+  handle('config:reset', () => {
+    const before = store.getConfig().launcher.window_open;
+    const saved = store.resetConfig();
+    if (saved?.launcher?.window_open !== before && !game.ownsTaskbar()) {
+      setTimeout(() => mainWindow.recreate(), 120);
+    }
+    return saved;
+  });
 
   /* ------------------------------------------------------------- COMPTES */
 

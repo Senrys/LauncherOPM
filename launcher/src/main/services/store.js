@@ -71,10 +71,15 @@ const DEFAULT_CONFIG = deepFreeze({
     keep_console: false,
     auto_update: true,
     rp_notifications: true,
-    music: false,
+    // La musique de Xenodys (components/ambiance.js). Nouvelle clé : l'ancienne
+    // `music`, jamais branchée, valait `false` partout et serait restée muette.
+    ambiance: true,
     volume: 40,
     auto_launch: false,
     download_multi: 5,
+    // Fenêtre « ouverte » : transparente, avec le décor de Xenodys autour du
+    // cadre (windows/mainWindow.js). Ignoré là où ce n'est pas possible.
+    window_open: true,
   },
 });
 
@@ -238,9 +243,10 @@ function normalizeConfig(input, pinned = null) {
       keep_console: toBool(launcher.keep_console, DEFAULT_CONFIG.launcher.keep_console),
       auto_update: toBool(launcher.auto_update, DEFAULT_CONFIG.launcher.auto_update),
       rp_notifications: toBool(launcher.rp_notifications, DEFAULT_CONFIG.launcher.rp_notifications),
-      music: toBool(launcher.music, DEFAULT_CONFIG.launcher.music),
+      ambiance: toBool(launcher.ambiance, DEFAULT_CONFIG.launcher.ambiance),
       volume: clampInt(launcher.volume, VOLUME_MIN, VOLUME_MAX, DEFAULT_CONFIG.launcher.volume),
       auto_launch: toBool(launcher.auto_launch, DEFAULT_CONFIG.launcher.auto_launch),
+      window_open: toBool(launcher.window_open, DEFAULT_CONFIG.launcher.window_open),
       download_multi: clampInt(
         launcher.download_multi,
         DOWNLOAD_MULTI_MIN,

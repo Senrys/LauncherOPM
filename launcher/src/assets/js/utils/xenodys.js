@@ -85,7 +85,7 @@ const LINES = {
     ],
     offline: [
       'Le monde dort. Xenodys veille sur lui en attendant.',
-      'Xenodys n’entend plus le Nexus. Elle cherche le chemin du retour.',
+      'Xenodys n’entend plus le monde. Elle cherche le chemin du retour.',
     ],
     maintenance: [
       'Xenodys répare une fissure dans le monde. Elle n’en a pas pour longtemps.',
@@ -130,7 +130,7 @@ const LINES = {
       'Xenodys t’observe. Elle prend des notes. Beaucoup de notes.',
     ],
     offline: [
-      'Ils ont pris le Nexus. Xenodys ne contrôle plus… rien.',
+      'Ils ont tout pris. Xenodys ne contrôle plus… rien.',
       'Silence. Xenodys a coupé le monde. Ou bien c’était eux ?',
     ],
     maintenance: [

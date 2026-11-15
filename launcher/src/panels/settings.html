@@ -536,6 +536,16 @@
 
       <div class="opm-row">
         <div class="opm-row__text">
+          <p class="opm-row__title">Fenêtre ouverte</p>
+          <p class="opm-row__desc">Le décor de Xenodys déborde autour du launcher. Désactivé : une fenêtre classique, plus compacte. Le launcher se recharge.</p>
+        </div>
+        <button type="button" class="opm-switch" role="switch" aria-checked="false"
+                aria-label="Fenêtre ouverte"
+                data-el="switch" data-key="launcher.window_open"><span class="opm-switch__knob"></span></button>
+      </div>
+
+      <div class="opm-row">
+        <div class="opm-row__text">
           <p class="opm-row__title">Mises à jour automatiques</p>
           <p class="opm-row__desc">Télécharge les correctifs dès l'ouverture du launcher.</p>
         </div>
@@ -544,12 +554,28 @@
                 data-el="switch" data-key="launcher.auto_update"><span class="opm-switch__knob"></span></button>
       </div>
 
-      <!-- Trois réglages ont été retirés de ce sous-écran, faute de consommateur :
-             · launcher.rp_notifications — aucune notification système n'est émise ;
-             · launcher.music / launcher.volume — le launcher n'embarque aucune piste
-               sonore (assets/ ne contient aucun fichier audio).
-           Leur interrupteur bougeait, la clé était bien écrite dans config.json, et rien
-           ne se produisait jamais. À réintroduire avec l'implémentation, pas avant. -->
+      <!-- Un réglage reste absent, faute de consommateur : launcher.rp_notifications
+           (aucune notification système n'est émise). À réintroduire avec
+           l'implémentation, pas avant. -->
+
+      <p class="opm-kicker"><span class="opm-kicker__dot" aria-hidden="true"></span>AMBIANCE</p>
+      <h2>LA VOIX DE XENODYS</h2>
+
+      <div class="opm-row">
+        <div class="opm-row__text">
+          <p class="opm-row__title">Musique de Xenodys</p>
+          <p class="opm-row__desc">La musique du site, passée par la voix mécanique de Xenodys, et la mer en dessous. Se tait pendant une partie.</p>
+        </div>
+        <button type="button" class="opm-switch" role="switch" aria-checked="false"
+                aria-label="Musique de Xenodys"
+                data-el="switch" data-key="launcher.ambiance"><span class="opm-switch__knob"></span></button>
+      </div>
+
+      <div class="opm-ram__slider opm-volume">
+        <label for="opm-volume">Volume<span><span data-bind="volume"></span> %</span></label>
+        <input type="range" id="opm-volume" min="0" max="100" step="5"
+               data-el="volume" data-key="launcher.volume">
+      </div>
 
       <p class="opm-kicker"><span class="opm-kicker__dot" aria-hidden="true"></span>STOCKAGE</p>
       <h2>DOSSIER DU JEU</h2>

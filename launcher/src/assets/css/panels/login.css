@@ -46,7 +46,7 @@
   flex: 0 1 auto;
   width: 470px;
   margin: auto auto auto 88px;
-  max-height: calc(100vh - var(--h-titlebar) - 48px);
+  max-height: calc(var(--frame-h) - var(--h-titlebar) - 48px);
   overflow: hidden auto;
   padding: 30px 34px 28px;
   background: var(--paper);

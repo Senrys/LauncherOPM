@@ -6,6 +6,9 @@
         content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https:; media-src 'self'; connect-src 'self' https:">
   <title>One Piece Minecraft — Launcher</title>
 
+  <!-- Mode de la fenêtre (ouvert / compact), posé avant le premier rendu. -->
+  <script src="assets/js/frame.js"></script>
+
   <!-- Ordre de chargement imposé : tokens → fonts → reset → layout → components → panels.
        Aucun style n'est écrit hors de ces fichiers. -->
   <link rel="stylesheet" href="assets/css/base/tokens.css">
@@ -14,6 +17,7 @@
   <link rel="stylesheet" href="assets/css/base/fonts.css">
   <link rel="stylesheet" href="assets/css/base/reset.css">
 
+  <link rel="stylesheet" href="assets/css/layout/frame.css">
   <link rel="stylesheet" href="assets/css/layout/shell.css">
   <link rel="stylesheet" href="assets/css/layout/titlebar.css">
   <link rel="stylesheet" href="assets/css/layout/rail.css">
@@ -46,7 +50,24 @@
   Aucune valeur affichée n'est écrite en dur : tous les emplacements data-bind
   partent vides et sont remplis par les données réelles.
 -->
-<body class="opm-app">
+<body class="opm-body">
+
+  <!-- ======================================================================
+       AUTOUR DU CADRE — mode « fenêtre ouverte » seulement (layout/frame.css)
+       Le décor de Xenodys, derrière le launcher, sur la marge transparente.
+       ================================================================== -->
+  <canvas class="opm-surround" data-el="surround" aria-hidden="true"></canvas>
+  <!-- Xenodys, immense, derrière le cadre, qu'elle domine depuis la droite. -->
+  <div class="opm-xeno-stage" data-el="xeno-stage" aria-hidden="true">
+    <canvas data-el="xeno-canvas"></canvas>
+  </div>
+  <!-- Devant le cadre : ce qui l'incruste dans le décor (bords tramés, cristaux). -->
+  <canvas class="opm-surround opm-surround--front" data-el="surround-front" aria-hidden="true"></canvas>
+
+  <!-- ======================================================================
+       LE CADRE — le launcher lui-même
+       ================================================================== -->
+  <div class="opm-app" data-el="frame">
 
   <!-- ======================================================================
        FOND — vidéo, repli dégradé, puis les deux voiles (valeurs en CSS)
@@ -57,6 +78,9 @@
            muted loop autoplay playsinline preload="auto"
            disablepictureinpicture tabindex="-1"></video>
     <div class="opm-bg__fallback" data-el="bg-fallback"></div>
+    <!-- Les circuits de Xenodys, incrustés dans l'image, et la teinte de son état. -->
+    <canvas class="opm-bg__circuits" data-el="bg-circuits"></canvas>
+    <div class="opm-bg__tint"></div>
     <div class="opm-bg__veil-a"></div>
     <div class="opm-bg__veil-b"></div>
   </div>
@@ -643,6 +667,12 @@
        ================================================================== -->
   <div class="opm-toasts" data-el="toasts" role="status" aria-live="polite"></div>
   <div data-el="modal-root"></div>
+
+  <!-- Poignée de redimensionnement du cadre (mode ouvert). -->
+  <button type="button" class="opm-grip" data-el="grip" tabindex="-1"
+          aria-label="Redimensionner le launcher"></button>
+  </div>
+
 
   <!-- Rendu 3D du skin (accueil). Script classique, pas un module : le bundle
        UMD expose le global `skinview3d`. Chargé avant le renderer pour que
