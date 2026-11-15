@@ -648,6 +648,7 @@ function onData(run, raw) {
     logger.info('Démarrage de la machine virtuelle Java…');
     cinematicStart();
     cinematicArm(Boolean(run.scene));
+    pollSignals(run);
     emit({ type: 'launching' });
     armStartFallback(run);
   }
@@ -691,25 +692,57 @@ function readLoading(run, text) {
   for (const line of lines) {
     const found = bridge.readLine(line);
     if (!found) continue;
-    if (found.kind === 'music') {
-      // La musique du launcher continue dans le jeu : le launcher peut se taire.
-      run.musicDone = true;
-      mainWindow.setThrottling(true);
-      emit({ type: 'music' });
-      return;
-    }
-    if (run.sceneDone) continue;
-    if (found.kind === 'ready') {
-      run.sceneDone = true;
-      bridge.writeLoadStats(run.loadLines || 0, Date.now() - (run.loadStart || Date.now()));
-      logger.info("L'écran de chargement du mod OPM a pris le relais.");
-      emit({ type: 'loaded' });
+    if (found.kind === 'music' || found.kind === 'ready') {
+      onSignal(run, found.kind);
+      if (run.musicDone) return;
       continue;
     }
+    if (run.sceneDone) continue;
     run.sceneStep = found.step;
     if (found.ratio > (run.sceneRatio ?? 0)) run.sceneRatio = found.ratio;
     emit({ type: 'loading', ratio: run.sceneRatio, step: found.step });
   }
+}
+
+/**
+ * Un signal du mod OPM (`ready` : son écran de chargement est affiché ;
+ * `music` : la musique a repris dans le jeu), lu dans sa sortie ou dans le
+ * fichier `opm/signaux.properties` — la voie sûre.
+ * @param {object} run
+ * @param {'ready'|'music'} kind
+ */
+function onSignal(run, kind) {
+  if (kind === 'ready' && !run.sceneDone) {
+    run.sceneDone = true;
+    bridge.writeLoadStats(run.loadLines || 0, Date.now() - (run.loadStart || Date.now()));
+    logger.info("L'écran de chargement du mod OPM a pris le relais.");
+    emit({ type: 'loaded' });
+  }
+  if (kind === 'music' && !run.musicDone) {
+    // La musique du launcher continue dans le jeu : le launcher peut se taire.
+    run.musicDone = true;
+    mainWindow.setThrottling(true);
+    emit({ type: 'music' });
+  }
+}
+
+/**
+ * Relit les signaux du mod dans son fichier, deux fois par seconde, tant que le
+ * launcher couvre le chargement.
+ * @param {object} run
+ */
+function pollSignals(run) {
+  if (run.signalTimer || !run.scene || !run.instanceDir) return;
+  run.signalTimer = setInterval(async () => {
+    if (run.finished || run.musicDone) {
+      clearInterval(run.signalTimer);
+      return;
+    }
+    const sig = await bridge.readSignals(run.instanceDir, run.sceneEpoch);
+    if (sig.ready) onSignal(run, 'ready');
+    if (sig.music) onSignal(run, 'music');
+  }, 500);
+  if (typeof run.signalTimer.unref === 'function') run.signalTimer.unref();
 }
 
 /**
@@ -902,6 +935,7 @@ function releaseSession(run) {
 function finish(run, event, note) {
   if (run.finished) return;
   run.finished = true;
+  if (run.signalTimer) clearInterval(run.signalTimer);
   mainWindow.setThrottling(true);
   clearStartFallback(run);
   cinematicEnd();
@@ -971,7 +1005,7 @@ const CINEMATIC_MAX_MS = 7_000;
  * chargement des mods : il ne s'efface qu'à `[OPM:READY]`, ou à ce délai si le
  * mod ne se manifeste jamais.
  */
-const SCENE_MAX_MS = 240_000;
+const SCENE_MAX_MS = 150_000;
 let cinematic = null;
 
 /** Ouvre l'attente de la cinématique (sans délai de garde : la préparation peut être longue). */
@@ -1217,8 +1251,11 @@ async function launch(instanceName) {
         mainWindow.windowMode() === 'ouvert' && config.game.intro && bridge.hasOpmMod(instanceDir);
       run.scene = scene;
       run.sceneEpoch = Date.now();
+      run.instanceDir = instanceDir;
+      await bridge.resetSignals(instanceDir);
       options.JVM_ARGS.unshift(...bridge.authArguments(instanceDir, api.baseUrl()));
       await bridge.setEarlyWindow(instanceDir, !scene);
+      await bridge.skipOnboarding(instanceDir).catch((err) => logger.warn(`options.txt : ${err.message}`));
       await bridge.writeSession(instanceDir, {
         launcherVersion: electronApp.getVersion(),
         etat: world.etat,

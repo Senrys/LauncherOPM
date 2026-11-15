@@ -1,4 +1,17 @@
 {
+ "bandeau_960": {
+  "largeur": 960,
+  "hauteur": 314,
+  "images": 1,
+  "origine": [
+   0,
+   0
+  ],
+  "fps": 0,
+  "boucle": false,
+  "colonnes": 1,
+  "densite": 1
+ },
  "bandeau_480": {
   "largeur": 480,
   "hauteur": 157,
@@ -15,6 +28,19 @@
  "bandeau_240": {
   "largeur": 240,
   "hauteur": 79,
+  "images": 1,
+  "origine": [
+   0,
+   0
+  ],
+  "fps": 0,
+  "boucle": false,
+  "colonnes": 1,
+  "densite": 1
+ },
+ "bandeau_960_corrompue": {
+  "largeur": 960,
+  "hauteur": 314,
   "images": 1,
   "origine": [
    0,

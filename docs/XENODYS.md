@@ -95,13 +95,16 @@ qui l'installe lui-même dans le jeu) se passent le relais sans que rien ne se v
    chargement** du launcher apparaît (`components/loadingScene.js`), en **vraie 3D** à la
    résolution de l'écran, sur la salle de simulation. Chorégraphie en boucle de 10 s :
    Xenodys façonne un monde de blocs entre ses mains (il grandit avec le chargement) ;
-   sur le circuit, un joueur de la galerie s'imprime, se change en orbe ; elle vole
-   jusqu'à lui, le saisit, le rapporte et le dépose dans le monde. Ses mains visent ce
+   sur le circuit, un joueur de la galerie s'imprime, puis est aspiré dans son orbe
+   (il tourne, s'étire, et un flot de lumière file vers l'orbe) ; elle vole jusqu'à
+   lui, l'orbe est aspiré dans sa paume, elle le rapporte, et le monde l'avale dans
+   une spirale. Ses mains visent ce
    qu'elles touchent (cinématique inverse des bras, lissée), sa tête suit ce qu'elle
    fait ; elle reste toujours derrière les autres modèles. Deux assistants : l'un au
    circuit, l'autre en ronde, qui trébuche parfois. La barre avance au prorata du
    chargement précédent (lignes du journal, durée). La fenêtre de chargement de
-   NeoForge est désactivée (`config/fml.toml`).
+   NeoForge est désactivée (`config/fml.toml`). « Réduire » (ou Échap) rend la main à
+   tout moment : la scène s'efface, le jeu continue de charger.
 2. **L'écran de chargement du jeu** (le mod remplace celui de Mojang et de NeoForge) :
    la même scène, en 3D elle aussi (`client/Choreo`, shader `position_tex_color`), à la
    même horloge — `scene_debut` dans `opm/session.json` — et avec les mêmes skins dans

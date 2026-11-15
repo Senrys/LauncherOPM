@@ -252,7 +252,7 @@ def bandeau(meta: dict) -> None:
     corr_im = Image.fromarray((corr * 255).astype(np.uint8))
     corr_im.save(SORTIES[1] / "bandeau_corrompue.png", optimize=True)
     for suffixe, image in (("", src), ("_corrompue", corr_im)):
-        for largeur in (480, 240):
+        for largeur in (960, 480, 240):
             h = round(image.height * largeur / image.width)
             im = image.resize((largeur, h), Image.LANCZOS)
             im.save(SORTIES[0] / f"bandeau_{largeur}{suffixe}.png", optimize=True)

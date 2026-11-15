@@ -222,6 +222,11 @@ function createScene3D(canvas) {
   }
   const orb = buildModel(T, m0.orbe, BLOC_GEO);
   const orbHolder = holder(orb);
+  // Le flot de lumière du joueur vers son orbe.
+  const motes = Array.from({ length: 14 }, () => {
+    const mm = buildModel(T, m0.orbe, BLOC_GEO);
+    return { model: mm, holder: holder(mm) };
+  });
   const scan = buildModel(T, m0.bloc, BLOC_GEO);
   const scanHolder = holder(scan);
 
@@ -238,6 +243,7 @@ function createScene3D(canvas) {
     swap(socle, m.socle);
     for (const b of blocks) swap(b.model, m.bloc);
     swap(orb, m.orbe);
+    for (const mo of motes) swap(mo.model, m.orbe);
     swap(scan, m.bloc);
   }
 
@@ -446,9 +452,11 @@ function createScene3D(canvas) {
     let reveal = 0;
     if (active && c < 3) {
       reveal = ease(c / 1.8);
-      alpha = reveal * (1 - seg(c, 2.6, 3.0));
+      alpha = reveal;
     }
-    playerHolder.visible = alpha > 0.01;
+    // L'aspiration : le joueur tourne, s'étire et se resserre jusqu'à son orbe.
+    const suck = active ? ease(seg(c, 2.3, 3.0)) : 0;
+    playerHolder.visible = alpha > 0.01 && suck < 0.99;
     if (playerHolder.visible) {
       const model = printed.slim ? players.slim : players.wide;
       players.slim.root.visible = printed.slim;
@@ -456,9 +464,11 @@ function createScene3D(canvas) {
       playerMat.map = printed.texture;
       playerMat.opacity = alpha;
       playerMat.needsUpdate = true;
-      playerHolder.position.copy(S);
-      playerHolder.rotation.y = 210 * DEG;
-      playerHolder.scale.setScalar(PLAYER);
+      const thin = 1 - 0.94 * suck;
+      const stretch = 1 + 1.3 * Math.sin(suck * Math.PI);
+      playerHolder.position.set(S.x, S.y + suck * 16 * PLAYER, S.z);
+      playerHolder.rotation.y = (210 + suck * 540) * DEG;
+      playerHolder.scale.set(PLAYER * thin, PLAYER * thin * stretch, PLAYER * thin);
       const p2 = (t * 2 * Math.PI) / 2.7;
       pose(model.bones, STILL, 0, {
         head: [4 - 3 * Math.sin(p2 * 2), 14 * Math.sin(p2), 0],
@@ -473,18 +483,43 @@ function createScene3D(canvas) {
       scanHolder.scale.set((22 * PLAYER) / 16, 0.4 / 16, (22 * PLAYER) / 16);
     }
 
-    // L'orbe (à terre, ou dans sa main).
+    // L'orbe : à terre, aspirée dans sa paume, puis dans le monde.
+    xenHolder.updateMatrixWorld(true);
+    const palm = xen.bones.get('hand_right').group.getWorldPosition(new T.V3()).add(new T.V3(0, -5, 3));
+    if (active && c >= 4.4 && c < 4.8 && orbPos) orbPos = orbPos.clone().lerp(palm, ease(seg(c, 4.4, 4.8)));
     if (held) {
-      xenHolder.updateMatrixWorld(true);
-      orbPos = xen.bones.get('hand_right').group.getWorldPosition(new T.V3()).add(new T.V3(0, -5, 3));
-      if (c >= 7.4) orbPos.lerp(W.clone().add(new T.V3(0, 4, 0)), ease(seg(c, 7.4, 8.0)));
+      orbPos = palm.clone();
+      if (c >= 7.3) {
+        // Aspirée par le monde : une spirale qui se resserre.
+        const e = ease(seg(c, 7.3, 8.0));
+        orbPos.lerp(W.clone().add(new T.V3(0, 3, 0)), e);
+        const r = 12 * (1 - e);
+        orbPos.add(new T.V3(Math.cos(e * 4 * Math.PI) * r, 0, Math.sin(e * 4 * Math.PI) * r));
+      }
     }
     orbHolder.visible = Boolean(orbPos) && orbScale > 0.01;
     if (orbHolder.visible) {
+      const sc = (6 / 16) * orbScale * (1 + Math.sin(t * 6) * 0.08);
+      const squash = active && c >= 7.3 ? 1 + Math.sin(seg(c, 7.3, 8.0) * Math.PI) * 0.8 : 1;
       orbHolder.position.copy(orbPos);
       orbHolder.rotation.set(t * 1.3, t * 2, 0);
-      orbHolder.scale.setScalar((6 / 16) * orbScale * (1 + Math.sin(t * 6) * 0.08));
+      orbHolder.scale.set(sc, sc * squash, sc);
     }
+    // Le flot de lumière du joueur vers son orbe (le même hasard que le jeu).
+    const chestS = S.clone().add(new T.V3(0, 20 * PLAYER, 0));
+    motes.forEach((mo, i) => {
+      const q = active && c >= 2.2 && c < 3.2 ? ease(seg(c, 2.2 + i * 0.035, 2.75 + i * 0.035)) : 0;
+      mo.holder.visible = q > 0 && q < 1;
+      if (!mo.holder.visible) return;
+      const from = S.clone().add(new T.V3((hash(i + k * 31) - 0.5) * 14 * PLAYER,
+        (0.1 + hash(i * 3 + k * 17) * 0.85) * 32 * PLAYER, (hash(i * 5 + k) - 0.5) * 8));
+      const p3 = from.lerp(chestS, q);
+      const sw = Math.sin(q * Math.PI) * 6;
+      p3.add(new T.V3(Math.cos(i + q * 8) * sw, 0, Math.sin(i + q * 8) * sw));
+      mo.holder.position.copy(p3);
+      mo.holder.rotation.set(0, t * 3 + i, 0);
+      mo.holder.scale.setScalar((1.4 / 16) * (1 - q * 0.6));
+    });
 
     // Les assistants.
     const phw = t * 2 * Math.PI;
@@ -563,14 +598,31 @@ function createScene3D(canvas) {
  * @param {HTMLElement} host  conteneur plein écran (vide)
  * @param {{etat: () => string}} options
  */
-export function createLoadingScene(host, { etat: etatOf }) {
+export function createLoadingScene(host, { etat: etatOf, onDismiss = null }) {
   const labCanvas = document.createElement('canvas');
   labCanvas.className = 'opm-loading__lab';
   const glCanvas = document.createElement('canvas');
   glCanvas.className = 'opm-loading__3d';
   const canvas = document.createElement('canvas');
   canvas.className = 'opm-loading__scene';
-  host.append(labCanvas, glCanvas, canvas);
+  // Le bandeau : une vraie image, à la résolution de l'écran (pas agrandie).
+  const banner = document.createElement('img');
+  banner.className = 'opm-loading__bandeau';
+  banner.alt = '';
+  // Jamais prisonnier de la scène : « Réduire » (et la touche Échap) la referme
+  // et rend la main, le jeu continue de charger derrière.
+  const dismiss = document.createElement('button');
+  dismiss.type = 'button';
+  dismiss.className = 'opm-loading__reduire';
+  dismiss.textContent = 'Réduire';
+  dismiss.title = 'Réduire le launcher (le jeu continue de charger)';
+  dismiss.setAttribute('data-hit', '');
+  dismiss.addEventListener('click', () => onDismiss?.());
+  const onKey = (e) => {
+    if (e.key === 'Escape' && raf) onDismiss?.();
+  };
+  window.addEventListener('keydown', onKey);
+  host.append(labCanvas, glCanvas, canvas, banner, dismiss);
   const ctx = canvas.getContext('2d');
   let lab = null;
   let scene3d = null;
@@ -663,12 +715,8 @@ export function createLoadingScene(host, { etat: etatOf }) {
     ctx.setTransform(2, 0, 0, 2, 0, 0);
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, vw, vh);
-    const banner = image(etat === 'corrompue' ? 'assets/sprites/bandeau_corrompue.png' : 'assets/images/bandeau-opm.png');
-    if (banner.complete && banner.naturalWidth) {
-      ctx.imageSmoothingEnabled = true;
-      ctx.drawImage(banner, 12, 10, 120, Math.round((120 * banner.naturalHeight) / banner.naturalWidth));
-      ctx.imageSmoothingEnabled = false;
-    }
+    const src = etat === 'corrompue' ? 'assets/sprites/bandeau_corrompue.png' : 'assets/images/bandeau-opm.png';
+    if (!banner.src.endsWith(src)) banner.src = src;
     const mx = vw * 0.5;
     const bw = Math.min(vw * 0.46, 240);
     const bx0 = mx - bw / 2;
@@ -750,6 +798,7 @@ export function createLoadingScene(host, { etat: etatOf }) {
     dispose() {
       cancelAnimationFrame(raf);
       raf = 0;
+      window.removeEventListener('keydown', onKey);
       lab?.dispose();
       scene3d?.dispose();
       host.replaceChildren();

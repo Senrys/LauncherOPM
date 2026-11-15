@@ -27,8 +27,8 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.client.event.ScreenEvent;
 import net.neoforged.neoforge.common.NeoForge;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 /**
  * Le mod One Piece Minecraft, côté client : l'écran de chargement de Xenodys
@@ -39,11 +39,12 @@ import org.slf4j.LoggerFactory;
 @Mod(value = Opm.ID, dist = Dist.CLIENT)
 public final class Opm {
     public static final String ID = "opm";
-    public static final Logger LOG = LoggerFactory.getLogger("OPM");
+    /** Log4j directement : un journal SLF4J peut être détourné par certains modpacks. */
+    public static final Logger LOG = LogManager.getLogger("OPM");
 
     public Opm() {
         // Le launcher lit cette ligne : le mod est là, l'écran de chargement suivra.
-        LOG.info("[OPM:HELLO] mod OPM chargé");
+        fr.onepieceminecraft.opm.client.Signal.send("hello", "mod OPM chargé");
         NeoForge.EVENT_BUS.addListener(ScreenEvent.Opening.class, event -> {
             Screen next = event.getNewScreen();
             // L'écran titre d'OPM ; et ni solo ni liste de serveurs : on ne joue

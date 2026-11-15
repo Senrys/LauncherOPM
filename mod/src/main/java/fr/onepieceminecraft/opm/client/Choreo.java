@@ -385,11 +385,18 @@ public final class Choreo {
             } else if (active && c < 3.0) {
                 shownPlayer = printed;
                 reveal = ease(c / 1.8);
-                playerAlpha = (float) (reveal * (1 - seg(c, 2.6, 3.0)));
+                playerAlpha = (float) reveal;
             }
-            if (shownPlayer != null && playerAlpha > 0.01f) {
+            // L'aspiration : le joueur tourne, s'étire et se resserre jusqu'à son orbe.
+            double suck = active && outro < 0 ? ease(seg(c, 2.3, 3.0)) : 0;
+            if (shownPlayer != null && playerAlpha > 0.01f && suck < 0.99) {
                 GeoModel model = shownPlayer.slim() ? playerSlim : player;
-                draw(model, playerPose(model, t, false), at(S, 210).scale(PLAYER), shownPlayer.texture(), null, playerAlpha, 0xFFFFFF);
+                float thin = (float) (1 - 0.94 * suck);
+                float stretch = (float) (1 + 1.3 * Math.sin(suck * Math.PI));
+                Matrix4f pm = new Matrix4f().translate(S.x, S.y + (float) (suck * 16 * PLAYER), S.z)
+                        .rotateY((float) Math.toRadians(210 + suck * 540))
+                        .scale(PLAYER * thin, PLAYER * thin * stretch, PLAYER * thin);
+                draw(model, playerPose(model, t, false), pm, shownPlayer.texture(), null, playerAlpha, 0xFFFFFF);
                 if (reveal < 1) {
                     // Le balayage de l'imprimante, qui monte.
                     Matrix4f scan = new Matrix4f().translate(S.x, S.y + (float) (33 * PLAYER * reveal), S.z).rotateY((float) Math.toRadians(210))
@@ -398,16 +405,43 @@ public final class Choreo {
                 }
             }
 
-            // --- L'orbe (à terre, ou dans sa main).
+            // --- L'orbe (à terre, aspirée dans sa paume, puis dans le monde).
+            Vector3f palm = xenWorld.transformPosition(xen.point(pose, "hand_right"), new Vector3f()).add(0, -5, 3);
+            if (active && c >= 4.4 && c < 4.8 && orb != null) {
+                orb = new Vector3f(orb).lerp(palm, (float) ease(seg(c, 4.4, 4.8)));
+            }
             if (held) {
-                Vector3f hand = xenWorld.transformPosition(xen.point(pose, "hand_right"), new Vector3f());
-                orb = hand.add(0, -5, 3);
-                if (c >= 7.4) orb.lerp(new Vector3f(W).add(0, 4, 0), (float) ease(seg(c, 7.4, 8.0)));
+                orb = new Vector3f(palm);
+                if (c >= 7.3) {
+                    // Aspirée par le monde : une spirale qui se resserre.
+                    double e = ease(seg(c, 7.3, 8.0));
+                    Vector3f into = new Vector3f(W).add(0, 3, 0);
+                    orb.lerp(into, (float) e);
+                    float r = (float) (12 * (1 - e));
+                    orb.add((float) (Math.cos(e * 4 * Math.PI) * r), 0, (float) (Math.sin(e * 4 * Math.PI) * r));
+                }
+            }
+            // Le flot de lumière du joueur vers son orbe.
+            if (active && c >= 2.2 && c < 3.2) {
+                Vector3f chest = new Vector3f(S).add(0, 20 * PLAYER, 0);
+                for (int i = 0; i < 14; i++) {
+                    double q = ease(seg(c, 2.2 + i * 0.035, 2.75 + i * 0.035));
+                    if (q <= 0 || q >= 1) continue;
+                    Vector3f from = new Vector3f(S).add((float) ((hash(i + k * 31) - 0.5) * 14 * PLAYER),
+                            (float) ((0.1 + hash(i * 3 + k * 17) * 0.85) * 32 * PLAYER), (float) ((hash(i * 5 + k) - 0.5) * 8));
+                    Vector3f p2 = new Vector3f(from).lerp(chest, (float) q);
+                    float sw = (float) Math.sin(q * Math.PI) * 6;
+                    p2.add((float) Math.cos(i + q * 8) * sw, 0, (float) Math.sin(i + q * 8) * sw);
+                    Matrix4f m = new Matrix4f().translate(p2).rotateY((float) (t * 3 + i)).scale(1.4f / 16f * (float) (1 - q * 0.6));
+                    draw(block, block.pose(null, 0), m, tex("orbe_" + etat), tex("orbe_" + etat + "_glowmask"), 1f, 0xFFFFFF);
+                }
             }
             if (orb != null && orbScale > 0.01f) {
                 float pulse = 1 + (float) Math.sin(t * 6) * 0.08f;
+                // Étirée dans le sens de l'aspiration quand le monde l'avale.
+                float squash = active && c >= 7.3 ? (float) (1 + Math.sin(seg(c, 7.3, 8.0) * Math.PI) * 0.8) : 1f;
                 Matrix4f m = new Matrix4f().translate(orb).rotateY((float) (t * 2)).rotateX((float) (t * 1.3))
-                        .scale(6f / 16f * orbScale * pulse);
+                        .scale(6f / 16f * orbScale * pulse, 6f / 16f * orbScale * pulse * squash, 6f / 16f * orbScale * pulse);
                 // Un cœur lumineux : le bloc, éclairci à la couleur de l'état, et sa lueur.
                 draw(block, block.pose(null, 0), m, tex("orbe_" + etat), tex("orbe_" + etat + "_glowmask"), 1f, 0xFFFFFF);
                 Matrix4f halo = new Matrix4f(m).scale(1.6f);

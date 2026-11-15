@@ -65,8 +65,8 @@ public final class LoadingScene {
         }
 
         // Le bandeau.
-        Sprites.Sheet banner = Sprites.get(corrupted ? "bandeau_240_corrompue" : "bandeau_240");
-        if (banner != null) Sprites.draw(g, banner, 0, 12, 10, false, 1f, 0.5f);
+        Sprites.Sheet banner = Sprites.get(corrupted ? "bandeau_960_corrompue" : "bandeau_960");
+        if (banner != null) Sprites.draw(g, banner, 0, 12, 10, false, 1f, 0.125f);
 
         // La barre et son étape.
         float mx = vw * 0.5f;

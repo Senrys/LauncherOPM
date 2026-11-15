@@ -851,7 +851,17 @@ function wireCinematic(xen) {
   // l'éclair du passage, effacée quand l'écran du mod a pris le relais.
   const sceneHost = document.querySelector('[data-el="loading-scene"]');
   const scene = sceneHost
-    ? createLoadingScene(sceneHost, { etat: () => document.documentElement.dataset.xenodys })
+    ? createLoadingScene(sceneHost, {
+        etat: () => document.documentElement.dataset.xenodys,
+        // « Réduire » : la scène s'efface, la fenêtre rend la main ; le jeu continue.
+        onDismiss: () => {
+          sceneLoaded = true;
+          hideScene().then(() => {
+            opm.window.cinematicEnd();
+            opm.window.minimize();
+          });
+        },
+      })
     : null;
   let sceneExpected = false;
   let sceneLoaded = false;

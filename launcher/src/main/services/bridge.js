@@ -299,6 +299,31 @@ async function setEarlyWindow(instanceDir, earlyWindow) {
   await fsp.writeFile(file, next, 'utf8');
 }
 
+/**
+ * Passe l'écran d'accessibilité que Minecraft montre au tout premier lancement
+ * (« Welcome to Minecraft… ») : il s'intercalerait entre le chargement d'OPM et
+ * l'écran titre, et bloquerait la connexion directe. Les réglages du joueur
+ * restent intacts ; seule la clé `onboardAccessibility` est fixée.
+ * @param {string} instanceDir
+ */
+async function skipOnboarding(instanceDir) {
+  const file = path.join(instanceDir, 'options.txt');
+  let text = '';
+  try {
+    text = await fsp.readFile(file, 'utf8');
+  } catch {
+    // Fichier neuf : la version des données de la 1.21.1, pour que Minecraft
+    // ne le prenne pas pour un vieux fichier à convertir.
+    text = 'version:3955\n';
+  }
+  const pattern = /^onboardAccessibility:.*$/m;
+  const line = 'onboardAccessibility:false';
+  const next = pattern.test(text) ? text.replace(pattern, line) : `${text}${text.endsWith('\n') ? '' : '\n'}${line}\n`;
+  if (next === text) return;
+  await fsp.mkdir(instanceDir, { recursive: true });
+  await fsp.writeFile(file, next, 'utf8');
+}
+
 /* ------------------------------------------------------------------ journal */
 
 /**
@@ -400,6 +425,36 @@ async function fingerprint(instanceDir, manifestUrl) {
   return { mods, packs, extra, modified, verified: Boolean(official) };
 }
 
+/* ------------------------------------------------------------------ signaux du mod */
+
+function signalsFile(instanceDir) {
+  return path.join(instanceDir, 'opm', 'signaux.properties');
+}
+
+/** Efface les signaux d'une partie précédente. */
+async function resetSignals(instanceDir) {
+  await fsp.rm(signalsFile(instanceDir), { force: true }).catch(() => {});
+}
+
+/**
+ * Les signaux écrits par le mod (`hello`, `ready`, `music` = horodatage), s'ils
+ * sont de cette partie.
+ * @returns {Promise<{hello?: boolean, ready?: boolean, music?: boolean}>}
+ */
+async function readSignals(instanceDir, since) {
+  try {
+    const text = await fsp.readFile(signalsFile(instanceDir), 'utf8');
+    const out = {};
+    for (const line of text.split(/\r?\n/)) {
+      const [k, v] = line.split('=');
+      if (k && Number(v) >= (since || 0) - 5000) out[k.trim()] = true;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
 /* ------------------------------------------------------------------ durée du chargement */
 
 /**
@@ -433,6 +488,8 @@ function writeLoadStats(lines, ms) {
 
 module.exports = {
   LAUNCHER_SHARE,
+  resetSignals,
+  readSignals,
   readLoadStats,
   writeLoadStats,
   fingerprint,
@@ -444,5 +501,6 @@ module.exports = {
   directConnectArguments,
   writeSession,
   setEarlyWindow,
+  skipOnboarding,
   readLine,
 };

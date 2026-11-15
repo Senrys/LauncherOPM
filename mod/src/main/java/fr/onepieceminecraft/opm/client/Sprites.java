@@ -73,7 +73,11 @@ public final class Sprites {
         try (InputStream in = Sprites.class.getResourceAsStream(ROOT + file + ".png")) {
             NativeImage image = NativeImage.read(in);
             ResourceLocation id = ResourceLocation.fromNamespaceAndPath(Opm.ID, "sprite/" + name);
-            Minecraft.getInstance().getTextureManager().register(id, new DynamicTexture(image));
+            DynamicTexture texture = new DynamicTexture(image);
+            // Le bandeau est une image lisse, pas du pixel art : filtrage bilinéaire,
+            // pour qu'il reste net à toutes les tailles d'écran.
+            if (name.startsWith("bandeau")) texture.setFilter(true, false);
+            Minecraft.getInstance().getTextureManager().register(id, texture);
             sheet = new Sheet(name, id, m.get("largeur").getAsInt(), m.get("hauteur").getAsInt(),
                     m.get("images").getAsInt(), m.getAsJsonArray("origine").get(0).getAsInt(),
                     m.getAsJsonArray("origine").get(1).getAsInt(), m.get("fps").getAsFloat(),
