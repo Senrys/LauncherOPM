@@ -94,8 +94,11 @@ demande de réduire les animations.
   fissures), cubes, bords du cadre qui s'effritent. Les clics sur la marge vide traversent
   jusqu'au bureau. Sinon, mode compact : la fenêtre classique.
 - **Xenodys elle-même** (`components/xenodys3d.js`) : le modèle de `xenodys/`, immense,
-  derrière le launcher, penchée vers lui (`lean` / `corrupted_lean`) ; elle regarde le
-  joueur, et sa main agrippe le bord du cadre — ses doigts seuls passent devant.
+  courbée derrière le launcher (`lean` / `corrupted_lean`), le bas du corps caché par lui ;
+  elle regarde le joueur. Sa main gauche agrippe le bord droit du cadre, sa main droite
+  son coin haut-droit (les boutons de la fenêtre s'en écartent) ; seuls ses doigts passent
+  devant. Les mains ne bougent pas. Deux assistants l'accompagnent : l'un se cache au
+  coin bas-gauche du cadre et passe la tête, l'autre se tient près d'elle et salue.
 - **Les circuits dans la vidéo** (`components/circuits.js`) : des pistes qui se dessinent
   par moments dans l'image, fondues en dégradé tramé, et un voile de teinte selon l'état.
 - **La musique** (`components/ambiance.js`, réglages `launcher.ambiance` et

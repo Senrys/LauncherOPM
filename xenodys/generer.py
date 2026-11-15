@@ -83,6 +83,9 @@ def centre(cx, y, cz, w, h, d, mat, pivot=None, rotation=None):
 
 
 def modele() -> list[Bone]:
+    """Xenodys : silhouette féminine (buste, taille fine, hanches larges), grande
+    tête aux grands yeux, chevelure en mèches, mains immenses : c'est elle qui
+    construit le monde."""
     os_: list[Bone] = []
 
     def bone(name, parent, pivot, rotation=None):
@@ -102,121 +105,153 @@ def modele() -> list[Bone]:
         centre(0, 8, 0, 4, 9, 4, "plate"),
         centre(0, 2, 0, 2, 6, 2, "crystal"),
     ]
-    # Éperons à la cheville de la flèche.
-    for s in (1, -1):
-        fleche.cubes.append(centre(5 * s, 17, 0, 6, 1, 1, "trim", (2 * s, 17.5, 0), (0, 0, 10 * s)))
-    fleche.cubes.append(centre(0, 17, -4, 1, 1, 6, "trim"))
 
     # --------------------------------------------------------------------- bassin
     corps = bone("body", "xenodys", (0, 62, 0))
     corps.cubes += [
-        centre(0, 56, 0, 18, 6, 12, "plate"),
-        centre(0, 55, 0, 19, 1, 13, "trim"),
-        centre(0, 62, 0, 8, 6, 6, "joint"),
+        centre(0, 56, 0, 16, 6, 10, "plate"),
+        centre(0, 55, 0, 17, 1, 11, "trim"),
+        centre(0, 62, 0, 6, 6, 5, "joint"),
+        centre(0, 63, -2.75, 2, 3, 1, "gem"),
     ]
 
     # ------------------------------------------------- la jupe d'armure (s'évase)
-    devant = bone("skirt_front", "body", (0, 56, -6))
+    devant = bone("skirt_front", "body", (0, 56, -5))
     devant.cubes += [
-        centre(0, 30, -6.5, 10, 26, 2, "plate", (0, 56, -6), (-6, 0, 0)),
-        centre(0, 34, -7.8, 2, 20, 1, "gem", (0, 56, -6), (-6, 0, 0)),
+        centre(0, 30, -5.5, 10, 26, 2, "plate", (0, 56, -5), (-6, 0, 0)),
+        centre(0, 34, -6.8, 2, 20, 1, "gem", (0, 56, -5), (-6, 0, 0)),
     ]
     for s in (1, -1):
-        devant.cubes.append(centre(9 * s, 32, -5.5, 8, 24, 2, "plate", (5 * s, 56, -6), (-4, 18 * s, -10 * s)))
-    dos = bone("skirt_back", "body", (0, 56, 6))
-    dos.cubes.append(centre(0, 28, 6.5, 16, 28, 2, "drape", (0, 56, 6), (8, 0, 0)))
+        devant.cubes.append(centre(8 * s, 32, -4.5, 7, 24, 2, "plate", (5 * s, 56, -5), (-4, 18 * s, -10 * s)))
+    dos = bone("skirt_back", "body", (0, 56, 5))
+    dos.cubes.append(centre(0, 28, 5.5, 14, 28, 2, "drape", (0, 56, 5), (8, 0, 0)))
     for cote, s in (("left", 1), ("right", -1)):
-        pan = bone(f"skirt_{cote}", "body", (9 * s, 56, 0))
+        pan = bone(f"skirt_{cote}", "body", (8 * s, 56, 0))
         for k, (h, flare) in enumerate(((28, 22), (32, 32), (26, 44))):
-            pan.cubes.append(centre((10 + k * 1.5) * s, 56 - h, (k - 1) * 3, 3, h, 10, "drape", (9 * s, 56, 0), (0, 0, -flare * s)))
-        pan.cubes.append(centre(11 * s, 52, 0, 3, 4, 12, "trim", (9 * s, 56, 0), (0, 0, -22 * s)))
+            pan.cubes.append(centre((9 + k * 1.5) * s, 56 - h, (k - 1) * 3, 3, h, 9, "drape", (8 * s, 56, 0), (0, 0, -flare * s)))
+        pan.cubes.append(centre(10 * s, 52, 0, 3, 4, 11, "trim", (8 * s, 56, 0), (0, 0, -22 * s)))
 
     # ------------------------------------------------------------------- buste
     buste = bone("chest", "body", (0, 68, 0))
     buste.cubes += [
-        centre(0, 68, 0, 14, 12, 8, "chest"),
-        centre(-3.5, 72, -4.5, 6, 5, 2, "plate", (-3.5, 74.5, -4), (0, 12, 0)),
-        centre(3.5, 72, -4.5, 6, 5, 2, "plate", (3.5, 74.5, -4), (0, -12, 0)),
-        centre(0, 79, 0, 12, 2, 9, "trim"),
-        centre(0, 69, -4.5, 2, 3, 1, "gem"),
-        centre(0, 64, -3.5, 2, 3, 1, "gem"),
+        centre(0, 68, 0, 10, 9, 6, "chest"),
+        centre(-2.6, 71, -3.6, 5, 4, 3, "bust"),
+        centre(2.6, 71, -3.6, 5, 4, 3, "bust"),
+        centre(0, 77, 0, 12, 2, 6, "trim"),
     ]
     for cote, s in (("left", 1), ("right", -1)):
-        epaule = bone(f"pauldron_{cote}", "chest", (8 * s, 78, 0))
+        epaule = bone(f"pauldron_{cote}", "chest", (6 * s, 77, 0))
         epaule.cubes += [
-            centre(11 * s, 74, 0, 8, 7, 9, "plate", (8 * s, 78, 0), (0, 0, -14 * s)),
-            centre(11 * s, 80, 0, 6, 2, 7, "trim", (8 * s, 78, 0), (0, 0, -14 * s)),
-            centre(15.5 * s, 74, 0, 2, 6, 6, "disc"),
+            centre(8.5 * s, 75, 0, 5, 4, 6, "plate", (6 * s, 77, 0), (0, 0, -16 * s)),
+            centre(11 * s, 74.5, 0, 1, 4, 4, "disc"),
         ]
 
     # ------------------------------------------------------------------- tête
-    cou = bone("neck", "chest", (0, 80, 0))
-    cou.cubes.append(centre(0, 80, 0, 4, 4, 4, "joint"))
-    tete = bone("head", "neck", (0, 84, 0))
+    cou = bone("neck", "chest", (0, 79, 0))
+    # Un cou de nacre, sans lumière : sous le menton, des points lumineux
+    # passeraient pour une bouche.
+    cou.cubes.append(centre(0, 79, 0, 3, 4, 3, "plate"))
+    tete = bone("head", "neck", (0, 83, 0))
     tete.cubes += [
-        centre(0, 84, 0, 10, 12, 10, "head"),
-        # Calotte de cheveux, mèches qui encadrent le visage.
-        centre(0, 94, 0.5, 11, 3, 11, "hairtop"),
-        centre(5.5, 84, 0.5, 1, 11, 9, "hair"),
-        centre(-5.5, 84, 0.5, 1, 11, 9, "hair"),
-        # Diadème : un bandeau de bronze au front, une gemme, une crête de cristal.
-        centre(0, 93, -0.3, 11, 1, 11, "trim"),
-        centre(0, 92.5, -5.6, 2, 2, 1, "gem"),
-        centre(0, 95, -4.5, 1, 7, 1, "crest", (0, 95, -4.5), (-12, 0, 0)),
+        centre(0, 83, 0, 12, 12, 12, "head"),
+        centre(0, 95, 0.3, 13, 3, 13, "hairtop"),
+        centre(6.5, 82, 0.8, 1, 13, 11, "hair"),
+        centre(-6.5, 82, 0.8, 1, 13, 11, "hair"),
+        # Mèches de devant : une frange en dents irrégulières.
+        *[centre(x, 95 - h, -6.3, 2, h, 1, "hair") for x, h in ((-5, 4), (-3, 5), (-1, 3), (1, 4), (3, 5), (5, 3))],
+        # Deux longues mèches qui encadrent le visage.
+        centre(5.8, 74, -5.2, 2, 14, 2, "hair"),
+        centre(-5.8, 74, -5.2, 2, 14, 2, "hair"),
+        # Diadème, gemme et crête de cristal.
+        centre(0, 96, 0.3, 14, 1, 14, "trim"),
+        centre(0, 96, -6.9, 2, 2, 1, "gem"),
+        centre(0, 97, -5.5, 1, 7, 1, "crest", (0, 97, -5.5), (-12, 0, 0)),
     ]
     for s in (1, -1):
-        # Cornes-lames, balayées vers l'arrière et vers le haut.
-        tete.cubes.append(centre(11 * s, 94, 2, 12, 2, 2, "blade", (5 * s, 95, 2), (0, -28 * s, -22 * s)))
-        tete.cubes.append(centre(8 * s, 91, 3, 7, 1, 2, "trim", (5 * s, 92, 3), (0, -30 * s, -10 * s)))
-    # La chevelure : de longues mèches qui tombent dans le dos.
-    for k, x in enumerate((-4, -1.5, 1.5, 4)):
-        meche = bone(f"cable_{k}", "head", (x, 92, 5))
-        meche.cubes.append(centre(x, 58 - k % 2 * 5, 5.5, 3, 34 + k % 2 * 5, 2, "hairback"))
+        tete.cubes.append(centre(10 * s, 95, 1.5, 10, 2, 2, "blade", (6 * s, 96, 1.5), (0, -25 * s, -28 * s)))
+    for k, x in enumerate((-4.5, -1.5, 1.5, 4.5)):
+        meche = bone(f"cable_{k}", "head", (x, 93, 6))
+        meche.cubes.append(centre(x, 60 - k % 2 * 5, 6.5, 3, 34 + k % 2 * 5, 2, "hairback"))
 
     # -------------------------------------------------------------------- halo
-    halo = bone("halo", "head", (0, 92, 9))
+    halo = bone("halo", "head", (0, 90, 10))
     for k in range(24):
         a = k * math.pi / 12
-        x, y = 15 * math.cos(a), 92 + 15 * math.sin(a)
-        halo.cubes.append(centre(round(x, 2), round(y - 1.5, 2), 9, 3, 3, 1, "trim" if k % 2 else "glow"))
-    interieur = bone("halo_inner", "head", (0, 92, 10))
+        halo.cubes.append(centre(round(15 * math.cos(a), 2), round(90 + 15 * math.sin(a) - 1.5, 2), 10, 3, 3, 1, "trim" if k % 2 else "glow"))
+    interieur = bone("halo_inner", "head", (0, 90, 11))
     for k in range(16):
         a = k * math.pi / 8
-        x, y = 11 * math.cos(a), 92 + 11 * math.sin(a)
-        interieur.cubes.append(centre(round(x, 2), round(y - 1, 2), 10, 2, 2, 1, "glow"))
+        interieur.cubes.append(centre(round(11 * math.cos(a), 2), round(90 + 11 * math.sin(a) - 1, 2), 11, 2, 2, 1, "glow"))
 
-    # ------------------------------------------------------------------- bras
+    # ------------------------------- bras longs et fins, mains immenses
     for cote, s in (("left", 1), ("right", -1)):
-        bras = bone(f"arm_{cote}", "chest", (15 * s, 77, 0), (0, 0, -24 * s))
-        bras.cubes += [centre(15 * s, 63, 0, 4, 14, 4, "plate"), centre(15 * s, 69, 0, 6, 2, 6, "glowring")]
-        avant = bone(f"forearm_{cote}", f"arm_{cote}", (15 * s, 63, 0), (-20, 0, 0))
+        x = 7.5 * s
+        bras = bone(f"arm_{cote}", "chest", (x, 77, 0), (0, 0, -10 * s))
+        bras.cubes += [centre(x, 59, 0, 3, 18, 3, "plate"), centre(x, 67, 0, 4, 1, 4, "glowring")]
+        avant = bone(f"forearm_{cote}", f"arm_{cote}", (x, 59, 0), (-12, 0, 0))
         avant.cubes += [
-            centre(15 * s, 49, 0, 4, 14, 4, "plate"),
-            centre(15 * s, 53, 0, 6, 2, 6, "glowring"),
-            centre(15 * s, 47, 0, 3, 2, 3, "joint"),
+            centre(x, 42, 0, 3, 17, 3, "plate"),
+            centre(x, 47, 0, 4, 1, 4, "glowring"),
+            centre(x, 40, 0, 3, 2, 3, "joint"),
         ]
-        # La main : une paume fine, quatre doigts de deux phalanges, un pouce.
-        main = bone(f"hand_{cote}", f"forearm_{cote}", (15 * s, 47, 0))
-        main.cubes.append(centre(15 * s, 42, 0, 2, 5, 4, "palm"))
-        for k, (a, b) in enumerate(((3, 2), (3, 3), (3, 2), (2, 2))):
-            z = -1.5 + k
-            doigt = bone(f"finger_{cote}_{k}", f"hand_{cote}", (15 * s, 42, z))
-            doigt.cubes.append(centre(15 * s, 42 - a, z, 1, a, 1, "finger"))
-            bout = bone(f"finger_{cote}_{k}_tip", f"finger_{cote}_{k}", (15 * s, 42 - a, z))
-            bout.cubes.append(centre(15 * s, 42 - a - b, z, 1, b, 1, "fingertip"))
-        pouce = bone(f"thumb_{cote}", f"hand_{cote}", (15 * s, 45, -2), (-30, 0, 0))
-        pouce.cubes.append(centre(15 * s, 42, -2.5, 1, 3, 1, "finger"))
-        bout = bone(f"thumb_{cote}_tip", f"thumb_{cote}", (15 * s, 42, -2.5))
-        bout.cubes.append(centre(15 * s, 40, -2.5, 1, 2, 1, "fingertip"))
+        main = bone(f"hand_{cote}", f"forearm_{cote}", (x, 40, 0))
+        main.cubes.append(centre(x, 33, 0, 3, 7, 8, "palm"))
+        for k, (a, b) in enumerate(((4, 3), (5, 3), (4, 3), (3, 2))):
+            z = -3 + 2 * k
+            doigt = bone(f"finger_{cote}_{k}", f"hand_{cote}", (x, 33, z))
+            doigt.cubes.append(centre(x, 33 - a, z, 2, a, 2, "finger"))
+            bout = bone(f"finger_{cote}_{k}_tip", f"finger_{cote}_{k}", (x, 33 - a, z))
+            bout.cubes.append(centre(x, 33 - a - b, z, 2, b, 2, "fingertip"))
+        pouce = bone(f"thumb_{cote}", f"hand_{cote}", (x, 38, -4), (-30, 0, 0))
+        pouce.cubes.append(centre(x, 34, -4.5, 2, 4, 2, "finger"))
+        bout = bone(f"thumb_{cote}_tip", f"thumb_{cote}", (x, 34, -4.5))
+        bout.cubes.append(centre(x, 31, -4.5, 2, 3, 2, "fingertip"))
 
     # ---------------------------------------------- ailerons, depuis le dos
     for cote, s in (("left", 1), ("right", -1)):
-        aile = bone(f"wing_{cote}", "chest", (5 * s, 76, 5), (0, -18 * s, 0))
-        for k, (tilt, longueur, y) in enumerate(((28, 26, 78), (8, 30, 74), (-14, 24, 70))):
+        aile = bone(f"wing_{cote}", "chest", (4 * s, 74, 3.5), (0, -18 * s, 0))
+        for tilt, longueur, y in ((28, 26, 76), (8, 30, 72), (-14, 24, 68)):
             aile.cubes.append(
-                Cube((5 * s if s > 0 else 5 * s - longueur, y, 5), (longueur, 4, 2), "fin", (5 * s, y + 2, 6), (0, 0, -tilt * s))
+                Cube((4 * s if s > 0 else 4 * s - longueur, y, 3.5), (longueur, 4, 2), "fin", (4 * s, y + 2, 4.5), (0, 0, -tilt * s))
             )
 
+    return os_
+
+
+def modele_assistant() -> list[Bone]:
+    """Les assistants de Xenodys : de petits robots chibi, grosse tête à visière,
+    grands yeux, une crête et un halo comme elle — et deux jambes."""
+    os_: list[Bone] = []
+
+    def bone(name, parent, pivot, rotation=None):
+        b = Bone(name, parent, pivot, rotation)
+        os_.append(b)
+        return b
+
+    bone("assistant", None, (0, 0, 0))
+    for cote, s in (("left", 1), ("right", -1)):
+        jambe = bone(f"leg_{cote}", "assistant", (1.25 * s, 4, 0))
+        jambe.cubes += [centre(1.25 * s, 1, 0, 2, 3, 2, "plate"), centre(1.25 * s, 0, -0.5, 2, 1, 3, "joint")]
+    corps = bone("body", "assistant", (0, 4, 0))
+    corps.cubes += [
+        centre(0, 4, 0, 5, 5, 4, "plate"),
+        centre(0, 3, 0, 6, 1, 5, "trim"),
+        centre(0, 6, -2.25, 1, 2, 1, "gem"),
+    ]
+    for cote, s in (("left", 1), ("right", -1)):
+        bras = bone(f"arm_{cote}", "body", (3 * s, 8.5, 0), (0, 0, -8 * s))
+        bras.cubes += [centre(3 * s, 5, 0, 1, 4, 1, "plate"), centre(3 * s, 3.5, 0, 2, 2, 2, "palm")]
+    tete = bone("head", "body", (0, 9, 0))
+    tete.cubes += [
+        centre(0, 9, 0, 9, 8, 8, "chibihead"),
+        centre(5, 11, 0.5, 1, 4, 4, "trim"),
+        centre(-5, 11, 0.5, 1, 4, 4, "trim"),
+        centre(0, 17, -1, 1, 3, 1, "crystal"),
+    ]
+    halo = bone("halo", "head", (0, 20, 0))
+    for k in range(8):
+        a = k * math.pi / 4
+        halo.cubes.append(centre(round(3.5 * math.cos(a), 2), 19.5, round(3.5 * math.sin(a), 2), 1, 1, 1, "glow"))
     return os_
 
 
@@ -230,10 +265,10 @@ PALETTES = {
         "joint": ["#3A4250", "#272D37", "#181C23"],
         "glow": ["#E9FFFC", "#7FF5E8", "#3FD0C2"],
         "skin": ["#F7EEEA", "#E8DAD5", "#C9B6B0"],
-        "eye": ["#FFFFFF", "#5FF5E6", "#B8FFF8"],
+        "eye": ["#FFFFFF", "#3FE6D6", "#E9FFFC", "#1E9C92"],
         "lips": ["#D79AA8", "#B97888"],
         "blush": "#F0CFCF",
-        "lash": "#4A5568",
+        "lash": "#2B3340",
         "hair": ["#FFFFFF", "#E6ECF2", "#C9D3DE", "#9AA8B8"],
         "crystal": ["#E2FFFB", "#8DE6DB", "#45B3A6", "#1F6E66"],
         "cable": ["#C9D1DE", "#9AA5B8", "#6B778C"],
@@ -246,7 +281,7 @@ PALETTES = {
         "joint": ["#1A0D18", "#0E0710", "#070308"],
         "glow": ["#FFD3DD", "#FF4D6D", "#C0284A"],
         "skin": ["#DCD0DA", "#BDAEBB", "#5A1F4A"],
-        "eye": ["#2A0A18", "#FF2E55", "#FFB3C2"],
+        "eye": ["#2A0A18", "#FF2E55", "#FFD3DD", "#9E1032"],
         "lips": ["#6A1F3A", "#4A0F2E"],
         "blush": "#B98AA6",
         "lash": "#12060F",
@@ -473,42 +508,93 @@ def casque(p, pal, rng, face):
 
 
 def visage(p, pal, etat):
-    """Face nord de la tête (10 × 12) : un visage de porcelaine, fin, sous un
-    diadème. Sourcils, cils, iris lumineux, une rougeur, des lèvres ; la
-    jointure de la mâchoire rappelle qu'elle est une machine."""
-    s, e = pal["skin"], pal["eye"]
+    """Face nord de la tête (12 × 12). Un visage neutre, hautain : des yeux bien
+    écartés, mi-clos sous des paupières lourdes, un reflet, des sourcils
+    arqués — et pas de bouche. Le visage est une machine : coutures de plaques
+    sous les yeux et au front, points de circuit aux pommettes, jointures de
+    la mâchoire. Le haut est caché par la frange."""
+    s_, e = pal["skin"], pal["eye"]
     motif = [
-        "HHHHHHHHHH",
-        "HHhHHHHhHH",
-        "HhSSSSSShH",
-        "HbbbSSbbbH",
-        "HSSSSSSSSH",
-        "HLLLSSLLLH",
-        "HWEISSIEWH",
-        "HSsSSSSsSH",
-        "HSSSSnSSSH",
-        "HSrSSSSrSH",
-        "HSSlmmlSSH",
-        "JhSSSSSShJ",
+        "HHHHHHHHHHHH",
+        "HHHHHHHHHHHH",
+        "HhHHhHHhHHhH",
+        "HSSSSkkSSSSH",
+        "HSBBSSSSBBSH",
+        "HBSSSSSSSSBH",
+        "HLLLSSSSLLLH",
+        "HWEISSSSIEWH",
+        "HSEDSSSSDESH",
+        "HSkSSSSSSkSH",
+        "HckSSSSSSkcH",
+        "JJSSSSSSSSJJ",
     ]
     couleurs = {
-        "H": pal["hair"][1], "h": pal["hair"][2], "S": s[0], "s": s[1], "n": s[1],
-        "b": pal["hair"][3], "L": pal["lash"], "W": e[0], "r": pal["blush"],
-        "l": pal["lips"][0], "m": pal["lips"][1], "J": pal["joint"][1],
+        "H": pal["hair"][1], "h": pal["hair"][2], "S": s_[0], "B": pal["lash"], "L": pal["lash"],
+        "W": e[0], "k": s_[1], "J": pal["joint"][1],
     }
     for y, rangee in enumerate(motif):
         for x, ch in enumerate(rangee):
             if ch == "E":
                 p.px(x, y, e[1], lum=True)
+            elif ch == "D":
+                p.px(x, y, e[3], lum=True)
             elif ch == "I":
                 p.px(x, y, e[2], lum=True)
+            elif ch == "c":
+                p.px(x, y, pal["glow"][1], lum=True)
             else:
                 p.px(x, y, couleurs[ch])
     if etat == "corrompue":
-        # Une fissure part de l'œil gauche et descend sur la joue ; l'œil coule.
-        for x, y in ((7, 7), (7, 8), (8, 9), (7, 10), (7, 11)):
+        # Une fissure part de l'œil droit et descend sur la joue ; l'autre œil coule.
+        for x, y in ((8, 9), (8, 10), (9, 11)):
             p.px(x, y, pal["crack"][0], lum=True)
-        p.px(2, 7, pal["crack"][1], lum=True)
+        p.px(2, 9, pal["crack"][1], lum=True)
+
+
+def visage_chibi(p, pal, etat):
+    """Visière d'un assistant (9 × 8) : deux petits yeux lumineux, écartés."""
+    motif = [
+        "PPPPPPPPP",
+        "PVVVVVVVP",
+        "PVIVVVIVP",
+        "PVEVVVEVP",
+        "PVVVVVVVP",
+        "PVVVVVVVP",
+        "PPPPgPPPP",
+        "PPPPPPPPP",
+    ]
+    for y, rangee in enumerate(motif):
+        for x, ch in enumerate(rangee):
+            if ch == "P":
+                p.px(x, y, pal["plate"][1 if y else 0])
+            elif ch == "V":
+                p.px(x, y, pal["joint"][2])
+            elif ch == "E":
+                p.px(x, y, pal["eye"][1], lum=True)
+            elif ch == "D":
+                p.px(x, y, pal["eye"][3], lum=True)
+            elif ch == "I":
+                p.px(x, y, pal["eye"][2], lum=True)
+            elif ch == "g":
+                p.px(x, y, pal["glow"][1], lum=True)
+
+
+def tete_chibi(p, pal, rng, face, etat):
+    if face == "north":
+        visage_chibi(p, pal, etat)
+    else:
+        plaque(p, pal, rng, face, filet=face == "up")
+
+
+def buste(p, pal, rng, face):
+    """Plaques du buste : nacre bombée, liseré de bronze dessous, un éclat lumineux."""
+    plaque(p, pal, rng, face, filet=False)
+    if face in COTES:
+        for x in range(p.w):
+            p.px(x, p.h - 1, pal["trim"][1])
+    if face == "north":
+        p.px(1, 1, pal["plate"][0])
+        p.px(p.w // 2, p.h // 2, pal["glow"][1], lum=True)
 
 
 def tete(p, pal, rng, face, etat):
@@ -572,6 +658,8 @@ PEINTRES = {
     "finger": lambda p, pal, rng, f, e: doigt(p, pal, rng, f),
     "fingertip": lambda p, pal, rng, f, e: doigt(p, pal, rng, f, bout=True),
     "head": lambda p, pal, rng, f, e: tete(p, pal, rng, f, e),
+    "chibihead": lambda p, pal, rng, f, e: tete_chibi(p, pal, rng, f, e),
+    "bust": lambda p, pal, rng, f, e: buste(p, pal, rng, f),
 }
 
 
@@ -720,50 +808,45 @@ def animations():
         },
     }
 
-    # --- Le penché (launcher) : elle se tient derrière le launcher, se penche
-    # vers lui, regarde le joueur, et sa main droite agrippe le bord du cadre —
-    # bras tendu, doigts repliés par-dessus l'arête.
+    # --- Le penché (launcher) : elle se tient derrière le launcher, à droite,
+    # le bas du corps caché. Sa main gauche agrippe le bord droit du cadre,
+    # sa main droite, bras levé, agrippe la bordure du haut ; elle penche le
+    # buste et regarde le joueur. Ni le corps ni les bras ne bougent : les
+    # mains tiennent. Seuls la tête, les cheveux, le halo, les ailerons vivent.
     def penche(corrompue=False):
         os_ = mains_repos(1.0)
-        # La main qui agrippe : doigts fortement repliés vers la paume.
-        for k in range(4):
-            os_[f"finger_right_{k}"] = {"rotation": cles({0: [0, 0, -(80 + 3 * k)], 6: [0, 0, -(80 + 3 * k)]})}
-            os_[f"finger_right_{k}_tip"] = {"rotation": cles({0: [0, 0, -(55 + 4 * k)], 6: [0, 0, -(55 + 4 * k)]})}
-        os_["thumb_right"] = {"rotation": cles({0: [0, 0, -40], 6: [0, 0, -40]})}
+        for cote, s in (("left", 1), ("right", -1)):
+            for k in range(4):
+                os_[f"finger_{cote}_{k}"] = {"rotation": cles({0: [0, 0, (80 + 3 * k) * s], 6: [0, 0, (80 + 3 * k) * s]})}
+                os_[f"finger_{cote}_{k}_tip"] = {"rotation": cles({0: [0, 0, (55 + 4 * k) * s], 6: [0, 0, (55 + 4 * k) * s]})}
+            os_[f"thumb_{cote}"] = {"rotation": cles({0: [0, 0, 40 * s], 6: [0, 0, 40 * s]})}
         os_.update({
-            "xenodys": {"position": boucle([0, 0, 0], [0, 1.2, 0])},
-            "body": {"rotation": boucle([8, 0, -10], [9, 0, -11])},
-            "chest": {"rotation": boucle([6, 0, -6], [4, 0, -7])},
-            "neck": {"rotation": cles({0: [6, 0, -4], 6: [6, 0, -4]})},
-            "head": {"rotation": cles({0: [12, -28, 8], 3: [10, -24, 6], 6: [12, -28, 8]})},
-            # Le bras vient de derrière vers l'avant, par-dessus l'arête du cadre ;
-            # la main pivote, paume vers l'extérieur, et les doigts se replient
-            # sur la face avant du launcher.
-            "arm_right": {"rotation": cles({0: [-78, 0, 12], 3: [-77, 0, 11], 6: [-78, 0, 12]})},
-            "forearm_right": {"rotation": cles({0: [16, 0, 0], 6: [16, 0, 0]})},
+            # Le corps ne bouge pas : ses mains tiennent le launcher.
+            "body": {"rotation": cles({0: [-6, 0, 8], 6: [-6, 0, 8]})},
+            "chest": {"rotation": cles({0: [4, 0, 4], 6: [4, 0, 4]})},
+            "neck": {"rotation": cles({0: [4, 0, 0], 6: [4, 0, 0]})},
+            "head": {"rotation": cles({0: [10, -26, 6], 3: [8, -22, 4], 6: [10, -26, 6]})},
+            "arm_left": {"rotation": cles({0: [-70, 0, -18], 6: [-70, 0, -18]})},
+            "forearm_left": {"rotation": cles({0: [-10, 0, 0], 6: [-10, 0, 0]})},
+            "hand_left": {"rotation": cles({0: [0, -180, 10], 6: [0, -180, 10]})},
+            "arm_right": {"rotation": cles({0: [-160, 0, 15], 6: [-160, 0, 15]})},
+            "forearm_right": {"rotation": cles({0: [-15, 0, 0], 6: [-15, 0, 0]})},
             "hand_right": {"rotation": cles({0: [0, 180, -10], 6: [0, 180, -10]})},
-            "arm_left": {"rotation": boucle([10, 0, -4], [6, 0, -6])},
-            "forearm_left": {"rotation": boucle([-10, 0, 0], [-18, 0, 0])},
-            # Ailerons repliés vers l'arrière : elle se tient tout près du cadre.
             "wing_left": {"rotation": boucle([0, -34, 4], [0, -30, 0])},
             "wing_right": {"rotation": boucle([0, 34, -4], [0, 30, 0])},
             "halo": {"rotation": cles({0: [0, 0, 0], 6: [0, 0, -30]}, lisse=False)},
             "halo_inner": {"rotation": cles({0: [0, 0, 0], 6: [0, 0, 45]}, lisse=False)},
-            "spire": {"rotation": boucle([-6, 0, 8], [-4, 0, 9])},
-            "skirt_left": {"rotation": boucle([0, 0, 0], [0, 0, -4])},
-            "skirt_right": {"rotation": boucle([0, 0, 4], [0, 0, 7])},
             "cable_0": {"rotation": boucle([4, 0, 6], [8, 0, 8])},
             "cable_1": {"rotation": boucle([4, 0, 6], [9, 0, 7])},
             "cable_2": {"rotation": boucle([4, 0, 6], [7, 0, 8])},
             "cable_3": {"rotation": boucle([4, 0, 6], [6, 0, 9])},
         })
         if corrompue:
-            # Le regard se fige, puis la tête se tord ; la main se crispe.
-            os_["head"] = {"rotation": cles({0: [16, -32, 10], 1.6: [16, -32, 10], 1.65: [26, -10, 24], 1.9: [26, -10, 24], 1.95: [16, -32, 10], 4.1: [16, -32, 10], 4.15: [8, -40, -6], 4.3: [8, -40, -6], 4.35: [16, -32, 10], 6: [16, -32, 10]}, lisse=False)}
-            os_["arm_left"] = {"rotation": cles({0: [10, 0, -4], 3.0: [10, 0, -4], 3.05: [-30, 0, -26], 3.3: [-30, 0, -26], 3.35: [10, 0, -4], 6: [10, 0, -4]}, lisse=False)}
+            # Le regard se fige, puis la tête se tord ; le halo s'affole.
+            os_["head"] = {"rotation": cles({0: [14, -30, 8], 1.6: [14, -30, 8], 1.65: [24, -8, 22], 1.9: [24, -8, 22], 1.95: [14, -30, 8], 4.1: [14, -30, 8], 4.15: [6, -38, -6], 4.3: [6, -38, -6], 4.35: [14, -30, 8], 6: [14, -30, 8]}, lisse=False)}
             os_["halo"] = {"rotation": cles({0: [0, 0, 0], 0.6: [10, 0, 50], 1.6: [-8, 0, 40], 1.7: [0, 0, 160], 6: [0, 0, 200]}, lisse=False)}
-            os_["wing_left"] = {"rotation": boucle([0, 0, 18], [0, 8, 24])}
-            os_["wing_right"] = {"rotation": boucle([0, 0, -18], [0, -8, -24])}
+            os_["wing_left"] = {"rotation": boucle([0, -20, 18], [0, -12, 24])}
+            os_["wing_right"] = {"rotation": boucle([0, 20, -18], [0, 12, -24])}
         return {"loop": True, "animation_length": 6.0, "bones": os_}
 
     return {
@@ -778,10 +861,54 @@ def animations():
     }
 
 
+def animations_assistant():
+    idle = {
+        "loop": True,
+        "animation_length": 2.0,
+        "bones": {
+            "assistant": {"position": boucle([0, 0, 0], [0, 0.4, 0], 2.0)},
+            "head": {"rotation": cles({0: [0, 0, -5], 1: [0, 0, 5], 2: [0, 0, -5]})},
+            "arm_left": {"rotation": boucle([0, 0, 0], [-8, 0, 0], 2.0)},
+            "arm_right": {"rotation": boucle([-8, 0, 0], [0, 0, 0], 2.0)},
+            "halo": {"rotation": cles({0: [0, 0, 0], 2: [0, 90, 0]}, lisse=False)},
+        },
+    }
+    # Il se cache, se penche pour regarder, se cache de nouveau.
+    peek = {
+        "loop": True,
+        "animation_length": 6.0,
+        "bones": {
+            "assistant": {
+                "position": cles({0: [0, 0, 0], 0.8: [0, 0, 0], 1.4: [-5, 0, 0], 3.8: [-5, 0, 0], 4.4: [0, 0, 0], 6: [0, 0, 0]}),
+                "rotation": cles({0: [0, 0, 0], 0.8: [0, 0, 0], 1.4: [0, 0, 16], 3.8: [0, 0, 16], 4.4: [0, 0, 0], 6: [0, 0, 0]}),
+            },
+            "head": {"rotation": cles({0: [0, 0, 0], 1.4: [0, 0, 0], 2.0: [0, 0, -14], 2.8: [0, 20, -10], 3.6: [0, 0, -14], 4.4: [0, 0, 0], 6: [0, 0, 0]})},
+            "arm_left": {"rotation": cles({0: [0, 0, 0], 1.4: [-60, 0, 0], 3.8: [-60, 0, 0], 4.4: [0, 0, 0], 6: [0, 0, 0]})},
+            "halo": {"rotation": cles({0: [0, 0, 0], 6: [0, 270, 0]}, lisse=False)},
+        },
+    }
+    wave = {
+        "loop": False,
+        "animation_length": 2.4,
+        "bones": {
+            "arm_right": {"rotation": cles({0: [0, 0, 0], 0.3: [0, 0, 150], 0.6: [0, 0, 120], 0.9: [0, 0, 150], 1.2: [0, 0, 120], 1.5: [0, 0, 150], 2.0: [0, 0, 150], 2.4: [0, 0, 0]})},
+            "head": {"rotation": cles({0: [0, 0, 0], 0.4: [0, 0, 10], 2.0: [0, 0, 10], 2.4: [0, 0, 0]})},
+        },
+    }
+    return {
+        "format_version": "1.8.0",
+        "animations": {
+            "animation.xenodys_assistant.idle": idle,
+            "animation.xenodys_assistant.peek": peek,
+            "animation.xenodys_assistant.wave": wave,
+        },
+    }
+
+
 # --------------------------------------------------------------------- écriture
 
 
-def geo(bones, tw, th):
+def geo(bones, tw, th, identifiant="geometry.xenodys"):
     sortie = []
     for b in bones:
         entree = {"name": b.name}
@@ -804,7 +931,7 @@ def geo(bones, tw, th):
         "minecraft:geometry": [
             {
                 "description": {
-                    "identifier": "geometry.xenodys",
+                    "identifier": identifiant,
                     "texture_width": tw,
                     "texture_height": th,
                     "visible_bounds_width": 4,
@@ -817,26 +944,28 @@ def geo(bones, tw, th):
     }
 
 
-def main():
-    bones = modele()
-    tw, th = ranger(bones)
-    geometrie = geo(bones, tw, th)
-    anims = animations()
-
+def ecrire(nom, bones, anims, identifiant, largeur):
+    tw, th = ranger(bones, largeur)
+    geometrie = geo(bones, tw, th, identifiant)
     for dossier in ("geo", "animations", "textures"):
         (SORTIE_GECKO / dossier).mkdir(parents=True, exist_ok=True)
     SORTIE_LAUNCHER_PNG.mkdir(parents=True, exist_ok=True)
-    SORTIE_LAUNCHER_JS.parent.mkdir(parents=True, exist_ok=True)
-
-    (SORTIE_GECKO / "geo" / "xenodys.geo.json").write_text(json.dumps(geometrie, indent=2) + "\n")
-    (SORTIE_GECKO / "animations" / "xenodys.animation.json").write_text(json.dumps(anims, indent=2) + "\n")
-
+    (SORTIE_GECKO / "geo" / f"{nom}.geo.json").write_text(json.dumps(geometrie, indent=2) + "\n")
+    (SORTIE_GECKO / "animations" / f"{nom}.animation.json").write_text(json.dumps(anims, indent=2) + "\n")
     for etat in ("creatrice", "corrompue"):
         img, glow = textures(bones, tw, th, etat)
         for cible in (SORTIE_GECKO / "textures", SORTIE_LAUNCHER_PNG):
-            img.save(cible / f"xenodys_{etat}.png")
-            glow.save(cible / f"xenodys_{etat}_glowmask.png")
+            img.save(cible / f"{nom}_{etat}.png")
+            glow.save(cible / f"{nom}_{etat}_glowmask.png")
+    nb = sum(len(b.cubes) for b in bones)
+    print(f"{nom} : {len(bones)} os, {nb} cubes, texture {tw} × {th}.")
+    return geometrie
 
+
+def main():
+    geo_x = ecrire("xenodys", modele(), animations(), "geometry.xenodys", 256)
+    geo_a = ecrire("xenodys_assistant", modele_assistant(), animations_assistant(), "geometry.xenodys_assistant", 64)
+    SORTIE_LAUNCHER_JS.parent.mkdir(parents=True, exist_ok=True)
     module = (
         "/**\n"
         " * Xenodys en cubes — FICHIER GÉNÉRÉ par xenodys/generer.py, ne pas modifier à la main.\n"
@@ -844,12 +973,12 @@ def main():
         " * La même géométrie et les mêmes animations que xenodys/geckolib/ (GeckoLib, le jeu),\n"
         " * en module ES : le launcher ne peut pas lire un fichier local avec fetch().\n"
         " */\n\n"
-        f"export const GEO = {json.dumps(geometrie, separators=(',', ':'))};\n\n"
-        f"export const ANIMATIONS = {json.dumps(anims, separators=(',', ':'))};\n"
+        f"export const GEO = {json.dumps(geo_x, separators=(',', ':'))};\n\n"
+        f"export const ANIMATIONS = {json.dumps(animations(), separators=(',', ':'))};\n\n"
+        f"export const ASSISTANT_GEO = {json.dumps(geo_a, separators=(',', ':'))};\n\n"
+        f"export const ASSISTANT_ANIMATIONS = {json.dumps(animations_assistant(), separators=(',', ':'))};\n"
     )
     SORTIE_LAUNCHER_JS.write_text(module)
-    nb = sum(len(b.cubes) for b in bones)
-    print(f"Xenodys : {len(bones)} os, {nb} cubes, texture {tw} × {th}.")
 
 
 if __name__ == "__main__":
