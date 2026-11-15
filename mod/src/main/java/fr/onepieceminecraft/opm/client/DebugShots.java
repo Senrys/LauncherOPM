@@ -76,21 +76,22 @@ public final class DebugShots {
         long now = net.minecraft.Util.getMillis();
         if (worldStart < 0) worldStart = now;
         double t = (now - worldStart) / 1000.0;
-        if (t > 8 && !summoned) {
+        // Après l'arrivée (7 s) : sinon la Xenodys de test semble « revenir » près du joueur.
+        if (t > 12 && !summoned) {
             summoned = true;
             mc.player.connection.sendCommand("execute at @s rotated ~ 0 positioned ^ ^ ^8 run summon minecraft:armor_stand ~ ~-1 ~ "
                     + "{Invisible:1b,Marker:1b,NoGravity:1b,Tags:[\"opm_xenodys\"],CustomName:'\"opm:xenodys:idle\"'}");
             mc.player.connection.sendCommand("execute as @e[tag=opm_xenodys,limit=1] at @s run tp @s ~ ~ ~ facing entity @p feet");
         }
-        if (t > 10 && !warned) {
+        if (t > 18 && !warned) {
             warned = true;
             XenodysWarning.show("Je te vois… Ce que tu as ajouté au jeu ne passe pas inaperçu.");
         }
-        if (t > 16 && !paused) {
+        if (t > 30 && !paused) {
             paused = true;
             mc.setScreen(new net.minecraft.client.gui.screens.PauseScreen(true));
         }
-        if (t > 24) mc.stop();
+        if (t > 38) mc.stop();
     }
 
     public static void world() {
