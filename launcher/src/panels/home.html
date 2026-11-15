@@ -154,9 +154,12 @@
     <div class="opm-scene__halo" aria-hidden="true"></div>
 
     <!-- Le personnage, en 3D quand c'est possible : skin complet, tête aux
-         pieds, animé et en rotation lente — on peut le faire tourner à la
-         souris. Rendu par skinview3d dans ce canevas. Masqué tant qu'aucun
+         pieds, posé sur son socle de circuit imprimé, qui respire. Rendu par
+         skinview3d dans ce canevas. Masqué tant qu'aucun
          skin n'est chargé, ou si WebGL n'est pas disponible sur la machine. -->
+    <!-- Les circuits de Xenodys, qui se dessinent autour du personnage, derrière
+         lui (components/circuits.js). -->
+    <canvas class="opm-scene__aura" data-el="character-aura" hidden aria-hidden="true"></canvas>
     <canvas class="opm-scene__char3d" data-el="character-3d" hidden
             aria-label="Votre personnage en 3D"></canvas>
 

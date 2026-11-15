@@ -573,6 +573,33 @@ export async function createXenodys(canvas, stage, frame) {
     return layer;
   }
 
+  /** Le masque des seuls bords de la fenêtre (fondus tramés), sans le cadre :
+   *  pendant la cinématique, elle passe devant le launcher. */
+  function edgeMask() {
+    const c = document.createElement('canvas');
+    c.width = Math.ceil(W);
+    c.height = Math.ceil(H);
+    const g = c.getContext('2d');
+    g.fillStyle = '#fff';
+    g.fillRect(0, 0, W, H);
+    paintEdgeFades(g);
+    return `url(${c.toDataURL('image/png')})`;
+  }
+
+  /** Les fondus tramés vers le bord droit et le bas de la fenêtre. */
+  function paintEdgeFades(g) {
+    const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+    const P = 4;
+    for (let y = 0; y < H; y += P) {
+      for (let x = 0; x < W; x += P) {
+        const v = Math.min((W - x) / FADE_RIGHT, (H - y) / FADE_BOTTOM);
+        if (v >= 1) continue;
+        const t = (BAYER[(((y / P) & 3) << 2) | ((x / P) & 3)] + 0.5) / 16;
+        if (v < t) g.clearRect(x, y, P, P);
+      }
+    }
+  }
+
   /**
    * Le masque : tout est visible, SAUF sur le cadre — elle et les assistants
    * sont derrière lui —, à l'exception de ses doigts, qui passent par-dessus
@@ -586,16 +613,7 @@ export async function createXenodys(canvas, stage, frame) {
     const g = c.getContext('2d');
     g.fillStyle = '#fff';
     g.fillRect(0, 0, W, H);
-    const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
-    const P = 4;
-    for (let y = 0; y < H; y += P) {
-      for (let x = 0; x < W; x += P) {
-        const v = Math.min((W - x) / FADE_RIGHT, (H - y) / FADE_BOTTOM);
-        if (v >= 1) continue;
-        const t = (BAYER[(((y / P) & 3) << 2) | ((x / P) & 3)] + 0.5) / 16;
-        if (v < t) g.clearRect(x, y, P, P);
-      }
-    }
+    paintEdgeFades(g);
     const f = frameBox;
     g.clearRect(f.x, f.y, f.w, f.h);
     g.save();
@@ -609,6 +627,323 @@ export async function createXenodys(canvas, stage, frame) {
     stage.style.maskRepeat = 'no-repeat';
   }
 
+  const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+  let fitTimer = 0;
+
+  /* ---------------------------------------------------- la cinématique */
+
+  // Au lancement du jeu : elle lâche le cadre, vole devant lui, nous tourne
+  // le dos, recueille le launcher qui rétrécit entre ses mains jusqu'à n'être
+  // plus qu'un orbe, puis ouvre grand les bras — le passage vers le monde
+  // s'ouvre (lumière cyan, ou déchirure rouge et violette si elle est
+  // corrompue). Au retour du jeu, le launcher réapparaît.
+  const cineAnims = { fly: compile('fly'), cradle: compile('cradle'), unveil: compile('unveil') };
+  let cine = null;
+
+  /** Les rotations (et positions) d'une animation au temps `t`, par os. */
+  function sampleMap(anim, t, extra = null) {
+    const map = new Map();
+    for (const [name, ch] of Object.entries(anim.bones)) {
+      map.set(name, { r: ch.rotation ? sample(ch.rotation, t) : null, p: ch.position ? sample(ch.position, t) : null });
+    }
+    if (extra) {
+      for (const [name, r] of Object.entries(extra)) {
+        const cur = map.get(name) ?? { r: null, p: null };
+        cur.r = cur.r ? cur.r.map((v, i) => v + r[i]) : [...r];
+        map.set(name, cur);
+      }
+    }
+    return map;
+  }
+
+  /** Mélange deux poses (`w` de 0 à 1) et l'applique. */
+  function poseBlend(a, b, w) {
+    for (const bone of xen.bones.values()) {
+      bone.group.position.copy(bone.rest.position);
+      bone.group.rotation.set(...bone.rest.rotation);
+    }
+    const names = new Set([...a.keys(), ...b.keys()]);
+    const mix = (u, v) => [0, 1, 2].map((i) => (u?.[i] ?? 0) * (1 - w) + (v?.[i] ?? 0) * w);
+    for (const name of names) {
+      const bone = xen.bones.get(name);
+      if (!bone) continue;
+      const ra = a.get(name);
+      const rb = b.get(name);
+      const r = mix(ra?.r, rb?.r);
+      bone.group.rotation.x += -r[0] * DEG;
+      bone.group.rotation.y += -r[1] * DEG;
+      bone.group.rotation.z += r[2] * DEG;
+      if (ra?.p || rb?.p) {
+        const q = mix(ra?.p, rb?.p);
+        bone.group.position.x += -q[0];
+        bone.group.position.y += q[1];
+        bone.group.position.z += q[2];
+      }
+    }
+  }
+
+  const ease = (x) => (x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2);
+  const clamp01 = (x) => Math.min(1, Math.max(0, x));
+  const segment = (t, a, b) => clamp01((t - a) / (b - a));
+
+  const transformNow = () => ({
+    pos: tilt.position.clone(),
+    tiltZ: tilt.rotation.z,
+    rotY: holder.rotation.y,
+    scale: holder.scale.x,
+  });
+  const applyTransform = (from, to, k) => {
+    tilt.position.lerpVectors(from.pos, to.pos, k);
+    tilt.rotation.z = from.tiltZ + (to.tiltZ - from.tiltZ) * k;
+    holder.rotation.y = from.rotY + (to.rotY - from.rotY) * k;
+    holder.scale.setScalar(from.scale + (to.scale - from.scale) * k);
+  };
+
+  /** Où elle se place pour recueillir le launcher : devant lui, de dos, les
+   *  mains levées au-dessus du centre du cadre. Renvoie la transformation et
+   *  le point (écran) entre ses mains. */
+  function frontPlacement(lean) {
+    const saved = transformNow();
+    tilt.rotation.z = 0;
+    holder.rotation.y = 0.12;
+    holder.scale.setScalar(lean.scale * 1.15);
+    const cradle = sampleMap(cineAnims.cradle, 0);
+    const target = { x: frameBox.x + frameBox.w * 0.5, y: frameBox.y + frameBox.h * 0.36 };
+    let point = target;
+    for (let pass = 0; pass < 3; pass += 1) {
+      poseBlend(cradle, cradle, 0);
+      refresh();
+      const L = boxOf(handL);
+      const R = boxOf(handR);
+      const mid = { x: (L.minX + L.maxX + R.minX + R.maxX) / 4, y: Math.min(L.minY, R.minY) };
+      const unit = unitAt(holder);
+      tilt.position.x += (target.x - mid.x) / unit;
+      tilt.position.y -= (target.y - mid.y) / unit;
+      point = mid;
+    }
+    refresh();
+    const L = boxOf(handL);
+    const R = boxOf(handR);
+    point = { x: (L.minX + L.maxX + R.minX + R.maxX) / 4, y: Math.min(L.minY, R.minY) - 6 };
+    const to = transformNow();
+    applyTransform(saved, saved, 0);
+    return { to, point };
+  }
+
+  // Le calque des effets : l'orbe, puis le passage. En pixel art, comme le décor.
+  const fx = document.createElement('canvas');
+  fx.className = 'opm-cine';
+  fx.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(fx);
+  const fxCtx = fx.getContext('2d');
+  const FX_P = 4;
+  const FX = {
+    creatrice: { core: '#E9FFFC', glow: '#91D9D1', deep: '#1D5C51', flash: '233, 255, 252' },
+    corrompue: { core: '#FFD3DD', glow: '#F0506E', deep: '#6A1F8F', flash: '255, 211, 221' },
+  };
+  const BAYER4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+  const bayer = (x, y) => (BAYER4[((y & 3) << 2) | (x & 3)] + 0.5) / 16;
+
+  function fxResize() {
+    fx.width = Math.ceil(W / FX_P);
+    fx.height = Math.ceil(H / FX_P);
+    fx.style.width = `${fx.width * FX_P}px`;
+    fx.style.height = `${fx.height * FX_P}px`;
+  }
+
+  function drawOrb(cx, cy, r, c, flicker) {
+    const reach = r + 4;
+    for (let y = Math.floor(cy - reach); y <= cy + reach; y += 1) {
+      for (let x = Math.floor(cx - reach); x <= cx + reach; x += 1) {
+        const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
+        let color = null;
+        if (d < r * 0.45) color = c.core;
+        else if (d < r) color = c.glow;
+        else if (d < reach && (1 - (d - r) / 4) * flicker > bayer(x, y)) color = c.deep;
+        if (!color) continue;
+        fxCtx.fillStyle = color;
+        fxCtx.fillRect(x, y, 1, 1);
+      }
+    }
+  }
+
+  const hex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  const FX_RGB = Object.fromEntries(Object.entries(FX).map(([k, c]) => [k, { core: hex(c.core), glow: hex(c.glow), deep: hex(c.deep) }]));
+
+  /**
+   * Le passage s'ouvre : une onde de gros pixels tramés part de l'orbe et
+   * envahit la fenêtre — un front lumineux, une traîne qui se défait derrière
+   * lui. Corrompue : le front se brise en blocs qui grésillent.
+   */
+  function drawPortal(t, cx, cy, etat) {
+    const w = fx.width;
+    const h = fx.height;
+    const far = Math.hypot(Math.max(cx, w - cx), Math.max(cy, h - cy)) + 8;
+    const R = far * ease(clamp01(t / 0.85));
+    const band = 9;
+    const trail = 26;
+    const rgb = FX_RGB[etat];
+    const corrupted = etat === 'corrompue';
+    const img = fxCtx.createImageData(w, h);
+    const data = img.data;
+    for (let y = 0; y < h; y += 1) {
+      for (let x = 0; x < w; x += 1) {
+        let d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
+        if (corrupted) d += ((x * 7 + y * 13 + Math.floor(t * 30)) % 5) - 2; // un front cassé
+        const ahead = R - d; // > 0 : l'onde est passée
+        if (ahead < 0 || ahead > band + trail) continue;
+        let col;
+        let a;
+        if (ahead < band) {
+          // Le front : plein, du blanc au cœur, la couleur sur les bords.
+          const k = ahead / band;
+          col = k < 0.35 ? rgb.core : rgb.glow;
+          a = 255;
+        } else {
+          // La traîne : tramée, de plus en plus clairsemée.
+          const k = 1 - (ahead - band) / trail;
+          if (k < bayer(x, y)) continue;
+          col = corrupted && (x + y) % 3 === 0 ? rgb.glow : rgb.deep;
+          a = 200;
+        }
+        if (corrupted && Math.random() < 0.06) continue; // des trous qui grésillent
+        const i = (y * w + x) * 4;
+        data[i] = col[0];
+        data[i + 1] = col[1];
+        data[i + 2] = col[2];
+        data[i + 3] = a;
+      }
+    }
+    fxCtx.putImageData(img, 0, 0);
+  }
+
+  const surroundCanvases = () => [...document.querySelectorAll('.opm-surround')];
+
+  /**
+   * Joue la cinématique. Résolue quand le launcher a disparu et que le passage
+   * est ouvert (environ 4,6 s). `sfx` : components/sfx.js, facultatif.
+   */
+  function launch(sfx) {
+    if (cine || reduced || !frameBox) return Promise.resolve();
+    clearTimeout(fitTimer);
+    const lean = transformNow();
+    const leanMap = sampleMap(anims[etat], time % anims[etat].length, reach);
+    const { to, point } = frontPlacement(lean);
+    const corrupted = etat === 'corrompue';
+    const savedMask = stage.style.maskImage;
+    handQuats.clear();
+    fxResize();
+    fx.style.opacity = '1';
+    stage.style.maskImage = edgeMask();
+    sfx?.play('servo');
+    return new Promise((resolve) => {
+      cine = { start: performance.now(), lean, leanMap, to, point, corrupted, savedMask, resolve, cues: new Set(), sfx };
+    });
+  }
+
+  function cineFrame() {
+    const c$ = cine;
+    const t = (performance.now() - c$.start) / 1000;
+    const cue = (name, at, fn) => {
+      if (t >= at && !c$.cues.has(name)) {
+        c$.cues.add(name);
+        fn();
+      }
+    };
+
+    // Les assistants s'éclipsent.
+    const shrinkBots = 1 - segment(t, 0, 0.35);
+    for (const bot of bots) bot.holder.visible = shrinkBots > 0.02;
+
+    // Poses : penchée → vol → coupe → bras ouverts.
+    const fly = sampleMap(cineAnims.fly, t);
+    const cradle = sampleMap(cineAnims.cradle, t);
+    const unveil = sampleMap(cineAnims.unveil, t);
+    if (t < 0.4) poseBlend(c$.leanMap, fly, ease(segment(t, 0, 0.4)));
+    else if (t < 1.75) poseBlend(fly, cradle, ease(segment(t, 1.3, 1.75)));
+    else poseBlend(cradle, unveil, ease(segment(t, 2.9, 3.3)));
+
+    // Le vol : de sa place derrière le cadre jusque devant lui.
+    applyTransform(c$.lean, c$.to, ease(segment(t, 0.3, 1.5)));
+    if (c$.corrupted && t < 3.6 && Math.random() < 0.18) {
+      tilt.position.x += (Math.random() - 0.5) * 1.6;
+      tilt.position.y += (Math.random() - 0.5) * 1.2;
+    }
+
+    cue('whoosh', 0.35, () => c$.sfx?.play('whoosh'));
+    cue('shrink', 1.6, () => {
+      c$.sfx?.play('shrink');
+      const fr = frame.getBoundingClientRect();
+      const sr = stage.getBoundingClientRect();
+      const dx = c$.point.x + sr.left - (fr.left + fr.width / 2);
+      const dy = c$.point.y + sr.top - (fr.top + fr.height / 2);
+      frame.style.transition = 'transform 1.3s cubic-bezier(.7,0,.3,1), opacity .45s ease .95s, filter 1.3s ease';
+      frame.style.transform = `translate(${dx}px, ${dy}px) scale(0.02)`;
+      frame.style.filter = c$.corrupted ? 'brightness(1.4) hue-rotate(-20deg) saturate(1.8)' : 'brightness(1.8) saturate(1.3)';
+      frame.style.opacity = '0';
+      for (const s of surroundCanvases()) {
+        s.style.transition = 'opacity 1s ease';
+        s.style.opacity = '0';
+      }
+    });
+    cue('portal', 3.0, () => c$.sfx?.play('portal', { etat: c$.corrupted ? 'corrompue' : 'creatrice' }));
+    cue('fade', 3.9, () => {
+      stage.style.transition = 'opacity .7s ease';
+      stage.style.opacity = '0';
+    });
+
+    // Les effets.
+    fxCtx.clearRect(0, 0, fx.width, fx.height);
+    const col = FX[c$.corrupted ? 'corrompue' : 'creatrice'];
+    const cx = c$.point.x / FX_P;
+    const cy = c$.point.y / FX_P;
+    if (t >= 1.6 && t < 3.2) {
+      const r = 1.5 + 8 * ease(segment(t, 1.6, 2.9));
+      const flicker = c$.corrupted ? (Math.random() < 0.2 ? 0.3 : 1) : 0.85 + 0.15 * Math.sin(t * 20);
+      drawOrb(cx, cy, r, col, flicker);
+    }
+    if (t >= 3.0) drawPortal(t - 3.0, cx, cy, c$.corrupted ? 'corrompue' : 'creatrice');
+    if (t >= 3.25 && t < 4.6) {
+      // Un éclair qui couvre la fin : le monde s'ouvre.
+      const k = 1 - segment(t, 3.35, 4.6);
+      const a = (t < 3.35 ? segment(t, 3.25, 3.35) : k) * (c$.corrupted && Math.random() < 0.3 ? 0.4 : 0.85);
+      fxCtx.fillStyle = `rgba(${col.flash}, ${a.toFixed(3)})`;
+      fxCtx.fillRect(0, 0, fx.width, fx.height);
+    }
+
+    if (t >= 4.6 && !c$.cues.has('done')) {
+      c$.cues.add('done');
+      fx.style.opacity = '0';
+      c$.resolve();
+    }
+  }
+
+  /** Le launcher revient : le cadre regrandit depuis ses mains, Xenodys
+   *  reprend sa place derrière lui et ses assistants aussi. */
+  function comeBack(sfx) {
+    if (!cine) return;
+    const c$ = cine;
+    cine = null;
+    fxCtx.clearRect(0, 0, fx.width, fx.height);
+    fx.style.opacity = '0';
+    applyTransform(c$.lean, c$.lean, 0);
+    for (const bot of bots) bot.holder.visible = true;
+    sfx?.play('power');
+    frame.style.transition = 'transform .9s cubic-bezier(.2,.8,.2,1), opacity .35s ease, filter .9s ease';
+    frame.style.transform = '';
+    frame.style.filter = '';
+    frame.style.opacity = '';
+    for (const s of surroundCanvases()) s.style.opacity = '';
+    stage.style.transition = 'opacity 1.2s ease .5s';
+    stage.style.opacity = '';
+    setTimeout(() => {
+      frame.style.transition = '';
+      stage.style.transition = '';
+      stage.style.maskImage = c$.savedMask;
+      fit();
+    }, 950);
+  }
+
   /* ---------------------------------------------------------- vie */
 
   const applySkin = () => {
@@ -619,11 +954,13 @@ export async function createXenodys(canvas, stage, frame) {
   applySkin();
   fit();
 
-  const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-
   viewer.animation = new lib.FunctionAnimation((_player, _progress, delta) => {
     const dt = reduced ? 0 : Math.min(0.1, Math.max(0, delta || 0));
     time += dt;
+    if (cine) {
+      cineFrame();
+      return;
+    }
     poseXen(time % anims[etat].length);
     for (const bot of bots) {
       bot.time += dt;
@@ -662,11 +999,11 @@ export async function createXenodys(canvas, stage, frame) {
   observer.observe(root$, { attributes: true, attributeFilter: ['data-xenodys'] });
 
   // Le calage essaie plusieurs centaines de poses : pendant un redimensionnement
-  // à la poignée, on attend que le geste se pose.
-  let fitTimer = 0;
+  // à la poignée, on attend que le geste se pose. Jamais pendant la cinématique.
   const sizer = new ResizeObserver(() => {
     clearTimeout(fitTimer);
     fitTimer = setTimeout(() => {
+      if (cine) return;
       const r = stage.getBoundingClientRect();
       if (r.width > 0 && r.height > 0) viewer.setSize(r.width, r.height);
       fit();
@@ -688,7 +1025,14 @@ export async function createXenodys(canvas, stage, frame) {
     bones: xen.bones,
     holder,
     bots,
+    launch,
+    comeBack,
+    /** Une cinématique est-elle en cours (ou le launcher encore « parti ») ? */
+    get busy() {
+      return cine !== null;
+    },
     dispose() {
+      fx.remove();
       clearTimeout(fitTimer);
       observer.disconnect();
       sizer.disconnect();

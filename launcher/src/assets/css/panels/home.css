@@ -449,11 +449,9 @@
   user-select: none;
 }
 
-/* Le personnage en 3D. Même ancrage que l'image 2D qu'il remplace, un peu
-   plus grand : le cadrage garde de la marge autour du personnage pour que
-   l'épée, la chope et le coffre de ses scènes restent entièrement visibles
-   (components/character3d.js). Pas d'animation de flottement : le modèle
-   s'anime lui-même. Les pointeurs passent — on le fait tourner à la souris. */
+/* Le personnage en 3D, sur son socle (components/character3d.js). Même
+   ancrage que l'image 2D qu'il remplace, un peu plus grand. Il ne se
+   manipule pas : les pointeurs le traversent. */
 .opm-scene__char3d {
   position: absolute;
   right: 0;
@@ -461,12 +459,22 @@
   width: 400px;
   height: 450px;
   filter: var(--sh-char);
-  cursor: grab;
+  pointer-events: none;
   user-select: none;
-  touch-action: none;
 }
 
-.opm-scene__char3d:active { cursor: grabbing; }
+/* Derrière lui, au même endroit : les circuits de Xenodys qui se dessinent
+   autour de lui, mêlés à la vidéo en « screen », en gros pixels. */
+.opm-scene__aura {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 400px;
+  height: 450px;
+  mix-blend-mode: screen;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
 
 /* Seul le rendu du skin est de l'art pixel : c'est un canevas de 128 × 256
    servi en `data:` par utils/skin.js, qu'il faut agrandir sans lissage. La

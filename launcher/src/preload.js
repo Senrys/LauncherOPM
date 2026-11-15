@@ -107,6 +107,10 @@ const opm = {
     hide: () => ipcRenderer.send('window:hide'),
     show: () => ipcRenderer.send('window:show'),
     isMaximized: () => call('window:is-maximized'),
+    /** Fin de la cinématique du lancement : le launcher peut se masquer. */
+    cinematicEnd: () => ipcRenderer.send('window:cinematic-end'),
+    /** Mode ouvert : début (`'start'`) ou fin (`'end'`) d'un glisser de la fenêtre. */
+    drag: (phase) => ipcRenderer.send('window:drag', phase === 'start' ? 'start' : 'end'),
     /** Mode ouvert : laisser passer les clics de la marge vide jusqu'au bureau. */
     setPassthrough: (passthrough) => ipcRenderer.send('window:passthrough', passthrough === true),
     /** Mode ouvert : nouvelle taille du cadre du launcher, en pixels. */

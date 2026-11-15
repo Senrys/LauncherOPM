@@ -121,6 +121,12 @@ html,
    de la fenêtre s'en écartent, pour que ses doigts ne les cachent jamais. */
 :root[data-fenetre="ouvert"] .opm-titlebar__win { margin-right: 84px; }
 
+/* Fenêtre ouverte : pas de zone de déplacement native — elle avalerait les
+   mouvements de souris, et les clics près des boutons traverseraient jusqu'au
+   bureau. Le déplacement est géré par components/frame.js. */
+:root[data-fenetre="ouvert"] .opm-titlebar,
+:root[data-fenetre="ouvert"] .opm-titlebar * { -webkit-app-region: no-drag; }
+
 /* Xenodys, immense, DERRIÈRE le cadre : penchée vers lui depuis la marge de
    droite, elle regarde le joueur et agrippe son bord (components/xenodys3d.js
    calcule sa taille, sa place et le masque). La scène couvre toute la fenêtre
@@ -155,4 +161,17 @@ html,
 }
 
 :root:not([data-fenetre="ouvert"]) .opm-xeno-stage { display: none; }
+
+/* La cinématique du lancement : l'orbe entre ses mains, puis le passage
+   (components/xenodys3d.js). Basse résolution, agrandie sans lissage. */
+.opm-cine {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 6;
+  pointer-events: none;
+  image-rendering: pixelated;
+  opacity: 0;
+  transition: opacity .5s ease;
+}
 

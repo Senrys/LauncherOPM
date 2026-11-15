@@ -483,6 +483,15 @@ function register(windowGetter) {
 
   handle('window:is-maximized', () => mainWindow.isMaximized());
 
+  // Fin de la cinématique du lancement : la fenêtre peut se masquer (game.hideForGame).
+  listen('window:cinematic-end', () => game.cinematicEnd());
+
+  // Mode ouvert : déplacement de la fenêtre par la barre de titre (voir mainWindow.dragStart).
+  listen('window:drag', (phase) => {
+    if (phase === 'start') mainWindow.dragStart();
+    else mainWindow.dragEnd();
+  });
+
   // Mode ouvert : la marge transparente laisse passer les clics jusqu'au bureau.
   listen('window:passthrough', (passthrough) => mainWindow.setPassthrough(passthrough === true));
 

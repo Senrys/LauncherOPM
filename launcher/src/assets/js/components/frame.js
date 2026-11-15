@@ -13,6 +13,10 @@
  *   2. **Redimensionnement.** Une fenêtre transparente ne se redimensionne pas
  *      par ses bords : le launcher dessine sa poignée, en bas à droite du cadre.
  *
+ *   3. **Déplacement.** Les zones de déplacement natives ne transmettent pas
+ *      les mouvements de souris : on les retire, et le glisser de la barre de
+ *      titre est suivi par le processus principal.
+ *
  * En mode compact, rien de tout cela : la fenêtre est le cadre.
  */
 
@@ -61,6 +65,37 @@ export function wireFrame(win) {
   });
   // Au démarrage, la souris n'a pas encore bougé : la marge laisse passer.
   setPassing(true);
+
+  /* ------------------------------------------------- déplacement */
+
+  // Les barres de titre déplacent la fenêtre (layout/frame.css leur retire la
+  // zone de déplacement native, qui empêchait de rendre la main au bureau).
+  const NOT_DRAG = 'button, a, input, select, textarea, [role="tab"], [data-action]';
+  let moving = null;
+  const stopMove = () => {
+    if (!moving) return;
+    moving = null;
+    dragging = false;
+    win.drag('end');
+  };
+  document.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0) return;
+    const bar = event.target.closest?.('.opm-titlebar');
+    if (!bar || event.target.closest(NOT_DRAG)) return;
+    moving = event.pointerId;
+    dragging = true;
+    setPassing(false);
+    bar.setPointerCapture?.(event.pointerId);
+    win.drag('start');
+  });
+  document.addEventListener('pointerup', stopMove);
+  document.addEventListener('pointercancel', stopMove);
+  window.addEventListener('blur', stopMove);
+  // Double-clic sur la barre : agrandir / restaurer, comme une fenêtre native.
+  document.addEventListener('dblclick', (event) => {
+    const bar = event.target.closest?.('.opm-titlebar');
+    if (bar && !event.target.closest(NOT_DRAG)) win.maximize();
+  });
 
   /* ------------------------------------------------------------ poignée */
 

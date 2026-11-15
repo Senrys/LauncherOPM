@@ -36,6 +36,7 @@ import { network, store } from '../utils/state.js';
 import { FALLBACK_BODY, bodyDataUrl, skinImage } from '../utils/skin.js';
 import { toast } from '../components/toast.js';
 import { createCharacter } from '../components/character3d.js';
+import { createVideoCircuits } from '../components/circuits.js';
 import * as xenodys from '../utils/xenodys.js';
 
 /** Rafraîchissement du statut du serveur. */
@@ -292,6 +293,7 @@ export default class Home {
 
       character: $('[data-el="character"]', root),
       character3d: $('[data-el="character-3d"]', root),
+      characterAura: $('[data-el="character-aura"]', root),
       voice: $('[data-el="xenodys-voice"]', root),
       voiceLine: $('[data-bind="xenodys-line"]', root),
       playerName: $('[data-bind="player-name"]', root),
@@ -949,6 +951,16 @@ export default class Home {
     }
 
     this.character = character;
+
+    // Les circuits autour de lui : le centre du personnage dans son canevas,
+    // un anneau un peu plus large que sa silhouette.
+    if (this.refs.characterAura && !this.aura) {
+      try {
+        this.aura = createVideoCircuits(this.refs.characterAura, { anchor: { x: 0.56, y: 0.5, rx: 0.3, ry: 0.34 } });
+      } catch {
+        this.aura = null;
+      }
+    }
     return character;
   }
 
@@ -958,11 +970,16 @@ export default class Home {
    */
   showCharacter3d(live) {
     if (this.refs.character3d) this.refs.character3d.hidden = !live;
+    if (this.refs.characterAura) this.refs.characterAura.hidden = !live;
     if (this.refs.character) this.refs.character.hidden = live;
   }
 
   /** Libère la scène WebGL et son observateur de taille. */
   disposeViewer() {
+    if (this.aura) {
+      this.aura.dispose();
+      this.aura = null;
+    }
     if (this.viewerResize) {
       this.viewerResize.disconnect();
       this.viewerResize = null;

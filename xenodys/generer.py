@@ -849,9 +849,62 @@ def animations():
             os_["wing_right"] = {"rotation": boucle([0, 20, -18], [0, 12, -24])}
         return {"loop": True, "animation_length": 6.0, "bones": os_}
 
+    # --- La cinématique du lancement (launcher) : trois poses tenues, entre
+    # lesquelles le launcher fait les fondus.
+    def tenue(os_, duree=1.0):
+        return {"loop": True, "animation_length": duree, "bones": {k: {"rotation": cles({0: v, duree: v})} for k, v in os_.items()}}
+
+    doigts_ouverts = {}
+    for cote, s_ in (("left", 1), ("right", -1)):
+        for k in range(4):
+            doigts_ouverts[f"finger_{cote}_{k}"] = [0, 0, -8 * s_]
+            doigts_ouverts[f"finger_{cote}_{k}_tip"] = [0, 0, -4 * s_]
+    doigts_creux = {}
+    for cote, s_ in (("left", 1), ("right", -1)):
+        for k in range(4):
+            doigts_creux[f"finger_{cote}_{k}"] = [0, 0, 38 * s_]
+            doigts_creux[f"finger_{cote}_{k}_tip"] = [0, 0, 30 * s_]
+
+    # Le vol : buste penché, bras et ailerons rejetés en arrière, chevelure au vent.
+    vol = tenue({
+        "body": [18, 0, 0], "chest": [6, 0, 0], "head": [-14, 0, 0],
+        "arm_left": [38, 0, -26], "arm_right": [38, 0, 26],
+        "forearm_left": [-8, 0, 0], "forearm_right": [-8, 0, 0],
+        "wing_left": [0, 12, -28], "wing_right": [0, -12, 28],
+        "skirt_left": [0, 0, -14], "skirt_right": [0, 0, 14], "skirt_front": [-18, 0, 0], "spire": [-20, 0, 0],
+        **{f"cable_{k}": [40 + 4 * k, 0, 0] for k in range(4)},
+        **doigts_ouverts,
+    })
+    vol["bones"]["halo"] = {"rotation": cles({0: [0, 0, 0], 1.0: [0, 0, -60]}, lisse=False)}
+    # Les mains levées au-dessus de la tête, en coupe : elle recueille le launcher.
+    coupe = tenue({
+        "body": [-4, 0, 0], "head": [-24, 0, 0],
+        "arm_left": [-150, 0, 16], "arm_right": [-150, 0, -16],
+        "forearm_left": [-20, 0, 0], "forearm_right": [-20, 0, 0],
+        "hand_left": [0, 90, 0], "hand_right": [0, -90, 0],
+        "wing_left": [0, 4, -12], "wing_right": [0, -4, 12],
+        **{f"cable_{k}": [6, 0, 0] for k in range(4)},
+        **doigts_creux,
+    })
+    coupe["bones"]["halo"] = {"rotation": cles({0: [0, 0, 0], 1.0: [0, 0, -120]}, lisse=False)}
+    # Les bras grands ouverts : le passage s'ouvre.
+    ouverture = tenue({
+        "body": [-8, 0, 0], "head": [-18, 0, 0],
+        "arm_left": [-12, 0, -112], "arm_right": [-12, 0, 112],
+        "forearm_left": [0, 0, -10], "forearm_right": [0, 0, 10],
+        "wing_left": [0, 18, -40], "wing_right": [0, -18, 40],
+        "skirt_left": [0, 0, -10], "skirt_right": [0, 0, 10],
+        **{f"cable_{k}": [-10, 0, (k - 1.5) * 8] for k in range(4)},
+        **doigts_ouverts,
+    })
+    ouverture["bones"]["halo"] = {"rotation": cles({0: [0, 0, 0], 1.0: [0, 0, -360]}, lisse=False)}
+
     return {
         "format_version": "1.8.0",
         "animations": {
+            "animation.xenodys.fly": vol,
+            "animation.xenodys.cradle": coupe,
+            "animation.xenodys.unveil": ouverture,
             "animation.xenodys.idle": idle,
             "animation.xenodys.greet": greet,
             "animation.xenodys.corrupted_idle": corrupted,

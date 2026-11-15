@@ -32,9 +32,12 @@ const DIRS = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -
 
 /**
  * @param {HTMLCanvasElement} canvas
+ * @param {{anchor?: {x: number, y: number, rx: number, ry: number}}} [options]
+ *   `anchor` : les circuits naissent sur un anneau autour de ce point (en
+ *   fractions du canevas) — autour du personnage —, au lieu d'un peu partout.
  * @returns {{dispose: () => void}}
  */
-export function createVideoCircuits(canvas) {
+export function createVideoCircuits(canvas, { anchor = null } = {}) {
   const ctx = canvas.getContext('2d');
   const root = document.documentElement;
   const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)');
@@ -61,14 +64,28 @@ export function createVideoCircuits(canvas) {
   /** Un nouveau circuit : une piste qui part d'un point au hasard. */
   function spawn() {
     const crack = corrupted();
-    const x0 = Math.floor(W * (0.4 + Math.random() * 0.58));
-    const y0 = Math.floor(H * (0.08 + Math.random() * 0.8));
+    let x0;
+    let y0;
+    let ring = null;
+    if (anchor) {
+      // Autour du personnage : un point de l'anneau, et un départ qui longe
+      // l'anneau (tangente) ou s'en éloigne.
+      const a = Math.random() * Math.PI * 2;
+      x0 = Math.floor(W * (anchor.x + Math.cos(a) * anchor.rx));
+      y0 = Math.floor(H * (anchor.y + Math.sin(a) * anchor.ry));
+      const out = Math.random() < 0.5;
+      const ang = out ? a : a + Math.PI / 2 * (Math.random() < 0.5 ? 1 : -1);
+      ring = Math.round(((ang % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) / (Math.PI / 4)) % 8;
+    } else {
+      x0 = Math.floor(W * (0.4 + Math.random() * 0.58));
+      y0 = Math.floor(H * (0.08 + Math.random() * 0.8));
+    }
     const cells = [[x0, y0]];
     const nodes = [];
     let x = x0;
     let y = y0;
-    let dir = Math.floor(Math.random() * 4) * 2; // départ droit
-    const length = 30 + Math.floor(Math.random() * 50);
+    let dir = ring ?? Math.floor(Math.random() * 4) * 2; // départ droit
+    const length = anchor ? 16 + Math.floor(Math.random() * 26) : 30 + Math.floor(Math.random() * 50);
     let run = 0;
     for (let i = 0; i < length; i += 1) {
       run += 1;
@@ -88,7 +105,8 @@ export function createVideoCircuits(canvas) {
       // Une ramification, de temps en temps.
       if (!crack && Math.random() < 0.04) nodes.push(cells.length - 1);
     }
-    circuits.push({ cells, nodes, crack, x0, y0, radius: 26 + Math.random() * 18, age: 0, pulse: Math.random() });
+    const radius = anchor ? 14 + Math.random() * 10 : 26 + Math.random() * 18;
+    circuits.push({ cells, nodes, crack, x0, y0, radius, age: 0, pulse: Math.random() });
   }
 
   function color(rgb, a) {
@@ -115,7 +133,8 @@ export function createVideoCircuits(canvas) {
         const v = (1 - d) * fading * flicker;
         if (v <= 0 || v < bayer(x, y) * 0.75) continue;
         const head = i >= shown - 2 && grown < 1;
-        ctx.fillStyle = color(head ? theme.pulse : theme.trace, Math.min(1, 0.55 + v * 0.45));
+        // Autour du personnage, des pistes plus vives : elles sont sur la vidéo claire.
+        ctx.fillStyle = color(head ? theme.pulse : anchor ? theme.bright : theme.trace, Math.min(1, 0.55 + v * 0.45));
         ctx.fillRect(x, y, 1, 1);
       }
       for (const n of c.nodes) {
@@ -144,9 +163,10 @@ export function createVideoCircuits(canvas) {
     });
 
     nextSpawn -= dt;
-    if (nextSpawn <= 0 && circuits.length < MAX) {
+    if (nextSpawn <= 0 && circuits.length < (anchor ? 7 : MAX)) {
       spawn();
-      nextSpawn = (corrupted() ? 0.9 : 1.8) + Math.random() * 2.2;
+      // Autour du personnage, des circuits plus nombreux.
+      nextSpawn = anchor ? 0.35 + Math.random() * 0.8 : (corrupted() ? 0.9 : 1.8) + Math.random() * 2.2;
     }
   }
 

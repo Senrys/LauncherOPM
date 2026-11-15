@@ -30,6 +30,7 @@ import { isOpen as isOpenWindow, wireFrame } from './components/frame.js';
 import { createSurround } from './components/surround.js';
 import { createXenodys } from './components/xenodys3d.js';
 import { createAmbiance } from './components/ambiance.js';
+import { createSfx } from './components/sfx.js';
 import { createVideoCircuits } from './components/circuits.js';
 
 /** Pont exposé par le preload (docs/IPC.md). */
@@ -732,6 +733,7 @@ async function start() {
   wireXenodys();
   wireOpenWindow();
   wireAmbiance();
+  wireSfx();
   wireVideoCircuits();
 
   try {
@@ -812,6 +814,83 @@ function wireAmbiance() {
   apply(store.get());
 }
 
+/**
+ * La cinématique du lancement : quand le jeu démarre, Xenodys emporte le
+ * launcher ; quand il se ferme (ou si le lancement échoue), il revient. Le
+ * processus principal attend la fin de la cinématique pour masquer la fenêtre.
+ * @param {Awaited<ReturnType<typeof createXenodys>>} xen
+ */
+function wireCinematic(xen) {
+  let phase = 'idle'; // idle | playing | gone
+  let returnPending = false;
+  const OVER = new Set(['closed', 'error', 'idle']);
+
+  const comeBack = () => {
+    xen.comeBack(sfx);
+    phase = 'idle';
+    returnPending = false;
+  };
+
+  store.subscribe((state, changed) => {
+    if (!changed.has('game')) return;
+    const g = state.game?.state;
+    if (g === 'launching' && phase === 'idle') {
+      phase = 'playing';
+      xen.launch(sfx).then(() => {
+        opm.window.cinematicEnd();
+        phase = 'gone';
+        // Launcher gardé ouvert pendant la partie : il revient aussitôt.
+        const keepOpen = store.get().config?.launcher?.close_on_launch === false;
+        if (returnPending || keepOpen) setTimeout(comeBack, keepOpen ? 1200 : 0);
+      });
+      return;
+    }
+    if (OVER.has(g) && phase !== 'idle') {
+      if (phase === 'gone') comeBack();
+      else returnPending = true;
+    }
+  });
+}
+
+/** Les petits bruits de l'interface (components/sfx.js), partagés avec la cinématique. */
+const sfx = createSfx();
+
+/**
+ * Bruits mécaniques au survol et au clic des éléments interactifs, et quand
+ * Xenodys change d'état. Suivent `launcher.sfx` et `launcher.volume`.
+ */
+function wireSfx() {
+  const INTERACTIVE = 'button, a[href], [role="tab"], [data-action], input[type="range"]';
+  document.addEventListener('mouseover', (event) => {
+    const el = event.target.closest?.(INTERACTIVE);
+    if (!el || el.disabled || el.contains(event.relatedTarget)) return;
+    sfx.play('hover');
+  }, { passive: true });
+  document.addEventListener('click', (event) => {
+    const el = event.target.closest?.(INTERACTIVE);
+    if (!el || el.disabled) return;
+    if (el.matches('.opm-switch')) sfx.play('toggle');
+    else if (el.matches('[data-tab], [role="tab"]')) sfx.play('tab');
+    else sfx.play('click');
+  }, { passive: true, capture: true });
+
+  let etat = null;
+  const apply = (state) => {
+    const launcher = state.config?.launcher;
+    if (launcher) {
+      sfx.setEnabled(launcher.sfx !== false);
+      sfx.setVolume(state.volumePreview ?? launcher.volume);
+    }
+    const next = state.xenodys?.etat ?? null;
+    if (etat && next && next !== etat) sfx.play('servo');
+    etat = next ?? etat;
+  };
+  store.subscribe((state, changed) => {
+    if (changed.has('config') || changed.has('volumePreview') || changed.has('xenodys')) apply(state);
+  });
+  apply(store.get());
+}
+
 /** Les circuits de Xenodys, incrustés dans la vidéo de fond (components/circuits.js). */
 function wireVideoCircuits() {
   const canvas = $('[data-el="bg-circuits"]');
@@ -841,7 +920,15 @@ function wireOpenWindow() {
     const stage = $('[data-el="xeno-stage"]');
     const canvas = $('[data-el="xeno-canvas"]');
     if (stage && canvas && window.skinview3d) {
-      createXenodys(canvas, stage, frame).catch((err) => console.error('opm : Xenodys indisponible.', err));
+      createXenodys(canvas, stage, frame)
+        .then((xen) => wireCinematic(xen))
+        .catch((err) => {
+          console.error('opm : Xenodys indisponible.', err);
+          // Sans elle, pas de cinématique : le launcher n'a rien à attendre.
+          store.subscribe((state, changed) => {
+            if (changed.has('game') && state.game?.state === 'launching') opm.window.cinematicEnd();
+          });
+        });
     }
   } catch (err) {
     // Le décor est un plus : le launcher doit rester utilisable sans lui.

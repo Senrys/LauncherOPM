@@ -55,6 +55,9 @@ dans Blockbench est écrasée au prochain `generer.py`. Choisir l'un ou l'autre 
 | `animation.xenodys.corrupted_idle` | jeu | oui — sursauts, halo erratique |
 | `animation.xenodys.lean` | launcher | oui — courbée derrière le launcher, ses deux mains l'agrippent (corps et bras immobiles) |
 | `animation.xenodys.corrupted_lean` | launcher | oui — la même, la tête qui se tord, le halo qui s'affole |
+| `animation.xenodys.fly` | launcher | oui — le vol (cinématique du lancement) |
+| `animation.xenodys.cradle` | launcher | oui — les mains levées en coupe, elle recueille le launcher |
+| `animation.xenodys.unveil` | launcher | oui — les bras grands ouverts, le passage s'ouvre |
 | `animation.xenodys_assistant.idle` | jeu, launcher | oui — il se dandine, son halo tourne |
 | `animation.xenodys_assistant.peek` | jeu, launcher | oui — il se cache, se penche pour regarder, se recache |
 | `animation.xenodys_assistant.wave` | jeu, launcher | non — un salut de la main |
