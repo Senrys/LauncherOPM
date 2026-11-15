@@ -77,9 +77,10 @@ function serverOf(bootstrap) {
  * @param {{url: string, slim: boolean}[]} list
  */
 async function inlineSkins(list) {
-  const pick = list.slice().sort(() => Math.random() - 0.5).slice(0, 12);
+  // Dans l'ordre de la galerie, places vides comprises : le mod imprime les
+  // mêmes skins dans le même ordre (la chorégraphie est commune).
   const out = await Promise.all(
-    pick.map(async (s) => {
+    list.map(async (s) => {
       try {
         const ctrl = new AbortController();
         const timer = setTimeout(() => ctrl.abort(), CONTEXT_TIMEOUT_MS);
@@ -94,7 +95,7 @@ async function inlineSkins(list) {
       }
     })
   );
-  return out.filter(Boolean);
+  return out.map((s, i) => s || { url: list[i].url, slim: list[i].slim, data: null });
 }
 
 /** Galerie de skins : URL https uniquement, 32 au plus. */
@@ -119,7 +120,9 @@ async function prepareContext() {
     settle(content.xenodys(), CONTEXT_TIMEOUT_MS, null),
     settle(api.skinGallery(), CONTEXT_TIMEOUT_MS, null),
   ]);
-  const skins = galleryOf(gallery);
+  // Douze skins au plus, déjà tirés au hasard par le serveur : le même ordre pour
+  // la scène du launcher et pour le mod (opm/session.json).
+  const skins = galleryOf(gallery).slice(0, 12);
   const links = bootstrap && typeof bootstrap.links === 'object' && bootstrap.links ? bootstrap.links : {};
   const https = (u) => (typeof u === 'string' && /^https:\/\//.test(u) && u.length < 300 ? u : null);
   return {
@@ -262,6 +265,9 @@ async function writeSession(instanceDir, data) {
     animations: Boolean(data.animations),
     api: data.apiBase,
     progression_depart: data.scene ? LAUNCHER_SHARE : 0,
+    // L'horloge de la scène de chargement (ms) : le mod reprend la chorégraphie
+    // du launcher là où elle en est.
+    scene_debut: data.sceneEpoch || 0,
     galerie: data.gallery,
     liens: data.links,
   };
@@ -394,8 +400,41 @@ async function fingerprint(instanceDir, manifestUrl) {
   return { mods, packs, extra, modified, verified: Boolean(official) };
 }
 
+/* ------------------------------------------------------------------ durée du chargement */
+
+/**
+ * Ce qu'a duré le dernier chargement du jeu (lignes du journal et millisecondes
+ * jusqu'à l'écran du mod) : la barre avance au prorata, sans rester bloquée
+ * pendant les longues minutes où NeoForge charge les mods sans rien dire de
+ * reconnaissable.
+ */
+function loadStatsFile() {
+  return path.join(require('./paths').cacheDir, 'chargement-jeu.json');
+}
+
+function readLoadStats() {
+  try {
+    const s = JSON.parse(fs.readFileSync(loadStatsFile(), 'utf8'));
+    if (s.lines > 50 && s.ms > 3000) return s;
+  } catch {
+    /* premier lancement */
+  }
+  return { lines: 2500, ms: 60_000 };
+}
+
+function writeLoadStats(lines, ms) {
+  try {
+    fs.mkdirSync(path.dirname(loadStatsFile()), { recursive: true });
+    fs.writeFileSync(loadStatsFile(), JSON.stringify({ lines, ms }));
+  } catch {
+    /* sans conséquence */
+  }
+}
+
 module.exports = {
   LAUNCHER_SHARE,
+  readLoadStats,
+  writeLoadStats,
   fingerprint,
   installGameFiles,
   ownedPaths,

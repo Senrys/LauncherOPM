@@ -92,17 +92,21 @@ Le launcher et le **mod OPM** (`mod/`, voir `mod/README.md` ; embarqué dans le 
 qui l'installe lui-même dans le jeu) se passent le relais sans que rien ne se voie :
 
 1. **JOUER** : la cinématique (ci-dessous). À l'éclair du passage, la **scène de
-   chargement** du launcher apparaît (`components/loadingScene.js`) : la salle de
-   simulation, Xenodys qui façonne le monde — un cube qui se construit bloc à bloc au
-   rythme du chargement —, ses assistants qui « impriment » des joueurs OPM (la galerie
-   de skins, en volume, sur leur socle de circuit imprimé, tournés de 30°) ; l'un des
-   robots patrouille, et parfois trébuche. La fenêtre couvre tout l'écran ; la fenêtre
-   de chargement de NeoForge est désactivée (`config/fml.toml`). La barre avance au fil
-   du journal du jeu (`services/bridge.js`).
+   chargement** du launcher apparaît (`components/loadingScene.js`), en **vraie 3D** à la
+   résolution de l'écran, sur la salle de simulation. Chorégraphie en boucle de 10 s :
+   Xenodys façonne un monde de blocs entre ses mains (il grandit avec le chargement) ;
+   sur le circuit, un joueur de la galerie s'imprime, se change en orbe ; elle vole
+   jusqu'à lui, le saisit, le rapporte et le dépose dans le monde. Ses mains visent ce
+   qu'elles touchent (cinématique inverse des bras, lissée), sa tête suit ce qu'elle
+   fait ; elle reste toujours derrière les autres modèles. Deux assistants : l'un au
+   circuit, l'autre en ronde, qui trébuche parfois. La barre avance au prorata du
+   chargement précédent (lignes du journal, durée). La fenêtre de chargement de
+   NeoForge est désactivée (`config/fml.toml`).
 2. **L'écran de chargement du jeu** (le mod remplace celui de Mojang et de NeoForge) :
-   la même scène, au pixel près — mêmes planches de sprites (`xenodys/sprites.py`), même
-   police pixel, même salle. Le launcher s'efface quand il s'affiche (`[OPM:READY]`) ; la
-   barre reprend où il l'avait laissée.
+   la même scène, en 3D elle aussi (`client/Choreo`, shader `position_tex_color`), à la
+   même horloge — `scene_debut` dans `opm/session.json` — et avec les mêmes skins dans
+   le même ordre : la chorégraphie continue sans saut. Le launcher s'efface quand il
+   s'affiche (`[OPM:READY]`) ; la barre reprend où il l'avait laissée.
 3. **L'envol** : le chargement fini, Xenodys s'envole, un assistant salue, l'autre
    trébuche parfois et se relève, le skin du joueur s'imprime (« Bienvenue, … »), et le
    monde s'ouvre dans un éclair — connexion directe au serveur OPM. Passable (clic,

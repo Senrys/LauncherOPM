@@ -672,7 +672,23 @@ function onData(run, raw) {
  */
 function readLoading(run, text) {
   if (!run.scene || run.musicDone) return;
-  for (const line of text.split(/\r?\n/)) {
+  const lines = text.split(/\r?\n/);
+  if (!run.sceneDone) {
+    // L'avancement, au prorata du dernier chargement (lignes et durée).
+    if (!run.loadStart) {
+      run.loadStart = Date.now();
+      run.loadLines = 0;
+      run.loadStats = bridge.readLoadStats();
+    }
+    run.loadLines += lines.length;
+    const done = Math.max(run.loadLines / run.loadStats.lines, (Date.now() - run.loadStart) / run.loadStats.ms);
+    const ratio = Math.min(0.97, done) * bridge.LAUNCHER_SHARE;
+    if (ratio > (run.sceneRatio ?? 0) + 0.004) {
+      run.sceneRatio = ratio;
+      emit({ type: 'loading', ratio, step: run.sceneStep || 'Chargement des mondes' });
+    }
+  }
+  for (const line of lines) {
     const found = bridge.readLine(line);
     if (!found) continue;
     if (found.kind === 'music') {
@@ -685,14 +701,14 @@ function readLoading(run, text) {
     if (run.sceneDone) continue;
     if (found.kind === 'ready') {
       run.sceneDone = true;
+      bridge.writeLoadStats(run.loadLines || 0, Date.now() - (run.loadStart || Date.now()));
       logger.info("L'écran de chargement du mod OPM a pris le relais.");
       emit({ type: 'loaded' });
       continue;
     }
-    if (found.ratio > (run.sceneRatio ?? 0)) {
-      run.sceneRatio = found.ratio;
-      emit({ type: 'loading', ratio: found.ratio, step: found.step });
-    }
+    run.sceneStep = found.step;
+    if (found.ratio > (run.sceneRatio ?? 0)) run.sceneRatio = found.ratio;
+    emit({ type: 'loading', ratio: run.sceneRatio, step: found.step });
   }
 }
 
@@ -1200,6 +1216,7 @@ async function launch(instanceName) {
       const scene =
         mainWindow.windowMode() === 'ouvert' && config.game.intro && bridge.hasOpmMod(instanceDir);
       run.scene = scene;
+      run.sceneEpoch = Date.now();
       options.JVM_ARGS.unshift(...bridge.authArguments(instanceDir, api.baseUrl()));
       await bridge.setEarlyWindow(instanceDir, !scene);
       await bridge.writeSession(instanceDir, {
@@ -1215,11 +1232,12 @@ async function launch(instanceName) {
         scene,
         gallery: world.gallery,
         links: world.links,
+        sceneEpoch: run.sceneEpoch,
       });
       if (scene) {
         // La musique du launcher doit tenir, fenêtre masquée, jusqu'au relais du jeu.
         mainWindow.setThrottling(false);
-        emit({ type: 'scene', etat: world.etat, gallery: world.inline });
+        emit({ type: 'scene', etat: world.etat, gallery: world.inline, epoch: run.sceneEpoch });
       }
     };
 

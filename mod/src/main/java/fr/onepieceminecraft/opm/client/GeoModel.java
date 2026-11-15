@@ -28,7 +28,7 @@ import org.joml.Quaternionf;
 public final class GeoModel {
     private static final float DEG = (float) (Math.PI / 180);
 
-    private record Cube(float[] from, float[] size, float[] uv, float[] pivot, float[] rotation) {}
+    private record Cube(float[] from, float[] size, float[] uv, float[] pivot, float[] rotation, float inflate) {}
 
     private static final class Bone {
         String name;
@@ -75,7 +75,8 @@ public final class GeoModel {
                     float[] cr = c.has("rotation") ? vec(c.getAsJsonArray("rotation")) : null;
                     b.cubes.add(new Cube(new float[]{-(o[0] + s[0]), o[1], o[2]}, s, vec(c.getAsJsonArray("uv")),
                             cp != null ? new float[]{-cp[0], cp[1], cp[2]} : null,
-                            cr != null ? new float[]{-cr[0] * DEG, -cr[1] * DEG, cr[2] * DEG} : null));
+                            cr != null ? new float[]{-cr[0] * DEG, -cr[1] * DEG, cr[2] * DEG} : null,
+                            c.has("inflate") ? c.get("inflate").getAsFloat() : 0f));
                 }
             }
             if (b.parent != null) b.parent.children.add(b);
@@ -90,11 +91,12 @@ public final class GeoModel {
         }
     }
 
-    /** Charge un modèle du jar : `assets/opm/geckolib/{geo,animations}/<nom>…`. */
+    /** Charge un modèle du jar : `assets/opm/geckolib/{geo,animations}/<nom>…` (animations facultatives). */
     public static GeoModel load(String name, String prefix) {
         try {
-            return new GeoModel(read("/assets/opm/geckolib/geo/" + name + ".geo.json"),
-                    read("/assets/opm/geckolib/animations/" + name + ".animation.json"), prefix);
+            JsonObject anims = read("/assets/opm/geckolib/animations/" + name + ".animation.json");
+            return new GeoModel(read("/assets/opm/geckolib/geo/" + name + ".geo.json"), anims,
+                    prefix != null ? prefix : "animation." + name);
         } catch (Exception e) {
             Opm.LOG.error("Modèle « {} » illisible", name, e);
             return null;
@@ -188,6 +190,13 @@ public final class GeoModel {
         final Map<String, float[]> rot = new HashMap<>();
         final Map<String, float[]> pos = new HashMap<>();
         float weight = 1;
+
+        public Pose copy() {
+            Pose p = new Pose();
+            rot.forEach((k, v) -> p.rot.put(k, v.clone()));
+            pos.forEach((k, v) -> p.pos.put(k, v.clone()));
+            return p;
+        }
     }
 
     /** Repos + animation au temps `t` (secondes ; bouclée si l'animation boucle). */
@@ -280,8 +289,23 @@ public final class GeoModel {
      * unité du modèle). `only` : os dessinés (`null` : tous).
      */
     public void render(PoseStack ps, VertexConsumer vc, Pose pose, Set<String> only, int light, int color) {
+        shade = false;
         renderBone(ps, vc, root, pose, only, light, color);
     }
+
+    /**
+     * Comme `render`, mais l'ombrage est cuit dans la couleur de chaque face
+     * (lumière fixe par rapport à la caméra) : pour un shader sans éclairage
+     * (`position_tex_color`), le seul disponible pendant le chargement du jeu.
+     */
+    public void renderShaded(PoseStack ps, VertexConsumer vc, Pose pose, Set<String> only, int color) {
+        shade = true;
+        renderBone(ps, vc, root, pose, only, 0, color);
+        shade = false;
+    }
+
+    private boolean shade;
+    private static final org.joml.Vector3f LIGHT = new org.joml.Vector3f(-0.35f, 0.85f, 0.55f).normalize();
 
     private void renderBone(PoseStack ps, VertexConsumer vc, Bone b, Pose pose, Set<String> only, int light, int color) {
         ps.pushPose();
@@ -317,6 +341,7 @@ public final class GeoModel {
     private static final int[] DEPTH_SIGN = {1, -1, 1, -1, 1, -1};
 
     private void cube(PoseStack.Pose last, VertexConsumer vc, Cube c, int light, int color) {
+        float inflate = c.inflate();
         float w = c.size()[0];
         float h = c.size()[1];
         float d = c.size()[2];
@@ -334,13 +359,22 @@ public final class GeoModel {
             int ua = AXES[f][0];
             int va = AXES[f][1];
             int wa = AXES[f][2];
-            float W = c.size()[DIMS[f][0]];
-            float H = c.size()[DIMS[f][1]];
-            float D = c.size()[DIMS[f][2]] * DEPTH_SIGN[f];
+            float W = c.size()[DIMS[f][0]] + 2 * inflate;
+            float H = c.size()[DIMS[f][1]] + 2 * inflate;
+            float D = (c.size()[DIMS[f][2]] + 2 * inflate) * DEPTH_SIGN[f];
             float[] rect = rects[f];
             boolean flipV = f == 2 || f == 3;
             float[] n = new float[3];
             n[wa] = DEPTH_SIGN[f];
+            int faceColor = color;
+            if (shade) {
+                org.joml.Vector3f nv = last.normal().transform(new org.joml.Vector3f(n[0], n[1], n[2])).normalize();
+                float lum = 0.55f + 0.45f * Math.max(0, nv.dot(LIGHT));
+                int r = Math.min(255, Math.round(((color >> 16) & 255) * lum));
+                int gg = Math.min(255, Math.round(((color >> 8) & 255) * lum));
+                int bb = Math.min(255, Math.round((color & 255) * lum));
+                faceColor = (color & 0xFF000000) | (r << 16) | (gg << 8) | bb;
+            }
             // Ordre de BoxGeometry : (0,0) (1,0) (0,1) (1,1) — on dessine le quad (0,0) (0,1) (1,1) (1,0).
             int[][] order = {{0, 0}, {0, 1}, {1, 1}, {1, 0}};
             for (int[] o : order) {
@@ -352,7 +386,7 @@ public final class GeoModel {
                 pt[wa] = D / 2;
                 float tu = (rect[0] + ix * rect[2]) / tw;
                 float tv = (flipV ? rect[1] + (1 - iy) * rect[3] : rect[1] + iy * rect[3]) / th;
-                vc.addVertex(last, pt[0], pt[1], pt[2]).setColor(color).setUv(tu, tv)
+                vc.addVertex(last, pt[0], pt[1], pt[2]).setColor(faceColor).setUv(tu, tv)
                         .setOverlay(OverlayTexture.NO_OVERLAY).setLight(light).setNormal(last, n[0], n[1], n[2]);
             }
         }

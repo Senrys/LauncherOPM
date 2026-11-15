@@ -31,6 +31,8 @@ public final class OpmSession {
     public final boolean animations;
     public final String api;
     public final float progressStart;
+    /** Début de la scène de chargement (ms, horloge du système), partagé avec le launcher ; 0 : inconnu. */
+    public final long sceneStart;
     public final List<Skin> gallery;
     public final String website;
     public final String discord;
@@ -54,6 +56,7 @@ public final class OpmSession {
         animations = !j.has("animations") || j.get("animations").getAsBoolean();
         String a = str(j, "api");
         api = a != null && a.startsWith("https://") ? a.replaceAll("/+$", "") : "https://auth.onepieceminecraft.fr";
+        sceneStart = j.has("scene_debut") ? j.get("scene_debut").getAsLong() : 0L;
         progressStart = j.has("progression_depart") ? Math.max(0, Math.min(0.9f, j.get("progression_depart").getAsFloat())) : 0f;
         List<Skin> skins = new ArrayList<>();
         if (j.has("galerie") && j.get("galerie").isJsonArray()) {

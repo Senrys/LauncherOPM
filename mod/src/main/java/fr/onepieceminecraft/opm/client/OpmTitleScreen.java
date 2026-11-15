@@ -78,6 +78,25 @@ public final class OpmTitleScreen extends Screen {
         super(Component.literal("One Piece Minecraft"));
     }
 
+    private static GeoModel socle;
+    private static boolean socleTried;
+
+    private static final GeoModel[] PLAYERS = new GeoModel[2];
+
+    private static GeoModel playerModel(boolean slim) {
+        int i = slim ? 1 : 0;
+        if (PLAYERS[i] == null) PLAYERS[i] = GeoModel.load(slim ? "joueur_fin" : "joueur", null);
+        return PLAYERS[i];
+    }
+
+    private static GeoModel socleModel() {
+        if (!socleTried) {
+            socleTried = true;
+            socle = GeoModel.load("socle", null);
+        }
+        return socle;
+    }
+
     private static GeoModel model() {
         if (!xenodysTried) {
             xenodysTried = true;
@@ -334,22 +353,62 @@ public final class OpmTitleScreen extends Screen {
             ps.popPose();
         }
 
-        // Le socle et le joueur, devant elle.
+        // Le socle et le joueur, devant elle — en 3D, comme Xenodys.
         g.flush();
         com.mojang.blaze3d.systems.RenderSystem.clear(org.lwjgl.opengl.GL11.GL_DEPTH_BUFFER_BIT, net.minecraft.client.Minecraft.ON_OSX);
-        Sprites.draw(g, Sprites.get("socle", etat), 0, px, floor - 6);
         Skins.pump();
-        Skins.Printed player = corrupted && Skins.ownFear() != null ? Skins.ownFear() : Skins.own();
-        if (player != null) LoadingScene.drawPlayer(g, player, px, stand, PlayerRaster.H, 1f, t);
+        Skins.Printed player = Skins.own();
+        float pscale = 2f;
+        org.joml.Matrix4f playerWorld = null;
+        GeoModel playerModel = null;
+        GeoModel.Pose playerPose = null;
+        {
+            var ps = g.pose();
+            Lighting.setupForEntityInInventory();
+            var buffers = g.bufferSource();
+            ps.pushPose();
+            ps.translate(px, stand, 200);
+            ps.scale(pscale, -pscale, pscale);
+            ps.mulPose(Axis.XP.rotationDegrees(-12));
+            ps.mulPose(Axis.YP.rotationDegrees(210));
+            if (socleModel() != null) {
+                socleModel().render(ps, buffers.getBuffer(RenderType.entityCutoutNoCull(Choreo.tex("socle_" + etat))),
+                        socleModel().pose(null, 0), null, LightTexture.FULL_BRIGHT, -1);
+                buffers.endBatch();
+                socleModel().render(ps, buffers.getBuffer(RenderType.eyes(Choreo.tex("socle_" + etat + "_glowmask"))),
+                        socleModel().pose(null, 0), null, LightTexture.FULL_BRIGHT, -1);
+                buffers.endBatch();
+            }
+            if (player != null) {
+                playerModel = playerModel(player.slim());
+                if (playerModel != null) {
+                    playerPose = Choreo.playerPose(playerModel, t, corrupted);
+                    playerModel.render(ps, buffers.getBuffer(RenderType.entityTranslucent(player.texture())), playerPose,
+                            null, LightTexture.FULL_BRIGHT, -1);
+                    buffers.endBatch();
+                    playerWorld = new org.joml.Matrix4f().translate(px, stand, 0).scale(pscale, -pscale, pscale)
+                            .rotateX((float) Math.toRadians(-12)).rotateY((float) Math.toRadians(210));
+                }
+            }
+            ps.popPose();
+            Lighting.setupFor3DItems();
+        }
 
         // Les fils de l'emprise : de ses doigts jusqu'à lui.
         if (corrupted && model != null && p != null && greetAt < 0 && !flicker) {
             org.joml.Matrix4f m = new org.joml.Matrix4f().translate(cx, baseY, 0).scale(scale, -scale, scale)
                     .rotateY((float) Math.toRadians(turn));
-            float[][] ends = {{px - 1, headPlayerY + 2}, {px - 13, stand - 40}, {px + 11, stand - 38}, {px + 2, stand - 30}};
+            String[] bones = {"head", "right_arm", "left_arm", "body"};
             for (int f = 0; f < 4; f++) {
                 org.joml.Vector3f tip = m.transformPosition(model.point(p, "finger_right_" + f + "_tip"));
-                string(g, tip.x, tip.y, ends[f][0], ends[f][1], f);
+                float ex = px;
+                float ey = headPlayerY + 2;
+                if (playerWorld != null && playerModel != null) {
+                    org.joml.Vector3f e = playerWorld.transformPosition(playerModel.point(playerPose, bones[f]).add(0, f == 0 ? 8 : -6, 0));
+                    ex = e.x;
+                    ey = e.y;
+                }
+                string(g, tip.x, tip.y, ex, ey, f);
             }
         }
     }

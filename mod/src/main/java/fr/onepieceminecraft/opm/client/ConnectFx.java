@@ -59,9 +59,18 @@ public final class ConnectFx {
         if (pixels != null) {
             int W = PlayerRaster.W;
             int H = PlayerRaster.H;
-            int rows = (int) Math.round((1 - cut) * H);
-            if (rows > 0 && Skins.own() != null) {
-                LoadingScene.drawPlayer(g, Skins.own(), px, stand, rows, 1f, 0);
+            // Ce qui ne s'est pas encore défait : le joueur, pixel par pixel.
+            int keepFrom = (int) Math.round(cut * H);
+            float dd = PlayerRaster.DENSITY;
+            for (int y = keepFrom - keepFrom % 2; y < H; y += 2) {
+                for (int x = 0; x < W; x += 2) {
+                    int c = pixels[y * W + x];
+                    if (((c >>> 24) & 255) < 128) continue;
+                    int rgb = ((c & 255) << 16) | (c & 0xFF00) | ((c >> 16) & 255);
+                    int sx = (int) (px - PlayerRaster.OX / dd + x / dd);
+                    int sy = (int) (stand - PlayerRaster.OY / dd + y / dd);
+                    g.fill(sx, sy, sx + 1, sy + 1, 0xFF000000 | rgb);
+                }
             }
             if (seeds == null) {
                 Random r = new Random(7);

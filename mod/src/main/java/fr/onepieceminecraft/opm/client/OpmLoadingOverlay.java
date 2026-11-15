@@ -33,6 +33,7 @@ public final class OpmLoadingOverlay extends Overlay {
             "Ouverture du monde",
     };
     private static boolean readySent;
+    private static final long sceneFallback = System.currentTimeMillis();
     private static LoadingScene scene;
 
     private final Minecraft minecraft;
@@ -110,7 +111,10 @@ public final class OpmLoadingOverlay extends Overlay {
         // Fondu de sortie : la scène pâlit au-dessus de l'écran qui l'attend.
         Sprites.alpha = alpha;
         try {
-            scene.render(g, vw, vh, dt, ratio, step, session.etat, outro, session.playerName);
+            // L'horloge de la scène : celle du launcher (scene_debut), pour continuer sa chorégraphie.
+            long epoch = session.sceneStart > 0 ? session.sceneStart : sceneFallback;
+            double sceneT = (System.currentTimeMillis() - epoch) / 1000.0;
+            scene.render(g, vw, vh, sceneT, ratio, step, session.etat, outro, session.playerName);
             g.flush();
         } finally {
             Sprites.alpha = 1f;
