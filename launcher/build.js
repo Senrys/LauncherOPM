@@ -60,6 +60,7 @@ const COPIED_EXTENSIONS = new Set([
   '.woff2', '.woff', '.ttf', '.otf',
   '.png', '.webp', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.icns',
   '.mp4', '.webm', '.mp3', '.ogg',
+  '.jar', // src/game : le mod OPM et authlib-injector (game-files.js)
   '.json', '.plist', '.txt', '.md',
 ]);
 
@@ -533,7 +534,13 @@ async function main() {
     say('');
   }
 
-  /* --- 2. Préparation de la copie de travail ---------------------------- */
+  /* --- 2. Les fichiers du jeu (mod OPM, authlib-injector) -------------- */
+
+  step('Fichiers du jeu : compilation du mod OPM, authlib-injector…');
+  const gameFiles = await require('./game-files').prepareGameFiles();
+  ok(gameFiles.mod ? `${gameFiles.mod.fichier} et authlib-injector ${gameFiles.authlib.version}` : 'authlib-injector seul (OPM_SKIP_MOD)');
+
+  /* --- 2 bis. Préparation de la copie de travail ------------------------ */
 
   step(`Préparation de ${path.relative(ROOT, STAGE_SRC)}${options.obfuscate ? ' (avec obfuscation)' : ''}…`);
   const staged = await stage(options.obfuscate);

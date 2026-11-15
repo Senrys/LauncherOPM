@@ -37,6 +37,7 @@ public final class Skins {
     private static final List<Printed> PRINTED = Collections.synchronizedList(new ArrayList<>());
     private static Printed own;
     private static Printed ownFear;
+    private static int[] ownPixels;
     private static boolean started;
     private static boolean fallbackAsked;
     private static int counter;
@@ -119,6 +120,12 @@ public final class Skins {
                 Printed p = new Printed(id, (Boolean) item[2]);
                 if (p.own()) {
                     own = p;
+                    // Ses pixels (première image), pour le voir se défaire à la connexion.
+                    int[] px = new int[PlayerRaster.W * PlayerRaster.H];
+                    for (int y = 0; y < PlayerRaster.H; y++) {
+                        for (int x = 0; x < PlayerRaster.W; x++) px[y * PlayerRaster.W + x] = sheet.getPixelRGBA(x, y);
+                    }
+                    ownPixels = px;
                     // Le même, sous l'emprise de Xenodys corrompue (écran titre).
                     ResourceLocation fear = ResourceLocation.fromNamespaceAndPath(Opm.ID, "dyn/skin_" + (counter++));
                     Minecraft.getInstance().getTextureManager().register(fear,
@@ -168,6 +175,11 @@ public final class Skins {
         }, "OPM skin par défaut");
         t.setDaemon(true);
         t.start();
+    }
+
+    /** Les pixels (ABGR) de la première image du joueur, W × H, ou `null`. */
+    public static int[] ownPixels() {
+        return ownPixels;
     }
 
     public static Printed ownFear() {

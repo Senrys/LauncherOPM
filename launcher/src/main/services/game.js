@@ -483,7 +483,9 @@ function buildOptions(instance, config, authenticator, verify, extraGameArgs = [
     },
 
     verify: Boolean(verify || instance.verify),
-    ignored: [...instance.ignored],
+    // Le mod OPM, authlib-injector, opm/ et fml.toml sont posés par le launcher
+    // (services/bridge.js) : la vérification du modpack ne doit pas les retirer.
+    ignored: [...instance.ignored, ...bridge.ownedPaths()],
 
     // `javaPath` de l'ancien launcher s'appelle `java.path` depuis la version 4.2 :
     // chemin complet de l'exécutable, ou `null` pour laisser la bibliothèque
@@ -1163,6 +1165,9 @@ async function launch(instanceName) {
     // Les fichiers sont à jour (le mod OPM compris) : dernier passage avant la
     // machine virtuelle.
     run.beforeStart = async () => {
+      await bridge.installGameFiles(instanceDir).catch((err) =>
+        logger.warn(`Installation du mod OPM impossible : ${err.message}`)
+      );
       const scene =
         mainWindow.windowMode() === 'ouvert' && config.game.intro && bridge.hasOpmMod(instanceDir);
       run.scene = scene;

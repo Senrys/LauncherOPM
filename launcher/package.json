@@ -22,7 +22,8 @@
     "vendor": "node scripts/vendor.js",
     "build": "node build.js --obf=false --build=platform",
     "build:obf": "node build.js --obf=true --build=platform",
-    "build:dir": "node build.js --obf=false --dir"
+    "build:dir": "node build.js --obf=false --dir",
+    "game-files": "node game-files.js"
   },
   "nodemonConfig": {
     "ext": "js,html,css",

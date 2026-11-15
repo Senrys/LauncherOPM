@@ -34,6 +34,7 @@ public final class DebugShots {
 
     /** `-Dopm.debug.options=4` : ouvre les options à 4 s ; `-Dopm.debug.quit=9` : quitte. */
     static void drive(net.minecraft.client.gui.screens.Screen title, double t) {
+        if (createWorld(t)) return;
         double open = Double.parseDouble(System.getProperty("opm.debug.options", "-1"));
         double quit = Double.parseDouble(System.getProperty("opm.debug.quit", "-1"));
         if (open >= 0 && t >= open && !optionsOpened) {
@@ -42,6 +43,54 @@ public final class DebugShots {
             mc.setScreen(new net.minecraft.client.gui.screens.options.OptionsScreen(title, mc.options));
         }
         if (quit >= 0 && t >= quit) Minecraft.getInstance().stop();
+    }
+
+    private static double worldStart = -1;
+    private static boolean created;
+    private static boolean summoned;
+    private static boolean paused;
+
+    /** `-Dopm.debug.world=1` : depuis l'écran titre, crée un monde de test en solo. */
+    static boolean createWorld(double t) {
+        if (!"1".equals(System.getProperty("opm.debug.world", "")) || created || t < 3) return false;
+        created = true;
+        Minecraft mc = Minecraft.getInstance();
+        var settings = new net.minecraft.world.level.LevelSettings("opm-test", net.minecraft.world.level.GameType.CREATIVE,
+                false, net.minecraft.world.Difficulty.PEACEFUL, true, new net.minecraft.world.level.GameRules(),
+                net.minecraft.world.level.WorldDataConfiguration.DEFAULT);
+        mc.createWorldOpenFlows().createFreshLevel("opm-test-" + System.currentTimeMillis(), settings,
+                new net.minecraft.world.level.levelgen.WorldOptions(42L, false, false),
+                net.minecraft.world.level.levelgen.presets.WorldPresets::createNormalWorldDimensions, mc.screen);
+        return true;
+    }
+
+    /**
+     * Une fois en jeu (monde de test) : invoque Xenodys devant le joueur (à 8 s),
+     * puis ouvre le menu pause (à 16 s), puis quitte.
+     */
+    public static void worldTick() {
+        if (!"1".equals(System.getProperty("opm.debug.world", ""))) return;
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null || mc.level == null) return;
+        long now = net.minecraft.Util.getMillis();
+        if (worldStart < 0) worldStart = now;
+        double t = (now - worldStart) / 1000.0;
+        if (t > 8 && !summoned) {
+            summoned = true;
+            mc.player.connection.sendCommand("execute at @s rotated ~ 0 positioned ^ ^ ^8 run summon minecraft:armor_stand ~ ~-1 ~ "
+                    + "{Invisible:1b,Marker:1b,NoGravity:1b,Tags:[\"opm_xenodys\"],CustomName:'\"opm:xenodys:idle\"'}");
+            mc.player.connection.sendCommand("execute as @e[tag=opm_xenodys,limit=1] at @s run tp @s ~ ~ ~ facing entity @p feet");
+        }
+        if (t > 16 && !paused) {
+            paused = true;
+            mc.setScreen(new net.minecraft.client.gui.screens.PauseScreen(true));
+        }
+        if (t > 24) mc.stop();
+    }
+
+    public static void world() {
+        if (TIMES.isEmpty() || worldStart < 0) return;
+        maybe("monde", (net.minecraft.Util.getMillis() - worldStart) / 1000.0);
     }
 
     /** Captures des menus ordinaires, image complète (ScreenEvent.Render.Post). */

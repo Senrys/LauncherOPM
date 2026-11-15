@@ -4,6 +4,16 @@
 #  /xenodys creatrice [annonce]   Xenodys redevient elle-même (thème cyan)
 #  /xenodys corrompue [annonce]   l'ennemi la contrôle (thème rouge et violet)
 #  /xenodys                       affiche l'état actuel
+#  /xenodys apparaitre [anim]     Xenodys apparaît dans le monde, devant toi
+#  /xenodys animation <anim>      change l'animation de la plus proche
+#  /xenodys disparaitre           la plus proche disparaît
+#
+#  Animations : idle, greet, fly, cradle, unveil, lean. Corrompue, « idle » et
+#  « lean » deviennent d'eux-mêmes leur version corrompue.
+#
+#  Rien à installer sur le serveur pour la voir : un support d'armure invisible
+#  et marqueur porte le nom « opm:xenodys:<anim> », et le mod OPM des joueurs
+#  (embarqué par le launcher) dessine Xenodys à sa place, immense.
 #
 #  La commande écrit dans la table « launcher_xenodys » de la base partagée.
 #  Le launcher de chaque joueur la relit toutes les 60 secondes et change de
@@ -27,7 +37,7 @@ options:
 command /xenodys [<text>] [<text>]:
     permission: {@permission}
     permission message: &cSeul le staff peut agir sur Xenodys.
-    usage: &7/xenodys <creatrice|corrompue> [annonce]
+    usage: &7/xenodys <creatrice|corrompue> [annonce] · /xenodys <apparaitre|animation> [anim] · /xenodys disparaitre
     trigger:
         # Sans argument : lire l'état actuel.
         if arg-1 is not set:
@@ -35,6 +45,34 @@ command /xenodys [<text>] [<text>]:
             send "&7Xenodys est actuellement : &f%{_r::etat::1}%&7 (depuis %{_r::depuis::1}%, par %{_r::par::1}%)."
             if {_r::message::1} is set:
                 send "&7Annonce : &f%{_r::message::1}%"
+            stop
+
+        # Xenodys dans le monde (le mod OPM des joueurs la dessine).
+        set {_cmd} to arg-1 in lowercase
+        if {_cmd} is "apparaitre" or "animation":
+            set {_anim} to "idle"
+            if arg-2 is set:
+                set {_anim} to arg-2 in lowercase
+            if {_anim} is not "idle", "greet", "fly", "cradle", "unveil" or "lean":
+                send "&cAnimation inconnue : « %{_anim}% ». Utilise idle, greet, fly, cradle, unveil ou lean."
+                stop
+            if sender is not a player:
+                send "&cÀ faire en jeu : Xenodys apparaît devant toi."
+                stop
+            if {_cmd} is "apparaitre":
+                execute console command "execute at %player% rotated ~ 0 positioned ^ ^ ^8 run summon minecraft:armor_stand ~ ~-1 ~ {Invisible:1b,Marker:1b,NoGravity:1b,Invulnerable:1b,Silent:1b,Tags:[""opm_xenodys""],CustomName:'""opm:xenodys:%{_anim}%""'}"
+                execute console command "execute at %player% as @e[tag=opm_xenodys,sort=nearest,limit=1] at @s run tp @s ~ ~ ~ facing entity %player% feet"
+                send "{@creatrice}Xenodys apparaît (%{_anim}%). Elle te fait face."
+            else:
+                execute console command "execute at %player% run data merge entity @e[tag=opm_xenodys,sort=nearest,limit=1] {CustomName:'""opm:xenodys:%{_anim}%""'}"
+                send "{@creatrice}Xenodys : animation « %{_anim}% »."
+            stop
+        if {_cmd} is "disparaitre":
+            if sender is a player:
+                execute console command "execute at %player% run kill @e[tag=opm_xenodys,sort=nearest,limit=1]"
+            else:
+                execute console command "kill @e[tag=opm_xenodys]"
+            send "{@creatrice}Xenodys s'efface."
             stop
 
         set {_etat} to arg-1 in lowercase

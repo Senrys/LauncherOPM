@@ -9,8 +9,8 @@
  *
  *   - **la redirection d'authentification** : le client Minecraft doit annoncer
  *     son arrivée (`join`) à NOTRE serveur d'authentification, pas à Mojang.
- *     authlib-injector (livré par le modpack, `authlib-injector.jar` à la racine
- *     de l'instance) s'en charge et fait aussi accepter nos skins signés ; à
+ *     authlib-injector (embarqué par le launcher, `authlib-injector.jar` à la racine
+ *     de l'instance, embarqué par le launcher) s'en charge et fait aussi accepter nos skins signés ; à
  *     défaut, les propriétés système d'authlib redirigent au moins le `join` ;
  *   - **la connexion directe** : `--quickPlayMultiplayer`, le jeu entre sur le
  *     serveur OPM sans passer par l'écran titre ;
@@ -133,6 +133,65 @@ async function prepareContext() {
 }
 
 /* ------------------------------------------------------------------ fichiers */
+
+/** Les fichiers du jeu embarqués dans le launcher (game-files.js → src/game/). */
+const GAME_DIR = path.join(__dirname, '..', '..', 'game');
+
+function gameManifest() {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(GAME_DIR, 'fichiers.json'), 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Chemins (relatifs à l'instance) que la vérification des fichiers du modpack
+ * ne doit pas supprimer : ce sont ceux que le launcher pose lui-même.
+ * @returns {string[]}
+ */
+function ownedPaths() {
+  const m = gameManifest();
+  return ['opm', 'config/fml.toml', INJECTOR_FILE, ...(m.mod ? [`mods/${m.mod.fichier}`] : [])];
+}
+
+async function sameFile(file, sha) {
+  try {
+    const data = await fsp.readFile(file);
+    return require('crypto').createHash('sha256').update(data).digest('hex') === sha;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Pose le mod OPM et authlib-injector dans l'instance, s'ils manquent ou ont
+ * changé ; retire les anciennes versions du mod. Rien à déposer sur le serveur :
+ * ils voyagent avec le launcher.
+ * @param {string} instanceDir
+ */
+async function installGameFiles(instanceDir) {
+  const m = gameManifest();
+  if (m.authlib) {
+    const target = path.join(instanceDir, INJECTOR_FILE);
+    if (!(await sameFile(target, m.authlib.sha256))) {
+      await fsp.writeFile(target, await fsp.readFile(path.join(GAME_DIR, m.authlib.fichier)));
+      logger.info(`authlib-injector ${m.authlib.version} installé dans le jeu.`);
+    }
+  }
+  if (m.mod) {
+    const mods = path.join(instanceDir, 'mods');
+    await fsp.mkdir(mods, { recursive: true });
+    for (const f of await fsp.readdir(mods)) {
+      if (MOD_FILE.test(f) && f !== m.mod.fichier) await fsp.rm(path.join(mods, f), { force: true });
+    }
+    const target = path.join(mods, m.mod.fichier);
+    if (!(await sameFile(target, m.mod.sha256))) {
+      await fsp.writeFile(target, await fsp.readFile(path.join(GAME_DIR, m.mod.fichier)));
+      logger.info(`Mod OPM ${m.mod.fichier} installé dans le jeu.`);
+    }
+  }
+}
 
 /** Le mod OPM est-il installé dans cette instance ? */
 function hasOpmMod(instanceDir) {
@@ -264,6 +323,8 @@ function readLine(line) {
 
 module.exports = {
   LAUNCHER_SHARE,
+  installGameFiles,
+  ownedPaths,
   prepareContext,
   hasOpmMod,
   authArguments,

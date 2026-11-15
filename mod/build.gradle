@@ -24,6 +24,8 @@ neoForge {
             systemProperty 'opm.debug.shots', (project.findProperty('opmShots') ?: '').toString()
             systemProperty 'opm.debug.options', (project.findProperty('opmOptions') ?: '-1').toString()
             systemProperty 'opm.debug.quit', (project.findProperty('opmQuit') ?: '-1').toString()
+            systemProperty 'opm.debug.status', (project.findProperty('opmStatus') ?: '').toString()
+            systemProperty 'opm.debug.world', (project.findProperty('opmWorld') ?: '').toString()
         }
     }
 
