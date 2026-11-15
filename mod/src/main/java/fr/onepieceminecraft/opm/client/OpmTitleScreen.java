@@ -38,7 +38,6 @@ import org.lwjgl.glfw.GLFW;
  * serveurs). C'est aussi l'écran où l'on revient après une déconnexion.
  */
 public final class OpmTitleScreen extends Screen {
-    private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(4)).build();
     private static GeoModel xenodys;
     private static boolean xenodysTried;
 
@@ -49,9 +48,6 @@ public final class OpmTitleScreen extends Screen {
     private double t;
     private double nextBlink = 2;
     private double blinkUntil;
-    private volatile String status = "Connexion au serveur…";
-    private volatile boolean online;
-    private volatile String news;
     private int hover = -1;
     private int lastHover = -1;
 
@@ -92,33 +88,14 @@ public final class OpmTitleScreen extends Screen {
 
     @Override
     protected void init() {
-        fetchStatus();
+        OpmLive.start();
         Skins.start(session);
         Skins.fallbackOwn();
     }
 
-    private void fetchStatus() {
-        get("/api/v1/status", o -> {
-            online = o.has("online") && o.get("online").getAsBoolean();
-            int n = o.has("players_online") ? o.get("players_online").getAsInt() : 0;
-            status = online ? "Serveur en ligne · " + n + (n > 1 ? " joueurs" : " joueur") : "Serveur hors ligne";
-        });
-        get("/api/v1/news?limit=1", o -> {
-            JsonObject featured = o.has("featured") && o.get("featured").isJsonObject() ? o.getAsJsonObject("featured") : null;
-            if (featured != null && featured.has("title")) news = featured.get("title").getAsString();
-        });
-    }
-
-    private void get(String path, java.util.function.Consumer<JsonObject> then) {
-        HTTP.sendAsync(HttpRequest.newBuilder(URI.create(session.api + path)).timeout(Duration.ofSeconds(5))
-                        .header("User-Agent", "OPM-mod").GET().build(), HttpResponse.BodyHandlers.ofString())
-                .thenAccept(r -> {
-                    if (r.statusCode() == 200) then.accept(JsonParser.parseString(r.body()).getAsJsonObject());
-                })
-                .exceptionally(e -> {
-                    if (path.contains("status")) status = "Serveur injoignable";
-                    return null;
-                });
+    /** Le serveur ne répond pas (connu comme tel). */
+    private static boolean offline() {
+        return OpmLive.known && !OpmLive.online;
     }
 
     private static int argb(int rgb, double a) {
@@ -205,18 +182,28 @@ public final class OpmTitleScreen extends Screen {
         Sprites.Sheet banner = Sprites.get(session.corrupted() ? "bandeau_240_corrompue" : "bandeau_240");
         if (banner != null) Sprites.draw(g, banner, 0, left + 12, top + 10, false, 1f, 0.5f);
         int y = top + 58;
-        g.fill(left + 12, y + 1, left + 15, y + 4, argb(online ? 0x6FE3A0 : 0xF0506E, 1));
+        String status = !OpmLive.known ? "Connexion au serveur…"
+                : !OpmLive.online ? "Serveur hors ligne"
+                : OpmLive.full() ? "Serveur complet · " + OpmLive.players + "/" + OpmLive.max
+                : "Serveur en ligne · " + OpmLive.players + (OpmLive.players > 1 ? " joueurs" : " joueur");
+        int dot = !OpmLive.known ? 0x7FA8A3 : !OpmLive.online ? 0xF0506E : OpmLive.full() ? 0xF0C05A : 0x6FE3A0;
+        g.fill(left + 12, y + 1, left + 15, y + 4, argb(dot, 1));
         PixelFont.draw(g, status, left + 20, y, core(), 0.95f, 1f);
         y += 14;
+        // Ce que dit Xenodys : l'annonce du staff, sinon l'état du monde.
         String said = session.message != null ? session.message
+                : offline() ? "Le monde est hors d'atteinte… Xenodys le cherche dans la simulation."
+                : OpmLive.full() ? "Le monde est plein. Xenodys vous garde une place : réessayez dans un instant."
                 : session.corrupted() ? "Xenodys n'est plus elle-même. Prudence, aventurier." : "Xenodys veille sur la simulation.";
+        String news = OpmLive.news;
         PixelFont.draw(g, "Xenodys", left + 12, y, accent(), 0.9f, 1f);
         y = wrap(g, said, left + 12, y + 10, bw, 0xB8D6D2, 3);
         if (news != null && y < by - 22) {
             PixelFont.draw(g, "Journal de bord", left + 12, y + 4, accent(), 0.9f, 1f);
             wrap(g, news, left + 12, y + 14, bw, 0xB8D6D2, 2);
         }
-        drawButton(g, 0, joining ? "Xenodys vous emmène…" : "Rejoindre One Piece Minecraft", true);
+        drawButton(g, 0, joining ? "Xenodys vous emmène…" : offline() ? "Réessayer la connexion"
+                : OpmLive.full() ? "Tenter de rejoindre" : "Rejoindre One Piece Minecraft", true);
         drawButton(g, 1, "Options", false);
         drawButton(g, 2, "Mods", false);
         drawButton(g, 3, "Quitter", false);
@@ -275,7 +262,11 @@ public final class OpmTitleScreen extends Screen {
             double headY = baseY - 89 * scale;
             double tx = px;
             double ty = headPlayerY + 10;
-            if (hover >= 0) {
+            if (offline() && hover < 0) {
+                // Le monde est hors d'atteinte : elle se détourne, inquiète, et cherche au loin.
+                tx = vw * 1.3 + Math.sin(t * 0.7) * vw * 0.2;
+                ty = vh * 0.1;
+            } else if (hover >= 0) {
                 tx = buttons[hover][0] + buttons[hover][2] / 2.0;
                 ty = buttons[hover][1] + buttons[hover][3] / 2.0;
             } else if (t - movedAt < 2.5) {
@@ -286,7 +277,7 @@ public final class OpmTitleScreen extends Screen {
             float targetPitch = (float) Math.max(-20, Math.min(35, (ty - headY) / (vh * 0.45) * 40));
             yaw = damp(yaw, targetYaw, 4.5, dt);
             pitch = damp(pitch, targetPitch, 4.5, dt);
-            lean = damp(lean, hover >= 0 || !corrupted ? 1 : 0, 2.5, dt);
+            lean = damp(lean, offline() ? -1.5f : hover >= 0 || !corrupted ? 1 : 0, 2.5, dt);
             if (t > nextBlink) {
                 blinkUntil = t + 0.13;
                 nextBlink = t + 2.2 + random.nextDouble() * 4;
@@ -295,6 +286,10 @@ public final class OpmTitleScreen extends Screen {
             if (greetAt >= 0) {
                 GeoModel.Pose greet = model.pose("greet", (float) (t - greetAt) * 1.6f);
                 p = GeoModel.blend(p, greet, (float) Math.min(1, (t - greetAt) * 4));
+            } else if (OpmLive.full()) {
+                // Le monde est plein : la main levée, paume ouverte — « patience ».
+                GeoModel.Pose wait = model.pose("greet", 1.0f);
+                p = GeoModel.blend(p, wait, 0.8f);
             } else if (corrupted) {
                 // L'emprise : la main droite tendue au-dessus de lui, les doigts en griffe
                 // qui tirent sur les fils.

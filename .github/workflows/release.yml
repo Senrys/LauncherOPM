@@ -69,6 +69,19 @@ jobs:
           cache: npm
           cache-dependency-path: launcher/package-lock.json
 
+      - name: Installer Java 21
+        # Le mod OPM (../mod) est compilé à chaque version et embarqué dans le
+        # launcher (game-files.js) : rien à déposer sur le serveur.
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+          cache-dependency-path: |
+            mod/*.gradle
+            mod/gradle.properties
+            mod/gradle/wrapper/gradle-wrapper.properties
+
       - name: Installer les dépendances
         # `npm ci` et non `npm install` : il installe exactement le
         # package-lock.json versionné, donc les trois machines compilent avec

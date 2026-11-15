@@ -88,8 +88,8 @@ demande de réduire les animations.
 
 ## Du launcher au jeu
 
-Le launcher et le **mod OPM** du modpack (`mod/`, voir `mod/README.md`) se passent le
-relais sans que rien ne se voie :
+Le launcher et le **mod OPM** (`mod/`, voir `mod/README.md` ; embarqué dans le launcher,
+qui l'installe lui-même dans le jeu) se passent le relais sans que rien ne se voie :
 
 1. **JOUER** : la cinématique (ci-dessous). À l'éclair du passage, la **scène de
    chargement** du launcher apparaît (`components/loadingScene.js`) : la salle de
@@ -119,7 +119,18 @@ relais sans que rien ne se voie :
    griffe au-dessus de lui, fils rouges, et lui qui se protège le visage.
 6. **Les autres menus** (options, pause, connexion…) : la salle de simulation en fond,
    boutons et curseurs aux couleurs du launcher ; dans le menu pause, « Donner son avis »
-   et « Signaler un bug » deviennent le site et le Discord d'OPM.
+   et « Signaler un bug » deviennent le site et le Discord d'OPM. Dans le menu pause,
+   Xenodys passe parfois la tête par le coin bas-droit et dit un mot (l'annonce du staff
+   s'il y en a une).
+7. **La connexion** : le joueur, sur son socle, se défait en pixels qui filent vers un
+   orbe, qu'un anneau entoure jusqu'à l'entrée dans le monde.
+8. **La première arrivée** sur le serveur : un éclair, et Xenodys, immense, tout près, la
+   main tendue — elle dépose le joueur sur Grand Line, puis s'envole.
+9. **Xenodys en jeu** : `/xenodys apparaitre [anim]` (staff) — elle apparaît à 8 blocs,
+   immense, et suit les joueurs du regard. Aucune installation sur le serveur.
+10. **L'écran titre suit le serveur** : hors ligne, elle se détourne et cherche le monde ;
+    complet, elle lève la main. L'état de Xenodys et l'annonce du staff se relisent en
+    jeu toutes les minutes, sans redémarrer.
 
 Le launcher écrit pour le mod `opm/session.json` (état, pseudo, serveur, galerie,
 liens ; jamais de jeton) ; le mod n'en a pas besoin pour fonctionner (valeurs par

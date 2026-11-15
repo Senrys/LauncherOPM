@@ -1,8 +1,9 @@
 # Le mod One Piece Minecraft
 
-Mod **client** NeoForge 1.21.1 (NeoForge 21.1.248, comme le serveur), livré **par le
-modpack** — jamais par le launcher : les joueurs ne peuvent pas installer d'autre modpack,
-et le launcher vérifie les fichiers à chaque lancement.
+Mod **client** NeoForge 1.21.1 (NeoForge 21.1.248, comme le serveur), **embarqué dans le
+launcher** : la CI le compile à chaque version (`launcher/game-files.js`), et le launcher
+l'installe lui-même dans le dossier du jeu avant chaque lancement, avec authlib-injector.
+Rien à déposer sur le serveur ; une mise à jour du launcher met le mod à jour.
 
 Ce qu'il fait (détail dans `docs/XENODYS.md`, « Du launcher au jeu ») :
 
@@ -13,7 +14,17 @@ Ce qu'il fait (détail dans `docs/XENODYS.md`, « Du launcher au jeu ») :
   le modèle GeckoLib sans GeckoLib), le joueur sur son socle (`client/PlayerRaster`) ;
   ni solo ni liste de serveurs ;
 - **les menus** aux couleurs du launcher (`assets/minecraft/textures/gui/…`,
-  `mixin/ScreenMixin`) et la **musique** du launcher (`client/OpmMusic`).
+  `mixin/ScreenMixin`) et la **musique** du launcher (`client/OpmMusic`) ;
+- **l'écran titre réagit au serveur** (`client/OpmLive`, relu toutes les 20 s) : hors
+  ligne, Xenodys se détourne et cherche ; complet, elle lève la main (« patience ») ;
+- **la connexion** (`client/ConnectFx`) : le joueur se défait en pixels vers un orbe ;
+- **le menu pause** (`client/PausePeek`) : Xenodys passe parfois la tête par le coin bas-droit
+  et dit un mot — toujours l'annonce du staff quand il y en a une ;
+- **Xenodys dans le monde** (`client/WorldXenodys`) : partout où le serveur pose un marqueur
+  nommé `opm:xenodys[:animation]` (`/xenodys apparaitre`, minecraft/xenodys.sk), immense,
+  la tête vers le joueur ; et **la première arrivée** de chaque joueur, qu'elle dépose
+  dans le monde. Rien à installer sur le serveur : le marqueur est un support d'armure
+  invisible, c'est le mod des joueurs qui la dessine.
 
 Il dialogue avec le launcher par `opm/session.json` (écrit par
 `launcher/src/main/services/bridge.js`) et par trois lignes du journal : `[OPM:HELLO]`,
@@ -29,8 +40,10 @@ cd mod
 ./gradlew runClient      # un client de développement (dossier run/)
 ```
 
-Captures de développement : `./gradlew runClient -PopmShots=0.5,2,4 -PopmOptions=6 -PopmQuit=9`
-(dans `run/screenshots/`). `run/opm/session.json` simule ce qu'écrit le launcher.
+Captures de développement (dans `run/screenshots/`) :
+`./gradlew runClient -PopmShots=0.5,2,4 -PopmOptions=6 -PopmQuit=9`. `-PopmStatus=offline|full`
+force l'état du serveur ; `-PopmWorld=1` crée un monde de test en solo, y invoque Xenodys et
+ouvre le menu pause. `run/opm/session.json` simule ce qu'écrit le launcher.
 
 ## Ressources générées
 
@@ -39,17 +52,21 @@ sprites (`assets/opm/textures/gui/sprites/`), le modèle GeckoLib (`assets/opm/g
 `assets/opm/textures/entity/`) et les textures des menus (`assets/minecraft/…`). La
 musique (`assets/opm/sounds/music/`) vient de `xenodys/musique/`.
 
-## Déployer
+## Livraison
 
-Sur le serveur du site (`/var/www/opm-launcher/`, servi par
-`https://auth.onepieceminecraft.fr/launcher/`) :
+Automatique : `launcher/game-files.js` (appelé par `build.js`, donc par la CI) compile ce
+mod et récupère authlib-injector (version figée, SHA-256 vérifiée) dans
+`launcher/src/game/`. Avant chaque lancement, le launcher les pose dans l'instance
+(`mods/opm-<version>.jar`, `authlib-injector.jar`) et les protège de la vérification du
+modpack. Rien à faire sur le serveur.
 
-1. `mods/opm-<version>.jar` (supprimer l'ancienne version) ;
-2. `authlib-injector.jar` **à la racine** (la même version que celle du serveur
-   Minecraft) : le launcher le passe au jeu, qui annonce alors son arrivée à notre
-   serveur d'authentification et accepte nos skins signés. Sans lui, le launcher se
-   rabat sur une redirection minimale (connexion possible, skins des autres joueurs
-   absents) ;
-3. `files.json` se régénère tout seul.
+## Xenodys en jeu (staff)
 
-Le serveur Minecraft n'a pas besoin du mod.
+```
+/xenodys apparaitre [idle|greet|fly|cradle|unveil|lean]   devant soi, à 8 blocs
+/xenodys animation <anim>                                 la plus proche
+/xenodys disparaitre                                      la plus proche
+```
+
+Ou à la main : un support d'armure `Invisible`, `Marker`, `NoGravity`, nommé
+`opm:xenodys:<anim>` (son orientation est la sienne).

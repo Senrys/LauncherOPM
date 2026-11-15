@@ -16,6 +16,12 @@ npm run icon         # régénère icon.ico / icon.icns / icon.png depuis logo-o
 npm run build        # compile pour la plateforme courante
 ```
 
+**Le mod OPM et authlib-injector voyagent avec le launcher.** Chaque compilation passe d'abord
+par `game-files.js` (`npm run game-files` pour le lancer seul) : il compile `../mod` avec
+Gradle — il faut **Java 21** (la CI l'installe) — et récupère authlib-injector 1.2.8,
+empreinte SHA-256 vérifiée, dans `src/game/` (non versionné). Le launcher les installe
+dans le jeu avant chaque lancement. `OPM_SKIP_MOD=1` saute la compilation du mod.
+
 `npm run build` produit dans `dist/` la cible de **la machine sur laquelle il tourne** :
 
 | Machine | Sortie |

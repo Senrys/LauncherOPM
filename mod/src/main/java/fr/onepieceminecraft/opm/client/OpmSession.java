@@ -20,8 +20,9 @@ public final class OpmSession {
     public record Skin(String url, boolean slim) {}
 
     public final boolean fromLauncher;
-    public final String etat;
-    public final String message;
+    /** Mis à jour en direct par {@link OpmLive} (la commande /xenodys du staff). */
+    public volatile String etat;
+    public volatile String message;
     public final String playerName;
     public final String playerUuid;
     public final String host;

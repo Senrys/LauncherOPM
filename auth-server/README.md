@@ -381,7 +381,8 @@ but, et c'est aussi la conséquence qu'il faut avoir acceptée :
 launcher tiers compatible authlib-injector, avec le mot de passe du joueur, ne passe
 pas — seules les sessions délivrées au clic sur JOUER (`POST /api/v1/game/session`)
 ouvrent le serveur (migration `0003_ygg_session_origin`). Côté client, le jeu lancé par
-le launcher porte `authlib-injector.jar`, livré par le modpack (`mod/README.md`).
+le launcher porte `authlib-injector.jar`, embarqué dans le launcher et posé par lui dans le
+dossier du jeu (`launcher/game-files.js`) : rien à déposer à la main.
 
 Le repli existe si vous changez d'avis : `OPM_YGG_MOJANG_FALLBACK=true` laisse
 entrer les joueurs premium venus du launcher officiel quand leur pseudo est

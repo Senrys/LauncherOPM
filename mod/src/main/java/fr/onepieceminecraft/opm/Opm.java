@@ -1,6 +1,16 @@
 package fr.onepieceminecraft.opm;
 
+import fr.onepieceminecraft.opm.client.ConnectFx;
+import fr.onepieceminecraft.opm.client.OpmLive;
 import fr.onepieceminecraft.opm.client.OpmSession;
+import fr.onepieceminecraft.opm.client.PausePeek;
+import fr.onepieceminecraft.opm.client.WorldXenodys;
+import net.minecraft.client.gui.screens.ConnectScreen;
+import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.neoforge.client.event.RenderGuiEvent;
+import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
+import net.neoforged.neoforge.client.event.RenderNameTagEvent;
 import fr.onepieceminecraft.opm.client.OpmTitleScreen;
 import java.util.ArrayList;
 import net.minecraft.client.gui.components.AbstractWidget;
@@ -24,7 +34,7 @@ import org.slf4j.LoggerFactory;
  * Le mod One Piece Minecraft, côté client : l'écran de chargement de Xenodys
  * (mixin/MinecraftMixin → client/OpmLoadingOverlay), son envol, l'écran titre
  * (client/OpmTitleScreen), les menus et la musique aux couleurs du launcher.
- * Livré par le modpack.
+ * Embarqué dans le launcher, qui l'installe lui-même dans le jeu (launcher/game-files.js).
  */
 @Mod(value = Opm.ID, dist = Dist.CLIENT)
 public final class Opm {
@@ -42,14 +52,38 @@ public final class Opm {
                 event.setNewScreen(new OpmTitleScreen());
             }
         });
+        NeoForge.EVENT_BUS.addListener(ScreenEvent.Init.Post.class, event -> {
+            if (event.getScreen() instanceof PauseScreen pause) relinkPause(event, pause);
+        });
+        // L'écran de connexion : le joueur se défait en pixels vers l'orbe.
+        NeoForge.EVENT_BUS.addListener(ScreenEvent.BackgroundRendered.class, event -> {
+            if (event.getScreen() instanceof ConnectScreen) ConnectFx.render(event.getScreen(), event.getGuiGraphics());
+        });
+        // Le menu pause : Xenodys passe parfois la tête par le coin.
+        NeoForge.EVENT_BUS.addListener(ScreenEvent.Render.Post.class, event -> {
+            if (event.getScreen() instanceof PauseScreen) {
+                PausePeek.render(event.getScreen(), event.getGuiGraphics(), event.getMouseX(), event.getMouseY());
+            }
+        });
+        // Xenodys dans le monde : les apparitions du staff, la première arrivée.
+        NeoForge.EVENT_BUS.addListener(RenderLevelStageEvent.class, WorldXenodys::onRender);
+        NeoForge.EVENT_BUS.addListener(RenderNameTagEvent.class, WorldXenodys::onNameTag);
+        NeoForge.EVENT_BUS.addListener(ClientPlayerNetworkEvent.LoggingIn.class, WorldXenodys::onLogin);
+        NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, event -> {
+            WorldXenodys.onClientTick();
+            fr.onepieceminecraft.opm.client.DebugShots.worldTick();
+        });
+        NeoForge.EVENT_BUS.addListener(RenderGuiEvent.Post.class, event -> {
+            WorldXenodys.onGui(event);
+            if (fr.onepieceminecraft.opm.client.DebugShots.enabled()) fr.onepieceminecraft.opm.client.DebugShots.world();
+        });
+        OpmLive.start();
+        // Captures de développement : en dernier, après tout ce qui se dessine.
         if (fr.onepieceminecraft.opm.client.DebugShots.enabled()) {
             NeoForge.EVENT_BUS.addListener(ScreenEvent.Render.Post.class, event -> {
                 if (!(event.getScreen() instanceof OpmTitleScreen)) fr.onepieceminecraft.opm.client.DebugShots.menu();
             });
         }
-        NeoForge.EVENT_BUS.addListener(ScreenEvent.Init.Post.class, event -> {
-            if (event.getScreen() instanceof PauseScreen pause) relinkPause(event, pause);
-        });
     }
 
     private static String key(Component c) {
@@ -70,10 +104,10 @@ public final class Opm {
             String label;
             if ("menu.sendFeedback".equals(k) || "menu.feedback".equals(k)) {
                 url = session.website;
-                label = "Site One Piece Minecraft";
+                label = "Site OPM";
             } else if ("menu.reportBugs".equals(k)) {
                 url = session.discord;
-                label = "Discord One Piece Minecraft";
+                label = "Discord OPM";
             } else {
                 continue;
             }
