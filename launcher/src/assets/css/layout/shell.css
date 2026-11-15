@@ -3,7 +3,7 @@
    Fenêtre, fond animé, voiles, empilement des écrans.
 
    Ordre d'empilement (z-index), du fond vers la surface :
-      0  .opm-bg          vidéo + repli + les deux voiles
+      0  .opm-bg          salle de simulation + repli + les deux voiles
      10  .opm-shell       barre de titre, rail, panneaux, barre du bas
      20  .opm-titlebar / .opm-bottom   (posés dans leurs fichiers respectifs)
      30  .opm-popover     comptes et console       (components/overlay.css)
@@ -20,7 +20,7 @@
    milieu d'une fenêtre transparente. */
 
 /* ============================================================================
-   2. FOND — vidéo, repli, voiles
+   2. FOND — salle de simulation, repli, voiles
    ========================================================================== */
 
 .opm-bg {
@@ -30,29 +30,23 @@
   overflow: hidden;
 }
 
-/* Les quatre couches sont empilées explicitement. Le repli est placé APRÈS la
-   vidéo dans le balisage : sans ordre imposé il la couvrirait. On le renvoie
-   donc au fond, où il tient lieu d'image de secours — pendant le chargement de
-   la vidéo, si sa lecture échoue, ou quand la configuration désactive le fond
-   animé (le renderer pose alors `hidden` sur la vidéo). Aucun état à gérer :
-   la vidéo se contente de le recouvrir tant qu'elle est là. */
+/* Le repli : un aplat sombre, sous la salle de simulation (components/lab.js),
+   le temps qu'elle se dessine — ou pour toujours, si son canevas échoue. */
 .opm-bg__fallback {
   position: absolute;
   inset: 0;
   z-index: 0;
-  background: linear-gradient(180deg,
-              var(--sky-high) 0%,
-              var(--sky-low) 45%,
-              var(--sea) 100%);
+  background: linear-gradient(180deg, var(--abyss) 0%, var(--hull) 45%, var(--abyss) 100%);
 }
 
-.opm-bg__video {
+/* La salle : un canevas en gros pixels, agrandi sans lissage. */
+.opm-bg__lab {
   position: absolute;
   inset: 0;
   z-index: 1;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  image-rendering: pixelated;
 }
 
 /* Voile A — assombrit la gauche de l'image pour asseoir les cartes claires,
@@ -62,10 +56,10 @@
   inset: 0;
   z-index: 2;
   background: linear-gradient(102deg,
-              rgb(var(--veil-ink) / .88) 0%,
-              rgb(var(--veil-ink) / .66) 42%,
-              rgb(var(--veil-ink) / .18) 70%,
-              rgb(var(--veil-ink) / .50) 100%);
+              rgb(var(--veil-ink) / .78) 0%,
+              rgb(var(--veil-ink) / .52) 42%,
+              rgb(var(--veil-ink) / .10) 70%,
+              rgb(var(--veil-ink) / .36) 100%);
 }
 
 /* Voile B — ancre la barre de titre en haut et la barre du bas en bas. */

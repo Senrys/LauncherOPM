@@ -32,6 +32,8 @@ import { createXenodys } from './components/xenodys3d.js';
 import { createAmbiance } from './components/ambiance.js';
 import { createSfx } from './components/sfx.js';
 import { createVideoCircuits } from './components/circuits.js';
+import { createLab } from './components/lab.js';
+import { frameBuilt } from './components/intro.js';
 
 /** Pont exposé par le preload (docs/IPC.md). */
 const opm = window.opm;
@@ -78,9 +80,6 @@ const SPLASH_MIN_MS = 900;
 /** Durée du fondu de sortie du splash (doit rester ≥ la transition CSS). */
 const SPLASH_FADE_MS = 450;
 
-/** Délai au-delà duquel une vidéo de fond qui n'a pas démarré cède la place au dégradé. */
-const VIDEO_TIMEOUT_MS = 3000;
-
 /**
  * Regroupement des lignes de journal avant écriture dans le magasin.
  *
@@ -124,8 +123,6 @@ const ui = {
   shell: $('[data-screen="app"]'),
   login: $('[data-screen="login"]'),
   panelHost: $('[data-el="panel-host"]'),
-  video: $('[data-el="bg-video"]'),
-  videoFallback: $('[data-el="bg-fallback"]'),
 };
 
 /** Panneaux montés : nom → { root, instance }. */
@@ -728,13 +725,12 @@ async function start() {
   wireGlobalErrors();
   wireShortcuts();
   wireStaticActions();
-  setupBackground();
   wireMainProcessEvents();
   wireXenodys();
   wireOpenWindow();
   wireAmbiance();
   wireSfx();
-  wireVideoCircuits();
+  wireLab();
 
   try {
     await boot();
@@ -789,10 +785,14 @@ const XENODYS_POLL_MS = 60_000;
  * `launcher.ambiance` et `launcher.volume`, l'état de Xenodys, et se tait
  * pendant une partie ou quand le launcher est réduit.
  */
+/** La musique, une fois créée : le fond bat sur ses temps. */
+let ambianceRef = null;
+
 function wireAmbiance() {
   let ambiance;
   try {
     ambiance = createAmbiance();
+    ambianceRef = ambiance;
   } catch (err) {
     console.error('opm : musique indisponible.', err);
     return;
@@ -815,9 +815,15 @@ function wireAmbiance() {
 }
 
 /**
- * La cinématique du lancement : quand le jeu démarre, Xenodys emporte le
- * launcher ; quand il se ferme (ou si le lancement échoue), il revient. Le
- * processus principal attend la fin de la cinématique pour masquer la fenêtre.
+ * La cinématique du lancement (components/xenodys3d.js).
+ *
+ * - Clic sur JOUER (`prepare`) : Xenodys emporte le launcher ; il n'est plus
+ *   qu'un orbe entre ses mains pendant la préparation des fichiers (un anneau
+ *   en dit l'avancement ; cliquer l'orbe ramène le launcher).
+ * - Le jeu démarre (`launching`) : le passage s'ouvre. Le processus principal
+ *   garde la fenêtre au premier plan et ne la masque qu'à `cinematicEnd`.
+ * - Fin de partie, échec : le launcher se reconstruit et elle revient ; après
+ *   un échec, elle réagit.
  * @param {Awaited<ReturnType<typeof createXenodys>>} xen
  */
 function wireCinematic(xen) {
@@ -831,26 +837,62 @@ function wireCinematic(xen) {
     returnPending = false;
   };
 
+  /** Le joueur clique l'orbe : le launcher revient, la préparation continue. */
+  const abortToLauncher = () => {
+    comeBack();
+    // Plus rien à attendre : si le jeu démarre ensuite, une nouvelle
+    // cinématique (sans attente) prendra le relais.
+    opm.window.cinematicEnd();
+  };
+
+  const begin = () => {
+    phase = 'playing';
+    xen.begin(sfx, { progress: () => store.get().game, onAbort: abortToLauncher }).then((done) => {
+      if (!done) return;
+      opm.window.cinematicEnd();
+      phase = 'gone';
+      // Launcher gardé ouvert pendant la partie : il revient aussitôt.
+      const keepOpen = store.get().config?.launcher?.close_on_launch === false;
+      if (returnPending || keepOpen) setTimeout(comeBack, keepOpen ? 1200 : 0);
+    });
+  };
+
+  opm.game.on((event) => {
+    if (event?.type === 'prepare' && phase === 'idle') begin();
+  });
+
   store.subscribe((state, changed) => {
     if (!changed.has('game')) return;
     const g = state.game?.state;
-    if (g === 'launching' && phase === 'idle') {
-      phase = 'playing';
-      xen.launch(sfx).then(() => {
-        opm.window.cinematicEnd();
-        phase = 'gone';
-        // Launcher gardé ouvert pendant la partie : il revient aussitôt.
-        const keepOpen = store.get().config?.launcher?.close_on_launch === false;
-        if (returnPending || keepOpen) setTimeout(comeBack, keepOpen ? 1200 : 0);
-      });
+    if (g === 'launching') {
+      if (phase === 'idle') begin();
+      if (phase === 'playing') xen.release();
       return;
     }
     if (OVER.has(g) && phase !== 'idle') {
-      if (phase === 'gone') comeBack();
+      // Pendant l'attente (préparation), le launcher revient tout de suite ;
+      // une fois le passage ouvert, on laisse la cinématique finir.
+      if (phase === 'gone' || !xen.released) comeBack();
       else returnPending = true;
     }
+    if (g === 'error') xen.react('fail');
   });
 }
+
+/** Le bouton JOUER survolé : elle le regarde. */
+function wirePlayGaze(xen) {
+  document.addEventListener('mouseover', (event) => {
+    const play = event.target.closest?.('[data-action="play"]');
+    if (play && !play.contains(event.relatedTarget)) xen.attend(play);
+  }, { passive: true });
+  document.addEventListener('mouseout', (event) => {
+    const play = event.target.closest?.('[data-action="play"]');
+    if (play && !play.contains(event.relatedTarget)) xen.attend(null);
+  }, { passive: true });
+}
+
+/** Xenodys, une fois en scène (fenêtre ouverte) : la bascule de son état passe par elle. */
+let xenScene = null;
 
 /** Les petits bruits de l'interface (components/sfx.js), partagés avec la cinématique. */
 const sfx = createSfx();
@@ -882,7 +924,8 @@ function wireSfx() {
       sfx.setVolume(state.volumePreview ?? launcher.volume);
     }
     const next = state.xenodys?.etat ?? null;
-    if (etat && next && next !== etat) sfx.play('servo');
+    // En fenêtre ouverte, c'est Xenodys qui fait entendre sa bascule (`shift`).
+    if (etat && next && next !== etat && !xenScene) sfx.play('servo');
     etat = next ?? etat;
   };
   store.subscribe((state, changed) => {
@@ -891,14 +934,27 @@ function wireSfx() {
   apply(store.get());
 }
 
-/** Les circuits de Xenodys, incrustés dans la vidéo de fond (components/circuits.js). */
-function wireVideoCircuits() {
+/**
+ * Le fond : la salle de simulation (components/lab.js), qui bat sur les temps
+ * de la musique, et les circuits de Xenodys incrustés par-dessus
+ * (components/circuits.js).
+ */
+function wireLab() {
+  const lab = $('[data-el="bg-lab"]');
+  if (lab) {
+    try {
+      createLab(lab, { pulse: () => ambianceRef?.pulse?.() ?? 0 });
+    } catch (err) {
+      // Le repli (un aplat sombre) reste dessous.
+      console.error('opm : salle de simulation indisponible.', err);
+    }
+  }
   const canvas = $('[data-el="bg-circuits"]');
   if (!canvas) return;
   try {
     createVideoCircuits(canvas);
   } catch (err) {
-    console.error('opm : circuits de la vidéo indisponibles.', err);
+    console.error('opm : circuits du fond indisponibles.', err);
   }
 }
 
@@ -919,9 +975,16 @@ function wireOpenWindow() {
     // Xenodys elle-même, derrière le cadre, qu'elle domine depuis la droite.
     const stage = $('[data-el="xeno-stage"]');
     const canvas = $('[data-el="xeno-canvas"]');
+    // Le cadre se construit (CSS, components/intro.js) ; elle n'arrive qu'après.
+    sfx.play('build');
     if (stage && canvas && window.skinview3d) {
       createXenodys(canvas, stage, frame)
-        .then((xen) => wireCinematic(xen))
+        .then((xen) => {
+          xenScene = xen;
+          wireCinematic(xen);
+          wirePlayGaze(xen);
+          return frameBuilt().then(() => xen.arrive(sfx));
+        })
         .catch((err) => {
           console.error('opm : Xenodys indisponible.', err);
           // Sans elle, pas de cinématique : le launcher n'a rien à attendre.
@@ -952,7 +1015,10 @@ function wireXenodys() {
     // Première valeur : on la pose sans spectacle. Ensuite seulement, une
     // vraie bascule s'annonce.
     const shifted = previous !== null && previous.etat !== next.etat;
-    xenodys.applyTheme(next.etat, { animate: shifted });
+    // En fenêtre ouverte, la bascule part du cœur de Xenodys : le thème change
+    // quand son onde a couvert la fenêtre.
+    if (shifted && xenScene) xenScene.shift(next.etat, () => xenodys.applyTheme(next.etat, { animate: true }));
+    else xenodys.applyTheme(next.etat, { animate: shifted });
     if (state.screen === 'splash') sayOnSplash(next.etat);
 
     if (shifted) {
@@ -1080,48 +1146,6 @@ async function openExternal(url) {
   } catch (error) {
     reportError(error, "Ouverture du lien impossible");
   }
-}
-
-/* ========================================================================== */
-/*  Vidéo de fond                                                             */
-/* ========================================================================== */
-
-/**
- * Lance la vidéo de fond et bascule sur le dégradé de repli si elle échoue,
- * si sa lecture est refusée, ou si elle n'a toujours pas démarré au bout de
- * quelques secondes.
- */
-function setupBackground() {
-  const video = ui.video;
-  const fallback = ui.videoFallback;
-  if (!video || !fallback) return;
-
-  let switched = false;
-
-  const useFallback = (reason) => {
-    if (switched) return;
-    switched = true;
-
-    video.pause();
-    // Opacité posée au runtime, puis retrait du flux : le dégradé prend la place.
-    video.style.opacity = '0';
-    video.hidden = true;
-    fallback.hidden = false;
-
-    log('warn', `Vidéo de fond indisponible (${reason}) : repli sur le dégradé.`);
-  };
-
-  on(video, 'error', () => useFallback('erreur de lecture'));
-
-  const played = video.play();
-  if (played && typeof played.catch === 'function') {
-    played.catch(() => useFallback('lecture refusée'));
-  }
-
-  setTimeout(() => {
-    // HAVE_CURRENT_DATA : en deçà, rien n'a jamais été affiché.
-    if (video.readyState < 2 || video.paused) useFallback('démarrage impossible');
-  }, VIDEO_TIMEOUT_MS);
 }
 
 /* ========================================================================== */

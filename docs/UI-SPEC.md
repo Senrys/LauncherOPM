@@ -67,12 +67,14 @@
 ```
 
 Sous la fenêtre, deux couches empilées, toujours présentes :
-1. `<video>` `assets/videos/opmback2.mp4`, `object-fit: cover`, `muted loop autoplay playsinline`.
+1. La salle de simulation : un canevas en gros pixels (components/lab.js) — sol quadrillé
+   en perspective, mur de calibration, impulsions de données, balayage de scan, qui bat sur
+   les temps de la musique ; magenta et cases cassées quand Xenodys est corrompue.
 2. Voile A : `linear-gradient(102deg, rgba(6,16,15,.88) 0%, rgba(6,16,15,.66) 42%, rgba(6,16,15,.18) 70%, rgba(6,16,15,.5) 100%)`
 3. Voile B : `linear-gradient(180deg, rgba(6,16,15,.45) 0%, rgba(6,16,15,0) 20%, rgba(6,16,15,0) 60%, rgba(6,16,15,.86) 100%)`
 
-Repli si la vidéo échoue (`error` / `videoBackground:false`) :
-`linear-gradient(180deg, #7FB6D8 0%, #A9CFE2 45%, #2C6C86 100%)`.
+Repli, sous la salle (le temps qu'elle se dessine, ou si son canevas échoue) :
+`linear-gradient(180deg, --abyss 0%, --hull 45%, --abyss 100%)`.
 
 **Zone de glissement** : la barre de titre est `-webkit-app-region: drag`, sauf onglets et
 boutons qui sont `no-drag`.

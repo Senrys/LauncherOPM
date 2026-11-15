@@ -192,6 +192,7 @@ type LoginResult =
   | { ok: false, error: 'totp_required' | 'microsoft_required' | string, message: string }
 
 type GameEvent =
+  | { type: 'prepare' }            // JOUER : la préparation commence (cinématique)
   | { type: 'check',    progress: number, size: number }
   | { type: 'progress', progress: number, size: number, speed_bps?: number, eta_s?: number }
   | { type: 'extract',  file: string }
@@ -225,6 +226,8 @@ Xenodys occupe la marge (windows/mainWindow.js, layout/frame.css).
 | `window.setPassthrough(bool)` | `window:passthrough` | La marge vide laisse passer les clics jusqu'au bureau (`setIgnoreMouseEvents`, mouvements toujours transmis). Sans effet en mode compact. |
 | `window.resizeFrame(w, h)` | `window:resize-frame` | Nouvelle taille du cadre (poignée dessinée par le launcher), bornée par 1100 × 700 et par l'écran. |
 | `window.maximize()` | `window:maximize` | En mode ouvert, le cadre prend toute la zone de travail ; `window:maximized` est émis comme en mode compact. |
+
+| `window.cinematicEnd()` | `window:cinematic-end` | La cinématique du lancement est jouée. Elle commence sur `prepare` (clic sur JOUER), l'orbe attend la fin de la préparation, le passage s'ouvre sur `launching`. Dès `launching`, la fenêtre passe au premier plan (le jeu s'ouvre derrière elle) ; elle n'est masquée, puis rendue au rang commun, qu'à cet appel, ou après 7 s. |
 
 Le mode est transmis à la page dans son adresse (`?fenetre=ouvert&mt=…`), lu
 avant le premier rendu par `assets/js/frame.js`. Changer `launcher.window_open`

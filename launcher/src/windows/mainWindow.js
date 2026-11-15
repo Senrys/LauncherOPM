@@ -239,6 +239,21 @@ function dragEnd() {
  * Recrée la fenêtre — le mode ouvert ou compact se décide à la création
  * (une fenêtre ne devient pas transparente après coup).
  */
+/**
+ * Garde la fenêtre au-dessus de toutes les autres (la fin de la cinématique du
+ * lancement : la fenêtre du jeu s'ouvre derrière elle), ou la rend au rang commun.
+ * @param {boolean} on
+ */
+function setOnTop(on) {
+  if (!win || win.isDestroyed()) return;
+  try {
+    if (on) win.setAlwaysOnTop(true, 'screen-saver');
+    else win.setAlwaysOnTop(false);
+  } catch {
+    // Sans conséquence : au pire, le jeu passe devant l'animation.
+  }
+}
+
 function recreate() {
   const old = getWindow();
   const bounds = old ? old.getBounds() : null;
@@ -412,4 +427,5 @@ module.exports = {
   setPassthrough,
   dragStart,
   dragEnd,
+  setOnTop,
 };

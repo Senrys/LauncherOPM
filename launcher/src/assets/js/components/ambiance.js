@@ -92,6 +92,8 @@ export function createAmbiance() {
   let pauseTimer = 0;
   // Position dans la musique : temps de la prochaine double-croche, et son rang.
   let nextStep = 0;
+  /** Les derniers temps planifiés : `{at, strong}`, en temps du contexte audio. */
+  const beats = [];
   let step = 0;
 
   const playing = () => enabled && !silenced && volume > 0;
@@ -312,6 +314,11 @@ export function createAmbiance() {
    */
   function playStep(song, s, at) {
     const S = SONGS[song];
+    // Les temps, pour ceux qui veulent battre avec la musique (le fond).
+    if (s % 4 === 0) {
+      beats.push({ at, strong: s % 16 === 0 });
+      if (beats.length > 16) beats.shift();
+    }
     const sixteenth = 60 / S.bpm / 4;
     const perChord = 16 * S.barsPerChord;
     const chord = S.chords[Math.floor(s / perChord) % S.chords.length];
@@ -417,6 +424,20 @@ export function createAmbiance() {
   window.addEventListener('pointerdown', unlock);
 
   return {
+    /**
+     * L'enveloppe du dernier temps joué, de 1 (le temps vient de tomber) à 0.
+     * Les premiers temps des mesures comptent plus. 0 quand la musique se tait.
+     */
+    pulse() {
+      if (!ctx || !playing() || volume <= 0) return 0;
+      const now = ctx.currentTime;
+      for (let i = beats.length - 1; i >= 0; i -= 1) {
+        const b = beats[i];
+        if (b.at > now) continue;
+        return Math.exp(-(now - b.at) * 5) * (b.strong ? 1 : 0.55);
+      }
+      return 0;
+    },
     setEnabled(on) {
       enabled = Boolean(on);
       update();

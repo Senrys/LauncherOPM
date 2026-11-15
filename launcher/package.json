@@ -30,7 +30,6 @@
       "src"
     ],
     "ignore": [
-      "src/assets/videos",
       ".stage",
       "dist"
     ]

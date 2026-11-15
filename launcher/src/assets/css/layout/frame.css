@@ -78,6 +78,59 @@ html,
    (coins pixelisés, encoches) et se fond dans la nappe tramée du décor. */
 :root[data-fenetre="ouvert"] .opm-app {
   border-radius: 0;
+  /* L'apparition : le cadre se construit ligne à ligne, de haut en bas
+     (components/intro.js sait l'attendre et la rejouer). Remplissage
+     « backwards » seulement : une fois jouée, l'animation ne retient rien. */
+  animation: opmFrameBuild .7s steps(14, end) .12s backwards;
+}
+
+@keyframes opmFrameBuild {
+  from { clip-path: inset(0 0 100% 0); }
+  to   { clip-path: inset(0 0 0 0); }
+}
+
+/* La ligne de scan qui construit le cadre. */
+.opm-buildline {
+  position: absolute;
+  top: var(--frame-mt);
+  left: var(--frame-ml);
+  right: var(--frame-mr);
+  z-index: 4;
+  height: 4px;
+  pointer-events: none;
+  background: var(--aqua);
+  box-shadow: 0 0 0 4px rgba(145, 217, 209, .25), 0 0 18px rgba(145, 217, 209, .7);
+  opacity: 0;
+  animation: opmBuildLine .7s steps(14, end) .12s;
+}
+
+:root[data-xenodys="corrompue"] .opm-buildline {
+  background: #F0506E;
+  box-shadow: 0 0 0 4px rgba(240, 80, 110, .25), 0 0 18px rgba(240, 80, 110, .7);
+}
+
+@keyframes opmBuildLine {
+  from { opacity: 1; transform: translateY(0); }
+  96%  { opacity: 1; }
+  to   { opacity: 0; transform: translateY(calc(100vh - var(--frame-mt) - var(--frame-mb))); }
+}
+
+:root:not([data-fenetre="ouvert"]) .opm-buildline { display: none; }
+
+/* Le décor autour ne s'allume qu'une fois le cadre construit. */
+:root[data-fenetre="ouvert"] .opm-surround {
+  animation: opmDecorOn .5s steps(5, end) .8s backwards;
+}
+
+@keyframes opmDecorOn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-fenetre="ouvert"] .opm-app,
+  :root[data-fenetre="ouvert"] .opm-surround,
+  .opm-buildline { animation: none; }
 }
 
 /* Fenêtre agrandie en mode ouvert : la marge reste, le cadre grandit. */
@@ -175,3 +228,44 @@ html,
   transition: opacity .5s ease;
 }
 
+
+/* Pendant l'attente (la préparation des fichiers) : cliquer l'orbe ramène le
+   launcher. Une étiquette sous l'orbe dit où en est la préparation. */
+.opm-cine-hit {
+  position: absolute;
+  z-index: 7;
+  width: 120px;
+  height: 120px;
+  margin: -60px 0 0 -60px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+}
+
+.opm-cine-hit[hidden] { display: none; }
+
+.opm-cine-hit__label {
+  position: absolute;
+  /* Au-dessus de l'orbe : ses mains sont dessous. */
+  bottom: 112px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font: 700 11px/1.5 var(--font-ui, sans-serif);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--aqua);
+  text-shadow: 0 0 6px rgba(0, 0, 0, .9), 0 1px 0 #000;
+}
+
+.opm-cine-hit__label small {
+  display: block;
+  font-size: 9px;
+  font-weight: 600;
+  opacity: .75;
+  text-align: center;
+}
+
+:root[data-xenodys="corrompue"] .opm-cine-hit__label { color: #F0506E; }

@@ -147,6 +147,79 @@ export function createSfx() {
       tone({ type: 'sine', from: 160, to: 880, dur: 0.6, gain: 0.08 });
       tone({ type: 'square', from: 880, at: 0.6, dur: 0.05, gain: 0.06, filter: { type: 'lowpass', freq: 2500 } });
     },
+    // Le cadre se construit, ligne à ligne : un balayage de petits bips.
+    build: () => {
+      for (let k = 0; k < 8; k += 1) {
+        tone({ type: 'square', from: 700 + k * 90, at: k * 0.075, dur: 0.03, gain: 0.035, filter: { type: 'lowpass', freq: 2600 } });
+      }
+      noise({ dur: 0.6, gain: 0.04, type: 'highpass', from: 5000, to: 2500 });
+    },
+    // Une main de Xenodys se pose sur le cadre : un servo bref, un « clac » métallique.
+    clamp: () => {
+      tone({ type: 'sawtooth', from: 180, to: 320, dur: 0.12, gain: 0.06, filter: { type: 'lowpass', freq: 900 } });
+      noise({ at: 0.11, dur: 0.05, gain: 0.2, type: 'bandpass', from: 1800, q: 5 });
+      tone({ type: 'triangle', from: 2300, to: 1900, at: 0.11, dur: 0.12, gain: 0.05 });
+      tone({ type: 'sine', from: 90, to: 55, at: 0.11, dur: 0.18, gain: 0.12 });
+    },
+    // Corrompue : ses mains s'écrasent sur le cadre.
+    slam: () => {
+      tone({ type: 'sine', from: 120, to: 38, dur: 0.5, gain: 0.3 });
+      noise({ dur: 0.35, gain: 0.3, type: 'lowpass', from: 3000, to: 200 });
+      noise({ at: 0.02, dur: 0.12, gain: 0.18, type: 'bandpass', from: 2400, q: 6 });
+      for (let k = 0; k < 4; k += 1) noise({ at: 0.18 + k * 0.07, dur: 0.03, gain: 0.08, type: 'bandpass', from: 1200 + k * 500, q: 5 });
+    },
+    // Un grésillement court : l'image qui saute.
+    glitch: () => {
+      for (let k = 0; k < 3; k += 1) {
+        tone({ type: 'square', from: 300 + Math.random() * 900, at: k * 0.045, dur: 0.03, gain: 0.04, filter: { type: 'bandpass', freq: 1800, q: 2 } });
+      }
+      noise({ dur: 0.12, gain: 0.07, type: 'highpass', from: 3500 });
+    },
+    // Un assistant touche le sol.
+    land: () => {
+      tone({ type: 'sine', from: 260, to: 120, dur: 0.09, gain: 0.07 });
+      noise({ dur: 0.03, gain: 0.05, type: 'bandpass', from: 2600, q: 3 });
+    },
+    // Le joueur se défait en pixels : une pluie de bips qui montent.
+    dissolve: () => {
+      for (let k = 0; k < 14; k += 1) {
+        tone({ type: 'square', from: 500 + k * 110 + Math.random() * 60, at: k * 0.05, dur: 0.035, gain: 0.025, filter: { type: 'lowpass', freq: 3500 } });
+      }
+      noise({ dur: 0.8, gain: 0.05, type: 'bandpass', from: 1500, to: 6000, q: 1.5 });
+    },
+    // Le bocal éclate.
+    shatter: () => {
+      noise({ dur: 0.08, gain: 0.3, type: 'highpass', from: 2500 });
+      for (let k = 0; k < 9; k += 1) {
+        tone({ type: 'sine', from: 2800 + Math.random() * 3500, at: 0.03 + Math.random() * 0.45, dur: 0.12, gain: 0.04 });
+      }
+      noise({ at: 0.05, dur: 0.5, gain: 0.08, type: 'bandpass', from: 5000, to: 2500, q: 2 });
+    },
+    // Un lancement raté, créatrice : deux notes qui descendent, dédaigneuses.
+    deny: () => {
+      tone({ type: 'triangle', from: 660, dur: 0.14, gain: 0.07 });
+      tone({ type: 'triangle', from: 440, to: 415, at: 0.16, dur: 0.3, gain: 0.07 });
+    },
+    // Corrompue : un rire mécanique, haché, qui grésille.
+    laugh: () => {
+      for (let k = 0; k < 6; k += 1) {
+        const f = 330 - k * 22;
+        tone({ type: 'sawtooth', from: f * 1.15, to: f, at: k * 0.11, dur: 0.08, gain: 0.07, filter: { type: 'bandpass', freq: 1300, q: 1.6 } });
+        noise({ at: k * 0.11, dur: 0.04, gain: 0.05, type: 'bandpass', from: 2500, q: 3 });
+      }
+    },
+    // La corruption gagne Xenodys : un coup sourd, une onde qui se déchire.
+    corrupt: () => {
+      tone({ type: 'sine', from: 70, to: 32, dur: 0.9, gain: 0.25 });
+      tone({ type: 'sawtooth', from: 110, to: 220, dur: 1.2, gain: 0.07, filter: { type: 'lowpass', freq: 1200 } });
+      tone({ type: 'sawtooth', from: 116, to: 208, dur: 1.2, gain: 0.06, filter: { type: 'lowpass', freq: 1200 } });
+      noise({ dur: 1.3, gain: 0.12, type: 'bandpass', from: 400, to: 3000, q: 1 });
+    },
+    // Elle redevient créatrice : un accord clair qui s'ouvre.
+    purify: () => {
+      [392, 493.88, 587.33, 783.99].forEach((f, k) => tone({ type: 'triangle', from: f, at: k * 0.09, dur: 1.1 - k * 0.12, gain: 0.06 }));
+      noise({ dur: 1.0, gain: 0.07, type: 'highpass', from: 3000, to: 8000 });
+    },
   };
 
   /** Délai minimal entre deux occurrences d'un même son, en secondes. */
