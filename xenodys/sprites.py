@@ -35,7 +35,9 @@ ICI = Path(__file__).resolve().parent
 RACINE = ICI.parent
 GECKO = ICI / "geckolib"
 SORTIES = [
-    RACINE / "mod" / "src" / "main" / "resources" / "assets" / "opm" / "textures" / "gui" / "sprites",
+    # Hors de « textures/gui/sprites » : Minecraft assemble ce dossier dans l'atlas
+    # de son interface, et ces planches n'ont rien à y faire (le mod les lit seul).
+    RACINE / "mod" / "src" / "main" / "resources" / "assets" / "opm" / "scene",
     RACINE / "launcher" / "src" / "assets" / "sprites",
 ]
 ETATS = ("creatrice", "corrompue")
@@ -945,13 +947,24 @@ def police(meta: dict) -> None:
 # --------------------------------------------------------------------------- #
 
 def menus() -> None:
-    """Boutons, curseurs, champs, séparateurs et fonds des menus de Minecraft.
+    """Boutons, curseurs, champs, séparateurs et fonds des menus, hors partie.
 
-    Le mod les place dans `assets/minecraft/…` : ils remplacent ceux du jeu dans
-    tous les menus (pause, options, connexion…). Palette « créatrice ».
+    **Le jeu sur le serveur garde son apparence** (et celle de son pack de
+    ressources) : les boutons, curseurs et champs vont dans `assets/opm/…`, et le
+    mod ne les substitue à ceux du jeu que hors du monde et sans pack du serveur
+    (mixin/GuiGraphicsMixin). Les fonds et séparateurs remplacés sont ceux des
+    menus hors partie seulement ; leurs variantes « inworld » (menu pause…) ne
+    sont pas touchées. Palette « créatrice ».
     """
     base = RACINE / "mod" / "src" / "main" / "resources" / "assets" / "minecraft" / "textures" / "gui"
-    widget = base / "sprites" / "widget"
+    widget = RACINE / "mod" / "src" / "main" / "resources" / "assets" / "opm" / "textures" / "gui" / "sprites" / "widget"
+    import shutil
+
+    # Anciennes substitutions directes (versions précédentes) : retirées.
+    shutil.rmtree(base / "sprites", ignore_errors=True)
+    for ancien in ("inworld_header_separator", "inworld_footer_separator", "inworld_menu_background",
+                   "inworld_menu_list_background"):
+        (base / f"{ancien}.png").unlink(missing_ok=True)
     widget.mkdir(parents=True, exist_ok=True)
     fond, fond_hi, fond_off = (14, 37, 34, 245), (29, 92, 81, 255), (10, 22, 21, 200)
     accent, core, terne = (145, 217, 209, 255), (233, 255, 252, 255), (60, 92, 88, 255)
@@ -999,14 +1012,12 @@ def menus() -> None:
         meta(f, 200, 20, 1)
 
     # Séparateurs (32 × 2) et fonds (16 × 16) : une trame de la salle de simulation.
-    for nom, couleur in (("header_separator", accent), ("footer_separator", accent),
-                         ("inworld_header_separator", accent), ("inworld_footer_separator", accent)):
+    for nom, couleur in (("header_separator", accent), ("footer_separator", accent)):
         im = Image.new("RGBA", (32, 2), (0, 0, 0, 0))
         for x in range(32):
             im.putpixel((x, 0 if "header" in nom else 1), couleur[:3] + ((200 if x % 4 else 255),))
         im.save(base / f"{nom}.png")
-    for nom, alpha in (("menu_background", 110), ("menu_list_background", 120),
-                       ("inworld_menu_background", 120), ("inworld_menu_list_background", 110)):
+    for nom, alpha in (("menu_background", 110), ("menu_list_background", 120)):
         # Un voile uni : la salle de simulation reste lisible dessous, sans grille en plus.
         im = Image.new("RGBA", (16, 16), (3, 9, 9, alpha))
         im.save(base / f"{nom}.png")

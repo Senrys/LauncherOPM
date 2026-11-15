@@ -24,7 +24,8 @@ import net.minecraft.resources.ResourceLocation;
  * l'ORIGINE de la planche (le pied du modèle) au point donné.
  */
 public final class Sprites {
-    private static final String ROOT = "/assets/opm/textures/gui/sprites/";
+    /** Hors de textures/gui/sprites : Minecraft n'en fait pas un atlas. */
+    private static final String ROOT = "/assets/opm/scene/";
     private static JsonObject meta;
     private static final Map<String, Sheet> SHEETS = new HashMap<>();
 
