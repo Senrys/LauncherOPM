@@ -210,6 +210,16 @@ class Settings(BaseSettings):
     #: authlib-injector — reste valable pour le reste du protocole, mais son
     #: ``join`` est refusé. Le repli Mojang, lui, doit rester désactivé.
     join_launcher_only: bool = True
+    #: Anti-triche : ``join`` exige que le launcher ait déclaré des fichiers de jeu
+    #: conformes au modpack officiel (``POST /api/v1/game/attest``).
+    join_require_attestation: bool = True
+    #: Le modpack officiel (``files.json``) : un chemin local (le serveur du site
+    #: l'héberge, ``/var/www/opm-launcher/files.json``) ou une URL. Vide :
+    #: ``<OPM_PUBLIC_URL>/launcher/files.json``.
+    modpack_manifest: str | None = None
+    #: Webhook (Discord ou compatible : ``{"content": …}``) où relayer au staff les
+    #: soupçons de triche. Vide : alertes seulement en base et dans le journal.
+    anticheat_webhook: str | None = None
 
     # -------------------------------------- 9. Statistiques du serveur Minecraft
     #: Autorise l'écriture de la fréquentation dans ``statistiques`` (id = 1).

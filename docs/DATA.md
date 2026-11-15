@@ -134,7 +134,27 @@ CREATE TABLE ygg_session (
     issued_at     timestamp NOT NULL DEFAULT now(),
     expires_at    timestamp NOT NULL,
     invalidated_at timestamp,
-    origin        varchar(16) NOT NULL DEFAULT 'yggdrasil'  -- 'launcher' : clic sur JOUER (migration 0003)
+    origin        varchar(16) NOT NULL DEFAULT 'yggdrasil', -- 'launcher' : clic sur JOUER (migration 0003)
+    attestation   varchar(12)            -- empreinte des fichiers : ok / refused / unverified (0004)
+);
+-- Anti-triche (migration 0004) : empreintes du launcher, rapports du mod…
+CREATE TABLE game_report (
+    id serial PRIMARY KEY,
+    user_id integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    kind varchar(12) NOT NULL,             -- launch / join / periodic
+    ok boolean NOT NULL,
+    details text,                          -- JSON : mods en trop, modifiés, packs, X-ray
+    created_at timestamp NOT NULL DEFAULT now()
+);
+-- … et les soupçons, écrits aussi par le serveur Minecraft (anticheat.sk, skript-db)
+CREATE TABLE opm_alerte (
+    id serial PRIMARY KEY,
+    joueur varchar(32) NOT NULL, uuid varchar(36),
+    type varchar(24) NOT NULL,             -- fichiers, client, vol, vitesse, portée, minerais
+    detail varchar(280),
+    source varchar(12) NOT NULL DEFAULT 'serveur',  -- serveur / launcher
+    relayee boolean NOT NULL DEFAULT false,         -- relayée au staff (webhook)
+    cree_le timestamp NOT NULL DEFAULT now()
 );
 CREATE TABLE ygg_join (
     server_id  varchar(64) PRIMARY KEY,

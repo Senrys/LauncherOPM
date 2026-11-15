@@ -1,0 +1,170 @@
+# ============================================================================
+#  Anti-triche de One Piece Minecraft — côté serveur
+# ----------------------------------------------------------------------------
+#  Des SOUPÇONS, jamais des sanctions automatiques : vol, vitesse, portée des
+#  coups, taux de minerais rares (X-ray). Chaque soupçon :
+#    - est enregistré dans la table « opm_alerte » (base partagée, comme
+#      « launcher_xenodys ») — le serveur d'authentification la relaie au staff
+#      (webhook Discord, OPM_ANTICHEAT_WEBHOOK) ;
+#    - est envoyé en jeu aux membres du staff (permission opm.staff) ;
+#    - fait apparaître Xenodys corrompue au coin de l'écran du joueur
+#      (« Je te vois… ») : le message [OPM:XENODYS] est intercepté par le mod
+#      OPM, le joueur ne le voit jamais en clair.
+#
+#  Commandes du staff :
+#    /alertes                  les 10 derniers soupçons
+#    /surveiller <joueur>      Xenodys apparaît près de lui et le fixe
+#
+#  Prérequis : skript-db et la variable {sql} ouverte par sql.sk (comme
+#  xenodys.sk) ; la migration 0004_anticheat du serveur d'authentification.
+#
+#  À RÉGLER sur un serveur de test avant la production : les seuils ci-dessous
+#  sont prudents, mais chaque serveur a ses particularités (mods de mouvement,
+#  montures, pouvoirs des fruits du démon…). Un pouvoir qui fait voler ou
+#  courir vite doit être exempté — voir « opmExempte ».
+# ============================================================================
+
+options:
+    staff: opm.staff
+    # Blocs par seconde, à l'horizontale (sprint + saut ≈ 7 ; une marge large).
+    vitesse: 13
+    # Secondes en l'air, au-dessus du vide, sans redescendre.
+    vol: 4
+    # Distance pieds à pieds au-delà de laquelle un coup est suspect (3 fois de suite).
+    portee: 5.5
+    # Minerais rares pour un bloc de roche, au-delà de 8 minerais.
+    minerais: 0.06
+    # Permission qui exempte un joueur (pouvoirs, événements RP…).
+    exempt: opm.anticheat.exempt
+
+# Un joueur à ne pas surveiller : créatif, spectateur, vol autorisé, exempté.
+function opmExempte(p: player) :: boolean:
+    if {_p}'s gamemode is creative or spectator:
+        return true
+    if {_p} has permission "{@exempt}":
+        return true
+    if {_p} can fly:
+        return true
+    return false
+
+# Un soupçon : en base, au staff, et Xenodys au joueur. Une fois par minute
+# au plus pour un même joueur et un même motif.
+function opmAlerte(p: player, type: text, detail: text):
+    set {_k} to "%uuid of {_p}%-%{_type}%"
+    if {-opm::alerte::%{_k}%} is set:
+        if difference between {-opm::alerte::%{_k}%} and now is less than 1 minute:
+            stop
+    set {-opm::alerte::%{_k}%} to now
+    set {_nom} to name of {_p}
+    set {_uuid} to "%uuid of {_p}%"
+    execute "INSERT INTO opm_alerte (joueur, uuid, type, detail, source, relayee, cree_le) VALUES (%{_nom}%, %{_uuid}%, %{_type}%, %{_detail}%, 'serveur', false, (now() at time zone 'utc'))" in {sql}
+    loop all players:
+        if loop-player has permission "{@staff}":
+            send "&c⚠ Xenodys &7soupçonne &f%{_nom}% &7: %{_type}% &8(%{_detail}%)" to loop-player
+    send "[OPM:XENODYS] Je te vois…" to {_p}
+
+# ---------------------------------------------------------- vol et vitesse
+on teleport:
+    delete {-opm::pos::%uuid of player%}
+    delete {-opm::air::%uuid of player%}
+
+on respawn:
+    delete {-opm::pos::%uuid of player%}
+    delete {-opm::air::%uuid of player%}
+
+on quit:
+    delete {-opm::pos::%uuid of player%}
+    delete {-opm::air::%uuid of player%}
+
+every 1 second:
+    loop all players:
+        set {_p} to loop-player
+        set {_id} to "%uuid of {_p}%"
+        set {_loc} to location of {_p}
+        if opmExempte({_p}) is false:
+            if {_p} is not riding:
+                if {_p} is not gliding:
+                    if {-opm::pos::%{_id}%} is set:
+                        set {_prev} to {-opm::pos::%{_id}%}
+                        if world of {_prev} is world of {_loc}:
+                            # La vitesse, à l'horizontale.
+                            set {_dx} to x-coordinate of {_loc} - x-coordinate of {_prev}
+                            set {_dz} to z-coordinate of {_loc} - z-coordinate of {_prev}
+                            set {_h} to sqrt(({_dx} * {_dx}) + ({_dz} * {_dz}))
+                            if {_h} > {@vitesse}:
+                                if {_p} doesn't have potion effect speed:
+                                    opmAlerte({_p}, "vitesse", "%rounded {_h}% blocs/s")
+                            # Le vol : au-dessus du vide (le serveur le voit, le client
+                            # ne peut pas le maquiller), sans redescendre.
+                            if block below {_loc} is air:
+                                if block at {_loc} is not water, lava, ladder, vine, scaffolding or cobweb:
+                                    if y-coordinate of {_loc} >= y-coordinate of {_prev} - 0.1:
+                                        add 1 to {-opm::air::%{_id}%}
+                                        if {-opm::air::%{_id}%} >= {@vol}:
+                                            if {_p} doesn't have potion effect levitation:
+                                                if {_p} doesn't have potion effect slow falling:
+                                                    opmAlerte({_p}, "vol", "%{-opm::air::%{_id}%}% s en l'air")
+                                    else:
+                                        delete {-opm::air::%{_id}%}
+                            else:
+                                delete {-opm::air::%{_id}%}
+        set {-opm::pos::%{_id}%} to {_loc}
+
+# ------------------------------------------------------------------- portée
+on damage:
+    attacker is a player
+    set {_a} to attacker
+    if opmExempte({_a}) is false:
+        set {_d} to distance between location of attacker and location of victim
+        if {_d} > {@portee}:
+            add 1 to {-opm::portee::%uuid of {_a}%}
+            if {-opm::portee::%uuid of {_a}%} >= 3:
+                delete {-opm::portee::%uuid of {_a}%}
+                opmAlerte({_a}, "portée", "coups à %rounded {_d}% blocs")
+
+every 1 minute:
+    delete {-opm::portee::*}
+
+# --------------------------------------------------------- minerais (X-ray)
+on break of diamond ore or deepslate diamond ore or ancient debris or emerald ore or deepslate emerald ore:
+    if player's gamemode is survival:
+        add 1 to {-opm::rare::%uuid of player%}
+
+on break of stone or deepslate or netherrack or tuff or andesite or diorite or granite or basalt or blackstone:
+    add 1 to {-opm::roche::%uuid of player%}
+
+every 5 minutes:
+    loop all players:
+        set {_id} to "%uuid of loop-player%"
+        if {-opm::rare::%{_id}%} >= 8:
+            set {_roche} to {-opm::roche::%{_id}%} ? 0
+            set {_ratio} to {-opm::rare::%{_id}%} / ({_roche} + 1)
+            if {_ratio} > {@minerais}:
+                opmAlerte(loop-player, "minerais", "%{-opm::rare::%{_id}%}% rares pour %{_roche}% roches")
+
+every 30 minutes:
+    delete {-opm::rare::*}
+    delete {-opm::roche::*}
+
+# -------------------------------------------------------------------- staff
+command /alertes:
+    permission: {@staff}
+    permission message: &cRéservé au staff.
+    trigger:
+        execute "SELECT joueur, type, detail, source, cree_le FROM opm_alerte ORDER BY id DESC LIMIT 10" in {sql} and store the result in {_r::*}
+        if {_r::joueur::*} is not set:
+            send "&7Aucun soupçon enregistré."
+            stop
+        send "&c⚠ Les derniers soupçons de Xenodys :"
+        loop {_r::joueur::*}:
+            send "&8%{_r::cree_le::%loop-index%}% &f%loop-value% &7— %{_r::type::%loop-index%}% &8(%{_r::detail::%loop-index%}%, %{_r::source::%loop-index%}%)"
+
+command /surveiller <player>:
+    permission: {@staff}
+    permission message: &cRéservé au staff.
+    trigger:
+        # Xenodys apparaît à 8 blocs de lui et le fixe (dessinée par le mod OPM).
+        execute console command "execute at %arg-1% rotated ~ 0 positioned ^ ^ ^8 run summon minecraft:armor_stand ~ ~-1 ~ {Invisible:1b,Marker:1b,NoGravity:1b,Invulnerable:1b,Silent:1b,Tags:[""opm_xenodys""],CustomName:'""opm:xenodys:idle""'}"
+        execute console command "execute at %arg-1% as @e[tag=opm_xenodys,sort=nearest,limit=1] at @s run tp @s ~ ~ ~ facing entity %arg-1% feet"
+        send "[OPM:XENODYS] Je te surveille." to arg-1
+        send "&7Xenodys surveille &f%arg-1%&7. &8(/xenodys disparaitre près de lui pour la retirer)"

@@ -68,13 +68,22 @@ public final class Opm {
         // Xenodys dans le monde : les apparitions du staff, la première arrivée.
         NeoForge.EVENT_BUS.addListener(RenderLevelStageEvent.class, WorldXenodys::onRender);
         NeoForge.EVENT_BUS.addListener(RenderNameTagEvent.class, WorldXenodys::onNameTag);
-        NeoForge.EVENT_BUS.addListener(ClientPlayerNetworkEvent.LoggingIn.class, WorldXenodys::onLogin);
+        NeoForge.EVENT_BUS.addListener(ClientPlayerNetworkEvent.LoggingIn.class, event -> {
+            WorldXenodys.onLogin(event);
+            fr.onepieceminecraft.opm.client.AntiCheat.onJoin();
+        });
+        NeoForge.EVENT_BUS.addListener(ClientPlayerNetworkEvent.LoggingOut.class,
+                event -> fr.onepieceminecraft.opm.client.AntiCheat.onLeave());
+        // Anti-triche : « Je te vois… » (pack X-ray, rapport refusé, ou le Skript du serveur).
+        NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.client.event.ClientChatReceivedEvent.class,
+                fr.onepieceminecraft.opm.client.XenodysWarning::onChat);
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, event -> {
             WorldXenodys.onClientTick();
             fr.onepieceminecraft.opm.client.DebugShots.worldTick();
         });
         NeoForge.EVENT_BUS.addListener(RenderGuiEvent.Post.class, event -> {
             WorldXenodys.onGui(event);
+            fr.onepieceminecraft.opm.client.XenodysWarning.onGui(event);
             if (fr.onepieceminecraft.opm.client.DebugShots.enabled()) fr.onepieceminecraft.opm.client.DebugShots.world();
         });
         OpmLive.start();

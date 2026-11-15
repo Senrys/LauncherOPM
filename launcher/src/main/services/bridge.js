@@ -321,8 +321,80 @@ function readLine(line) {
   return null;
 }
 
+/* ------------------------------------------------------------------ anti-triche */
+
+const sha1File = (file) =>
+  new Promise((resolve, reject) => {
+    const hash = require('crypto').createHash('sha1');
+    fs.createReadStream(file)
+      .on('data', (d) => hash.update(d))
+      .on('end', () => resolve(hash.digest('hex')))
+      .on('error', reject);
+  });
+
+/**
+ * L'empreinte des fichiers du jeu, juste avant le démarrage : les mods (chemin,
+ * SHA-1) et les packs de ressources de l'instance, comparés au modpack officiel
+ * (`files.json` de l'instance). Le mod OPM, posé par le launcher, est attendu en
+ * plus. Le serveur d'authentification refait la comparaison de son côté
+ * (`POST /api/v1/game/attest`) : c'est lui qui ouvre, ou non, le serveur de jeu.
+ *
+ * @param {string} instanceDir
+ * @param {string} manifestUrl  `files.json` de l'instance
+ * @returns {Promise<{mods: {path: string, sha1: string}[], packs: string[], extra: string[], modified: string[], verified: boolean}>}
+ */
+async function fingerprint(instanceDir, manifestUrl) {
+  const modsDir = path.join(instanceDir, 'mods');
+  let names = [];
+  try {
+    names = (await fsp.readdir(modsDir)).filter((f) => f.toLowerCase().endsWith('.jar'));
+  } catch {
+    names = [];
+  }
+  const mods = [];
+  for (const name of names) {
+    try {
+      mods.push({ path: `mods/${name}`, sha1: await sha1File(path.join(modsDir, name)) });
+    } catch {
+      /* fichier verrouillé : il sera signalé côté serveur */
+    }
+  }
+  let packs = [];
+  try {
+    packs = (await fsp.readdir(path.join(instanceDir, 'resourcepacks'))).slice(0, 200);
+  } catch {
+    packs = [];
+  }
+
+  let official = null;
+  try {
+    const res = await settle(fetch(manifestUrl), CONTEXT_TIMEOUT_MS * 2, null);
+    if (res && res.ok) {
+      const list = await res.json();
+      official = new Map();
+      for (const e of Array.isArray(list) ? list : []) {
+        const p = String(e?.path || '').replace(/\\/g, '/').replace(/^\/+/, '');
+        if (p.startsWith('mods/') && p.endsWith('.jar')) official.set(p, String(e.hash || '').toLowerCase());
+      }
+    }
+  } catch {
+    official = null;
+  }
+  const extra = [];
+  const modified = [];
+  if (official) {
+    for (const m of mods) {
+      if (/^mods\/opm-\d[\w.+-]*\.jar$/i.test(m.path)) continue;
+      if (!official.has(m.path)) extra.push(m.path);
+      else if (official.get(m.path) && official.get(m.path) !== m.sha1) modified.push(m.path);
+    }
+  }
+  return { mods, packs, extra, modified, verified: Boolean(official) };
+}
+
 module.exports = {
   LAUNCHER_SHARE,
+  fingerprint,
   installGameFiles,
   ownedPaths,
   prepareContext,

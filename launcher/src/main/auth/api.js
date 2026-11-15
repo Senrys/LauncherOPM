@@ -358,6 +358,16 @@ function bootstrap() {
  * des URL de textures, sans pseudonyme. Non authentifié.
  * @returns {Promise<{skins: {url: string, slim: boolean}[]}>}
  */
+/**
+ * Anti-triche : l'empreinte des fichiers du jeu, avant le démarrage.
+ * @param {{client_token: string, mods: {path: string, sha1: string}[], resourcepacks: string[]}} body
+ * @param {string} token
+ * @returns {Promise<{ok: boolean, message: string|null, extra: string[], modified: string[]}>}
+ */
+function gameAttest(body, token) {
+  return request('POST', `${API}/game/attest`, { body, token, timeoutMs: 15_000 });
+}
+
 function skinGallery() {
   return request('GET', `${API}/skins/gallery`, { attempts: 1, timeoutMs: 3_000 });
 }
@@ -707,6 +717,7 @@ module.exports = {
   unlink,
   gameSession,
   gameSessionClose,
+  gameAttest,
   news,
   instances,
   status,

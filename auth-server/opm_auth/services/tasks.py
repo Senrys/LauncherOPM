@@ -459,6 +459,12 @@ async def _run_loop(loop: _Loop) -> None:
         await asyncio.sleep(max(1.0, loop.interval - (time.monotonic() - started)))
 
 
+async def _relay_alerts() -> int:
+    from opm_auth.services import anticheat
+
+    return await anticheat.relay_alerts()
+
+
 class BackgroundLoops:
     """Groupe de boucles périodiques, démarrées et arrêtées ensemble.
 
@@ -495,6 +501,13 @@ class BackgroundLoops:
                 interval=PURGE_INTERVAL,
                 action=purge,
                 initial_delay=_INITIAL_DELAYS["purge"],
+            ),
+            # Les soupçons de triche (opm_alerte) relayés au staff.
+            _Loop(
+                name="anti-triche",
+                interval=30.0,
+                action=_relay_alerts,
+                initial_delay=20.0,
             ),
         ]
 

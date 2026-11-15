@@ -52,6 +52,17 @@ sprites (`assets/opm/textures/gui/sprites/`), le modèle GeckoLib (`assets/opm/g
 `assets/opm/textures/entity/`) et les textures des menus (`assets/minecraft/…`). La
 musique (`assets/opm/sounds/music/`) vient de `xenodys/musique/`.
 
+## Anti-triche
+
+- `client/AntiCheat` : à l'arrivée sur le serveur, puis toutes les 5 minutes, les mods
+  chargés et les packs actifs partent au serveur d'authentification
+  (`POST /api/v1/game/report`, jeton de jeu). Le mod repère lui-même un pack X-ray (pierre,
+  ardoise, terre, netherrack… rendus transparents).
+- `client/XenodysWarning` : « Je te vois… » — Xenodys corrompue au coin bas-droit, le bord
+  de l'écran qui rougit. Déclenchée par un pack X-ray, un rapport refusé, ou un message du
+  serveur commençant par `[OPM:XENODYS]` (caché au joueur) : c'est ainsi que
+  `minecraft/anticheat.sk` l'appelle.
+
 ## Livraison
 
 Automatique : `launcher/game-files.js` (appelé par `build.js`, donc par la CI) compile ce

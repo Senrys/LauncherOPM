@@ -71,10 +71,12 @@ __all__ = [
     "STATS_ROW_ID",
     "Article",
     "Audit",
+    "Alerte",
     "AuditAction",
     "Ban",
     "BlockedReason",
     "Equipage",
+    "GameReport",
     "Ile",
     "Instance",
     "LoaderType",
@@ -270,6 +272,8 @@ class AuditAction(enum.StrEnum):
     TEXTURE_DELETE = "texture_delete"
     BAN = "ban"
     UNBAN = "unban"
+    GAME_ATTEST = "game_attest"
+    GAME_REPORT = "game_report"
 
 
 # ╔═════════════════════════════════════════════════════════════════════════╗
@@ -878,6 +882,12 @@ class YggSession(Base):
     origin: Mapped[str] = mapped_column(
         String(16), nullable=False, default="yggdrasil", server_default="yggdrasil"
     )
+    #: Empreinte des fichiers du jeu, déclarée par le launcher juste avant le
+    #: démarrage (``POST /api/v1/game/attest``) : ``ok``, ``refused`` ou
+    #: ``unverified`` (modpack officiel illisible) ; ``NULL`` tant que rien n'est
+    #: déclaré. Avec ``OPM_JOIN_REQUIRE_ATTESTATION``, ``join`` exige ``ok`` ou
+    #: ``unverified``.
+    attestation: Mapped[str | None] = mapped_column(String(12), nullable=True)
 
     user: Mapped[User] = relationship(back_populates="ygg_sessions", lazy="raise")
 
@@ -1090,6 +1100,55 @@ class Xenodys(Base):
     depuis: Mapped[datetime] = mapped_column(TS, nullable=False, server_default=func.now())
 
 
+class GameReport(Base):
+    """``game_report`` — ce que déclarent le launcher et le jeu (anti-triche).
+
+    ``kind`` : ``launch`` (empreinte du launcher au clic sur JOUER), ``join`` ou
+    ``periodic`` (rapport du mod OPM en jeu). ``ok`` faux : quelque chose ne
+    correspond pas au modpack officiel ; ``details`` dit quoi (JSON).
+    """
+
+    __tablename__ = "game_report"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    kind: Mapped[str] = mapped_column(String(12), nullable=False)
+    ok: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    details: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        TS, nullable=False, default=utcnow, server_default=func.now()
+    )
+
+
+class Alerte(Base):
+    """``opm_alerte`` — les soupçons de triche, d'où qu'ils viennent.
+
+    Écrite par le serveur Minecraft (``minecraft/anticheat.sk``, via skript-db :
+    vol, vitesse, portée, minerais) et par ce serveur (rapports refusés). Une
+    tâche de fond les relaie au staff (``OPM_ANTICHEAT_WEBHOOK``) puis coche
+    ``relayee``. Rien n'y est sanctionné automatiquement : c'est au staff de juger.
+    """
+
+    __tablename__ = "opm_alerte"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    joueur: Mapped[str] = mapped_column(String(32), nullable=False)
+    uuid: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    type: Mapped[str] = mapped_column(String(24), nullable=False)
+    detail: Mapped[str | None] = mapped_column(String(280), nullable=True)
+    source: Mapped[str] = mapped_column(
+        String(12), nullable=False, default="serveur", server_default="serveur"
+    )
+    relayee: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
+    cree_le: Mapped[datetime] = mapped_column(
+        TS, nullable=False, default=utcnow, server_default=func.now()
+    )
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 #   PROPRIÉTÉ DES TABLES — le garde-fou
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1119,6 +1178,8 @@ LAUNCHER_TABLES: tuple[Table, ...] = (
     UserTexture.__table__,
     Instance.__table__,
     Xenodys.__table__,
+    GameReport.__table__,
+    Alerte.__table__,
 )
 
 #: Noms des tables du launcher, pratiques pour la migration et les tests.
@@ -1154,3 +1215,4 @@ def _check_table_ownership() -> None:
 
 
 _check_table_ownership()
+

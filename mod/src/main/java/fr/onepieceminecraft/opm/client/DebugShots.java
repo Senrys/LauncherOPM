@@ -49,6 +49,7 @@ public final class DebugShots {
     private static boolean created;
     private static boolean summoned;
     private static boolean paused;
+    private static boolean warned;
 
     /** `-Dopm.debug.world=1` : depuis l'écran titre, crée un monde de test en solo. */
     static boolean createWorld(double t) {
@@ -80,6 +81,10 @@ public final class DebugShots {
             mc.player.connection.sendCommand("execute at @s rotated ~ 0 positioned ^ ^ ^8 run summon minecraft:armor_stand ~ ~-1 ~ "
                     + "{Invisible:1b,Marker:1b,NoGravity:1b,Tags:[\"opm_xenodys\"],CustomName:'\"opm:xenodys:idle\"'}");
             mc.player.connection.sendCommand("execute as @e[tag=opm_xenodys,limit=1] at @s run tp @s ~ ~ ~ facing entity @p feet");
+        }
+        if (t > 10 && !warned) {
+            warned = true;
+            XenodysWarning.show("Je te vois… Ce que tu as ajouté au jeu ne passe pas inaperçu.");
         }
         if (t > 16 && !paused) {
             paused = true;

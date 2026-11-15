@@ -138,6 +138,7 @@ os.environ.update(
         # La plupart des tests ouvrent leur session par /authserver : le verrou
         # « launcher seulement » a ses propres tests (test_yggdrasil.py).
         "OPM_JOIN_LAUNCHER_ONLY": "false",
+        "OPM_JOIN_REQUIRE_ATTESTATION": "false",
         # Limitation de débit active : les tests vérifient aussi ce contrat.
         "OPM_RATE_LIMIT_ENABLED": "true",
         "OPM_TRUST_PROXY_HEADERS": "false",

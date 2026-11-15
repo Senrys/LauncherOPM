@@ -570,6 +570,55 @@ class GameSessionEndIn(ApiInput):
     duration_s: int = Field(ge=0, le=86_400, description="Durée jouée, en secondes.")
 
 
+class AttestModIn(ApiInput):
+    """Un mod du dossier ``mods/`` : chemin relatif à l'instance et SHA-1."""
+
+    path: str = Field(max_length=255)
+    sha1: str = Field(default="", max_length=40)
+
+
+class GameAttestIn(ApiInput):
+    """L'empreinte des fichiers du jeu, déclarée par le launcher avant le démarrage."""
+
+    client_token: str = Field(max_length=64)
+    mods: list[AttestModIn] = Field(default_factory=list, max_length=1000)
+    resourcepacks: list[str] = Field(default_factory=list, max_length=200)
+
+
+class ReportModIn(ApiInput):
+    """Un mod chargé par le jeu (``ModList``) : identifiant, version, fichier."""
+
+    id: str = Field(max_length=80)
+    version: str = Field(default="", max_length=80)
+    file: str = Field(default="", max_length=255)
+
+
+class ReportPackIn(ApiInput):
+    """Un pack de ressources actif ; ``xray`` : le mod le juge truqué."""
+
+    id: str = Field(max_length=120)
+    title: str = Field(default="", max_length=120)
+    xray: bool = False
+
+
+class GameReportIn(ApiInput):
+    """Le rapport du mod OPM en jeu."""
+
+    phase: Literal["join", "periodic"] = "join"
+    mods: list[ReportModIn] = Field(default_factory=list, max_length=1000)
+    resourcepacks: list[ReportPackIn] = Field(default_factory=list, max_length=200)
+
+
+class AntiCheatOut(ApiModel):
+    """Verdict anti-triche : ``ok`` faux → ``message`` à montrer au joueur."""
+
+    ok: bool
+    message: str | None = None
+    reasons: list[str] = []
+    extra: list[str] = []
+    modified: list[str] = []
+
+
 # ---------------------------------------------------------------------------
 # 6. Contenu du launcher (docs/API.md §1.5)
 # ---------------------------------------------------------------------------

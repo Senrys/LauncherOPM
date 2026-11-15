@@ -54,10 +54,20 @@ public final class PausePeek {
             line = staff != null ? staff : lines.get(RANDOM.nextInt(lines.size()));
         }
         if (!show || Xen.model() == null) return;
+        drawPeek(g, (Util.getMillis() - start) / 1000.0, line, session.etat, mouseX, mouseY, false);
+    }
+
+    /**
+     * Xenodys au coin bas-droit, qui monte du bas, avec sa bulle. Partagé avec
+     * l'avertissement anti-triche (client/XenodysWarning) : `glitch` la fait
+     * trembler, corrompue.
+     */
+    public static void drawPeek(GuiGraphics g, double t, String line, String etat, double mouseX, double mouseY,
+                                boolean glitch) {
+        if (Xen.model() == null) return;
         long now = Util.getMillis();
         double dt = last == 0 ? 0 : Math.min(0.1, (now - last) / 1000.0);
         last = now;
-        double t = (now - start) / 1000.0;
         double rise = Math.max(0, Math.min(1, (t - 0.5) / 0.7));
         rise = rise * rise * (3 - 2 * rise);
         if (rise <= 0) return;
@@ -70,8 +80,7 @@ public final class PausePeek {
         float s = (float) (k / window.getGuiScale());
         double mx = mouseX * window.getGuiScale() / k;
         double my = mouseY * window.getGuiScale() / k;
-        boolean corrupted = session.corrupted();
-        String etat = session.etat;
+        boolean corrupted = "corrompue".equals(etat);
 
         // La tête finit aux trois cinquièmes de la hauteur, au ras du bord droit ;
         // elle monte du bas de l'écran.
@@ -98,7 +107,8 @@ public final class PausePeek {
         ps.pushPose();
         ps.scale(s, s, 1);
         ps.pushPose();
-        ps.translate(cx, baseY, 300);
+        float shake = glitch && RANDOM.nextDouble() < 0.25 ? (RANDOM.nextFloat() - 0.5f) * 4 : 0;
+        ps.translate(cx + shake, baseY, 300);
         ps.scale(scale, -scale, scale);
         ps.mulPose(Axis.YP.rotationDegrees(180 + 20));
         // Penchée vers l'intérieur de l'écran (le demi-tour en y inverse le sens).
@@ -130,7 +140,7 @@ public final class PausePeek {
             PixelFont.draw(g, "Xenodys", bx, by - 10, accent, (float) bubble, 1f);
         }
         ps.popPose();
-        DebugShots.maybe("pause", t);
+        DebugShots.maybe(glitch ? "alerte" : "pause", t);
     }
 
     private static List<String> wrap(String text, int width) {
