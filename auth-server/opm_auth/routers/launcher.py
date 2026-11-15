@@ -80,8 +80,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from opm_auth.config import Settings, get_settings
 from opm_auth.db import SessionDep
-from opm_auth.models import STATS_ROW_ID, Article, Equipage, Ile, Instance, Paiement, Statistiques, Xenodys
+from opm_auth.models import (
+    STATS_ROW_ID,
+    Article,
+    Equipage,
+    Ile,
+    Instance,
+    Paiement,
+    Statistiques,
+    Texture,
+    TextureKind,
+    TextureModel,
+    UserTexture,
+    Xenodys,
+)
 from opm_auth.schemas import (
+    GallerySkinOut,
+    SkinGalleryOut,
     XenodysOut,
     AuthInfoOut,
     BootstrapOut,
@@ -394,6 +409,10 @@ async def _collecte(session: AsyncSession) -> tuple[_Collecte | None, bool]:
 #: launchers ouverts doivent basculer en moins d'une minute (ils interrogent
 #: toutes les 60 s) — mais pas au point d'interroger la base à chaque requête.
 XENODYS_TTL: Final[float] = 10.0
+#: La galerie de skins de l'écran de chargement : un tirage toutes les 5 min.
+GALLERY_TTL: Final[float] = 300.0
+#: Taille maximale de la galerie.
+GALLERY_SIZE: Final[int] = 32
 
 
 async def _load_xenodys(session: AsyncSession) -> XenodysOut:
@@ -828,6 +847,54 @@ async def xenodys(session: SessionDep) -> XenodysOut:
     (voir :func:`_xenodys`).
     """
     return await _xenodys(session)
+
+
+async def _load_gallery(session: AsyncSession) -> SkinGalleryOut:
+    """Tire au hasard des skins **personnalisés** de joueurs (jamais le défaut)."""
+    # Les textures portées par au moins un joueur, chacune une fois (deux
+    # joueurs au même skin partagent la ligne), puis le tirage. Sous-requête :
+    # PostgreSQL refuse un ``ORDER BY random()`` à côté d'un ``DISTINCT``.
+    worn = (
+        select(UserTexture.texture_id)
+        .where(UserTexture.kind == TextureKind.SKIN.value, UserTexture.texture_id.is_not(None))
+        .scalar_subquery()
+    )
+    rows = (
+        await session.execute(
+            select(Texture.sha256, Texture.model)
+            .where(Texture.id.in_(worn))
+            .order_by(func.random())
+            .limit(GALLERY_SIZE)
+        )
+    ).all()
+    settings = get_settings()
+    return SkinGalleryOut(
+        skins=[
+            GallerySkinOut(
+                url=settings.texture_url(sha), slim=model == TextureModel.SLIM.value
+            )
+            for sha, model in rows
+        ]
+    )
+
+
+@router.get("/skins/gallery", response_model=SkinGalleryOut, summary="Galerie de skins")
+async def skin_gallery(session: SessionDep) -> SkinGalleryOut:
+    """Des skins de joueurs OPM, au hasard : les assistants de Xenodys les
+    « impriment » pendant le chargement du jeu (launcher, puis mod du modpack).
+
+    Publique et anonyme : des URL de textures, sans pseudonyme ni identifiant.
+    Ne répond jamais en erreur : une base injoignable donne une galerie vide, et
+    l'écran de chargement se rabat sur les skins par défaut.
+    """
+    try:
+        value, _stale = await _cache.fetch(
+            "gallery", _ttl(GALLERY_TTL, get_settings()), lambda: _load_gallery(session)
+        )
+        return value
+    except ApiError:
+        await session.rollback()
+        return SkinGalleryOut()
 
 
 @router.get("/donations", response_model=DonationsOut, summary="Cagnotte du mois")

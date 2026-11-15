@@ -186,6 +186,23 @@ class XenodysOut(ApiModel):
     message: str | None = None
 
 
+class GallerySkinOut(ApiModel):
+    """Un skin de la galerie : son URL publique et son modèle de bras."""
+
+    url: str
+    slim: bool = False
+
+
+class SkinGalleryOut(ApiModel):
+    """Skins de joueurs OPM tirés au hasard, pour l'écran de chargement.
+
+    Aucun pseudonyme, aucun identifiant : seulement des textures, déjà
+    publiques (le client Minecraft de chaque joueur les télécharge).
+    """
+
+    skins: list[GallerySkinOut] = []
+
+
 class MaintenanceOut(ApiModel):
     """État de maintenance : bloque le bouton JOUER quand il est actif."""
 

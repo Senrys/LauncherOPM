@@ -54,6 +54,7 @@ const paths = require('./paths');
 const logger = require('./logger');
 const store = require('./store');
 const api = require('../auth/api');
+const bridge = require('./bridge');
 const mainWindow = require('../../windows/mainWindow');
 
 /* ------------------------------------------------------------------ constantes */
@@ -454,13 +455,14 @@ function jvmArguments(text) {
  * @param {boolean} verify       force la vérification complète des fichiers
  * @returns {object}
  */
-function buildOptions(instance, config, authenticator, verify) {
+function buildOptions(instance, config, authenticator, verify, extraGameArgs = []) {
   const loader = instance.loadder;
   const withLoader = loader.loadder_type && loader.loadder_type !== 'none';
 
   // La bibliothèque n'exploite pas `screen.fullscreen` : le plein écran passe donc
   // par l'argument de jeu, que Minecraft comprend depuis toujours.
   const gameArgs = config.game.fullscreen ? ['--fullscreen'] : [];
+  gameArgs.push(...extraGameArgs);
 
   return {
     url: instance.url,
@@ -643,7 +645,7 @@ function onData(run, raw) {
     taskbar(2);
     logger.info('Démarrage de la machine virtuelle Java…');
     cinematicStart();
-    cinematicArm();
+    cinematicArm(Boolean(run.scene));
     emit({ type: 'launching' });
     armStartFallback(run);
   }
@@ -655,7 +657,41 @@ function onData(run, raw) {
   }
 
   markRunning(run);
+  readLoading(run, text);
   logGameOutput(run, text);
+}
+
+/**
+ * Suit le chargement du jeu dans sa sortie (services/bridge.js) : la scène de
+ * chargement du launcher avance, puis s'efface quand l'écran du mod OPM est à
+ * l'écran (`[OPM:READY]`).
+ * @param {object} run
+ * @param {string} text
+ */
+function readLoading(run, text) {
+  if (!run.scene || run.musicDone) return;
+  for (const line of text.split(/\r?\n/)) {
+    const found = bridge.readLine(line);
+    if (!found) continue;
+    if (found.kind === 'music') {
+      // La musique du launcher continue dans le jeu : le launcher peut se taire.
+      run.musicDone = true;
+      mainWindow.setThrottling(true);
+      emit({ type: 'music' });
+      return;
+    }
+    if (run.sceneDone) continue;
+    if (found.kind === 'ready') {
+      run.sceneDone = true;
+      logger.info("L'écran de chargement du mod OPM a pris le relais.");
+      emit({ type: 'loaded' });
+      continue;
+    }
+    if (found.ratio > (run.sceneRatio ?? 0)) {
+      run.sceneRatio = found.ratio;
+      emit({ type: 'loading', ratio: found.ratio, step: found.step });
+    }
+  }
 }
 
 /**
@@ -848,6 +884,7 @@ function releaseSession(run) {
 function finish(run, event, note) {
   if (run.finished) return;
   run.finished = true;
+  mainWindow.setThrottling(true);
   clearStartFallback(run);
   cinematicEnd();
 
@@ -911,6 +948,12 @@ function abort(run, note) {
  * qu'à ce moment.
  */
 const CINEMATIC_MAX_MS = 7_000;
+/**
+ * Avec la scène de chargement (mod OPM présent), le launcher couvre tout le
+ * chargement des mods : il ne s'efface qu'à `[OPM:READY]`, ou à ce délai si le
+ * mod ne se manifeste jamais.
+ */
+const SCENE_MAX_MS = 240_000;
 let cinematic = null;
 
 /** Ouvre l'attente de la cinématique (sans délai de garde : la préparation peut être longue). */
@@ -924,22 +967,37 @@ function cinematicStart() {
 }
 
 /** Le jeu démarre : premier plan, et délai de garde. */
-function cinematicArm() {
+function cinematicArm(scene = false) {
   if (!cinematic || cinematic.timer) return;
-  cinematic.timer = setTimeout(cinematicEnd, CINEMATIC_MAX_MS);
+  cinematic.timer = setTimeout(cinematicEnd, scene ? SCENE_MAX_MS : CINEMATIC_MAX_MS);
   mainWindow.setOnTop(true);
+  cinematic.scene = scene;
+}
+
+/**
+ * La scène de chargement est opaque (le renderer l'annonce) : la fenêtre peut
+ * s'étendre à tout l'écran sans que rien ne saute. La fenêtre du jeu s'ouvre où
+ * elle veut, plein écran compris : la scène couvre donc tout l'écran.
+ */
+function sceneCover() {
+  if (!cinematic || !cinematic.scene || cinematic.covered) return;
+  cinematic.covered = true;
+  mainWindow.coverScreen(true);
 }
 
 /** Fin de la cinématique, annoncée par le renderer (ou par le délai de garde). */
 function cinematicEnd() {
   if (!cinematic) return;
   clearTimeout(cinematic.timer);
-  const { done, resolve } = cinematic;
+  const { done, resolve, covered } = cinematic;
   cinematic = null;
   resolve();
   // Après le masquage de la fenêtre (enchaîné plus tôt sur `done`) : le jeu
   // ne passe jamais devant la fin de l'animation.
-  done.then(() => mainWindow.setOnTop(false));
+  done.then(() => {
+    mainWindow.setOnTop(false);
+    if (covered) mainWindow.coverScreen(false);
+  });
 }
 
 /** Masque le launcher pendant la partie, si le joueur l'a demandé. */
@@ -1009,6 +1067,14 @@ function createLauncher(run, verifyOnly) {
     const prepared = await prepare();
     if (verifyOnly) return { error: VERIFY_ONLY };
     if (run.cancelled) return { error: CANCELLED };
+    if (run.beforeStart && !prepared?.error) {
+      try {
+        await run.beforeStart();
+      } catch (err) {
+        // Le pont est un plus : son échec ne doit jamais empêcher de jouer.
+        logger.warn(`Préparation du pont launcher → jeu incomplète : ${err.message}`);
+      }
+    }
     return prepared;
   };
 
@@ -1074,12 +1140,54 @@ async function launch(instanceName) {
     const account = await currentAccount();
     run.accountId = account && typeof account.id === 'string' ? account.id : null;
 
+    // Le contexte du monde (serveur, Xenodys, galerie de skins) se lit pendant
+    // que la session s'ouvre : il ne retarde jamais le lancement.
+    const context = bridge.prepareContext();
+
     // C'est notre serveur qui délivre la session : aucun jeton Microsoft n'ira au jeu.
     const authenticator = await require('../auth/accounts').gameSession();
     run.clientToken = typeof authenticator.client_token === 'string' ? authenticator.client_token : '';
 
+    const world = await context;
+    const direct = config.game.direct_connect;
     const launcher = createLauncher(run, false);
-    const options = buildOptions(instance, config, authenticator, false);
+    const options = buildOptions(
+      instance,
+      config,
+      authenticator,
+      false,
+      direct ? bridge.directConnectArguments(world.server) : []
+    );
+    const instanceDir = path.join(paths.gameDir, 'instances', instance.name);
+
+    // Les fichiers sont à jour (le mod OPM compris) : dernier passage avant la
+    // machine virtuelle.
+    run.beforeStart = async () => {
+      const scene =
+        mainWindow.windowMode() === 'ouvert' && config.game.intro && bridge.hasOpmMod(instanceDir);
+      run.scene = scene;
+      options.JVM_ARGS.unshift(...bridge.authArguments(instanceDir, api.baseUrl()));
+      await bridge.setEarlyWindow(instanceDir, !scene);
+      await bridge.writeSession(instanceDir, {
+        launcherVersion: electronApp.getVersion(),
+        etat: world.etat,
+        message: world.message,
+        name: authenticator.name,
+        uuid: authenticator.uuid,
+        server: world.server,
+        direct,
+        animations: config.game.intro,
+        apiBase: api.baseUrl(),
+        scene,
+        gallery: world.gallery,
+        links: world.links,
+      });
+      if (scene) {
+        // La musique du launcher doit tenir, fenêtre masquée, jusqu'au relais du jeu.
+        mainWindow.setThrottling(false);
+        emit({ type: 'scene', etat: world.etat, gallery: world.inline });
+      }
+    };
 
     logger.info(
       `Lancement de « ${instance.name} » (Minecraft ${instance.loadder.minecraft_version}, ` +
@@ -1349,5 +1457,6 @@ module.exports = {
   filesStat,
   ownsTaskbar,
   cinematicEnd,
+  sceneCover,
   onEvent,
 };

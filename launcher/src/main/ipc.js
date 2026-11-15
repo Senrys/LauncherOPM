@@ -485,6 +485,7 @@ function register(windowGetter) {
 
   // Fin de la cinématique du lancement : la fenêtre peut se masquer (game.hideForGame).
   listen('window:cinematic-end', () => game.cinematicEnd());
+  listen('window:scene-cover', () => game.sceneCover());
 
   // Mode ouvert : déplacement de la fenêtre par la barre de titre (voir mainWindow.dragStart).
   listen('window:drag', (phase) => {

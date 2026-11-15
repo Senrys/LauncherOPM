@@ -197,6 +197,10 @@ type GameEvent =
   | { type: 'progress', progress: number, size: number, speed_bps?: number, eta_s?: number }
   | { type: 'extract',  file: string }
   | { type: 'patch',    message: string }
+  | { type: 'scene', etat: string, gallery: {url, slim, data}[] } // le mod OPM est là : scène de chargement
+  | { type: 'loading', ratio: number, step: string } // avancement lu dans le journal du jeu (0 → 0,4)
+  | { type: 'loaded' }             // `[OPM:READY]` : l'écran du mod a pris le relais
+  | { type: 'music' }              // `[OPM:MUSIC]` : la musique continue dans le jeu
   | { type: 'launching' }
   | { type: 'running' }
   | { type: 'closed',   code: number }
@@ -227,6 +231,7 @@ Xenodys occupe la marge (windows/mainWindow.js, layout/frame.css).
 | `window.resizeFrame(w, h)` | `window:resize-frame` | Nouvelle taille du cadre (poignée dessinée par le launcher), bornée par 1100 × 700 et par l'écran. |
 | `window.maximize()` | `window:maximize` | En mode ouvert, le cadre prend toute la zone de travail ; `window:maximized` est émis comme en mode compact. |
 
+| `window.sceneCover()` | `window:scene-cover` | La scène de chargement est opaque : la fenêtre (mode ouvert) s'étend à tout l'écran, au-dessus des fenêtres plein écran, le temps que le jeu charge. Rendue à sa place à `cinematicEnd`. |
 | `window.cinematicEnd()` | `window:cinematic-end` | La cinématique du lancement est jouée. Elle commence sur `prepare` (clic sur JOUER), l'orbe attend la fin de la préparation, le passage s'ouvre sur `launching`. Dès `launching`, la fenêtre passe au premier plan (le jeu s'ouvre derrière elle) ; elle n'est masquée, puis rendue au rang commun, qu'à cet appel, ou après 7 s. |
 
 Le mode est transmis à la page dans son adresse (`?fenetre=ouvert&mt=…`), lu

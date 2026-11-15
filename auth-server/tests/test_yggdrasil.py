@@ -738,6 +738,76 @@ async def test_join_refuse_une_session_invalidee(client: AsyncClient) -> None:
     assert (await join(client, opened, "serveur-mort")).status_code == 403
 
 
+# --------------------------------------------------------------------------- #
+# Verrou « launcher seulement » (OPM_JOIN_LAUNCHER_ONLY)
+# --------------------------------------------------------------------------- #
+
+
+async def launcher_session(app: FastAPI, client: AsyncClient, player: Player) -> dict[str, Any]:
+    """La session que délivre le bouton JOUER, remise en forme Yggdrasil."""
+    sign_in_as(app, await load_user(player.id))
+    body = (await client.post(f"{API_PREFIX}/game/session")).json()
+    return {
+        "accessToken": body["access_token"],
+        "clientToken": body["client_token"],
+        "selectedProfile": {"id": body["uuid"], "name": body["name"]},
+    }
+
+
+async def test_verrou_launcher_refuse_une_session_d_un_launcher_tiers(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Une session ouverte par mot de passe (/authserver) ne rejoint pas le serveur."""
+    monkeypatch.setattr(get_settings(), "join_launcher_only", True)
+    player = await create_player()
+    opened = await authenticate(client, player.email)
+
+    response = await join(client, opened, "serveur-tiers")
+
+    assert response.status_code == 403
+    assert response.json()["error"] == "ForbiddenOperationException"
+    assert "launcher OPM" in response.json()["errorMessage"]
+    response = await client.get(
+        f"{SESSION}/hasJoined",
+        params={"username": player.mc_name, "serverId": "serveur-tiers"},
+    )
+    assert response.status_code == 204
+
+
+async def test_verrou_launcher_accepte_la_session_du_bouton_jouer(
+    app: FastAPI, client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """La session de ``POST /game/session`` ouvre le serveur, de bout en bout."""
+    monkeypatch.setattr(get_settings(), "join_launcher_only", True)
+    player = await create_player()
+    opened = await launcher_session(app, client, player)
+
+    assert (await join(client, opened, "serveur-opm")).status_code == 204
+    response = await client.get(
+        f"{SESSION}/hasJoined",
+        params={"username": player.mc_name, "serverId": "serveur-opm"},
+    )
+    assert response.status_code == 200
+    assert response.json()["id"] == player.mc_uuid
+
+
+async def test_verrou_launcher_un_jeton_rafraichi_perd_son_origine(
+    app: FastAPI, client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Un jeton de lancement copié puis rafraîchi ne rouvre pas le serveur."""
+    monkeypatch.setattr(get_settings(), "join_launcher_only", True)
+    player = await create_player()
+    opened = await launcher_session(app, client, player)
+
+    refreshed = await client.post(
+        f"{YGG}/authserver/refresh",
+        json={"accessToken": opened["accessToken"], "clientToken": opened["clientToken"]},
+    )
+    assert refreshed.status_code == 200, refreshed.text
+
+    assert (await join(client, refreshed.json(), "serveur-copie")).status_code == 403
+
+
 async def test_has_joined_refuse_apres_expiration_de_la_possession(
     client: AsyncClient,
 ) -> None:

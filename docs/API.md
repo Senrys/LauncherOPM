@@ -192,6 +192,7 @@ Erreurs : `403 {"error":"microsoft_required"}`, `403 {"error":"banned","until":�
 | `GET` | `/api/v1/votes` | `{count, goal, reward, reset_at}` |
 | `GET` | `/api/v1/donations` | `{collected_cents, goal_cents, currency, donors_count, days_left, tiers[], top[]}` |
 | `POST` | `/api/v1/donations/checkout` | `{amount_cents}` → `{checkout_url}` |
+| `GET` | `/api/v1/skins/gallery` | `{skins: [{url, slim}]}` — 32 skins personnalisés de joueurs, au hasard, **anonymes** (aucun pseudo) ; jamais en erreur (galerie vide) |
 
 `kind` d'une news ∈ `news | event | update`. Le format `instances` est **volontairement
 identique** à celui de l'ancien launcher pour rester compatible `minecraft-java-core`.
@@ -239,6 +240,13 @@ Erreurs au format Mojang, HTTP 403 :
 | `POST /session/minecraft/join` `{accessToken, selectedProfile, serverId}` | `204` |
 | `GET /session/minecraft/hasJoined?username=&serverId=&ip=` | `200 {profile}` ou `204` |
 | `GET /session/minecraft/profile/{uuid}?unsigned=false` | `200 {profile}` |
+
+**Le serveur ne s'ouvre qu'au launcher OPM** (`OPM_JOIN_LAUNCHER_ONLY`, actif par
+défaut) : `join` n'accepte que les sessions délivrées par `POST /api/v1/game/session`
+(clic sur JOUER, `ygg_session.origin = 'launcher'`). Une session ouverte par
+`/authserver/authenticate` (un launcher tiers) reçoit un `403` dont le message invite à
+passer par le launcher ; un jeton rafraîchi (`/authserver/refresh`) perd son origine
+`launcher`. Le dépôt étant public, c'est une dissuasion, pas une garantie absolue.
 
 `profile` :
 

@@ -86,6 +86,46 @@ un court parasitage (1,5 s), puis affiche l'annonce du staff — ou, à défaut,
 une phrase de Xenodys. Jamais au premier affichage, jamais si le système
 demande de réduire les animations.
 
+## Du launcher au jeu
+
+Le launcher et le **mod OPM** du modpack (`mod/`, voir `mod/README.md`) se passent le
+relais sans que rien ne se voie :
+
+1. **JOUER** : la cinématique (ci-dessous). À l'éclair du passage, la **scène de
+   chargement** du launcher apparaît (`components/loadingScene.js`) : la salle de
+   simulation, Xenodys qui façonne le monde — un cube qui se construit bloc à bloc au
+   rythme du chargement —, ses assistants qui « impriment » des joueurs OPM (la galerie
+   de skins, en volume, sur leur socle de circuit imprimé, tournés de 30°) ; l'un des
+   robots patrouille, et parfois trébuche. La fenêtre couvre tout l'écran ; la fenêtre
+   de chargement de NeoForge est désactivée (`config/fml.toml`). La barre avance au fil
+   du journal du jeu (`services/bridge.js`).
+2. **L'écran de chargement du jeu** (le mod remplace celui de Mojang et de NeoForge) :
+   la même scène, au pixel près — mêmes planches de sprites (`xenodys/sprites.py`), même
+   police pixel, même salle. Le launcher s'efface quand il s'affiche (`[OPM:READY]`) ; la
+   barre reprend où il l'avait laissée.
+3. **L'envol** : le chargement fini, Xenodys s'envole, un assistant salue, l'autre
+   trébuche parfois et se relève, le skin du joueur s'imprime (« Bienvenue, … »), et le
+   monde s'ouvre dans un éclair — connexion directe au serveur OPM. Passable (clic,
+   Échap, Espace, Entrée).
+4. **La musique** du launcher ne s'arrête pas : elle continue, fenêtre masquée, jusqu'à
+   ce que le jeu la reprenne (`[OPM:MUSIC]`) — les mêmes compositions, enregistrées par
+   `xenodys/musique/` — dans tous les menus.
+5. **L'écran titre** (après une déconnexion, ou sans connexion directe) : le menu à
+   gauche (rejoindre One Piece Minecraft — seul serveur possible —, options, mods,
+   quitter ; statut du serveur, journal de bord) ; à droite, le joueur sur son socle et
+   Xenodys en vraie 3D (le modèle GeckoLib). Créatrice, elle veille sur lui ; son regard
+   suit la souris, regarde le bouton survolé, revient au joueur, et elle tend la main
+   quand on rejoint le serveur. Corrompue, elle le tient sous son emprise : main en
+   griffe au-dessus de lui, fils rouges, et lui qui se protège le visage.
+6. **Les autres menus** (options, pause, connexion…) : la salle de simulation en fond,
+   boutons et curseurs aux couleurs du launcher ; dans le menu pause, « Donner son avis »
+   et « Signaler un bug » deviennent le site et le Discord d'OPM.
+
+Le launcher écrit pour le mod `opm/session.json` (état, pseudo, serveur, galerie,
+liens ; jamais de jeton) ; le mod n'en a pas besoin pour fonctionner (valeurs par
+défaut). Réglages du launcher : « Rejoindre directement le serveur » et « Chargement
+animé par Xenodys ».
+
 ## Dans le launcher
 
 - **Fenêtre ouverte** (réglage `launcher.window_open`, Windows et macOS, écran assez

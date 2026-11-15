@@ -109,6 +109,7 @@ const opm = {
     isMaximized: () => call('window:is-maximized'),
     /** Fin de la cinématique du lancement : le launcher peut se masquer. */
     cinematicEnd: () => ipcRenderer.send('window:cinematic-end'),
+    sceneCover: () => ipcRenderer.send('window:scene-cover'),
     /** Mode ouvert : début (`'start'`) ou fin (`'end'`) d'un glisser de la fenêtre. */
     drag: (phase) => ipcRenderer.send('window:drag', phase === 'start' ? 'start' : 'end'),
     /** Mode ouvert : laisser passer les clics de la marge vide jusqu'au bureau. */

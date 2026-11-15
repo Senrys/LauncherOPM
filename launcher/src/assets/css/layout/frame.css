@@ -269,3 +269,24 @@ html,
 }
 
 :root[data-xenodys="corrompue"] .opm-cine-hit__label { color: #F0506E; }
+
+/* La scène de chargement (components/loadingScene.js) : au-dessus de Xenodys,
+   sous l'éclair du passage (`.opm-cine`, z 6) qui la découvre. Pixels nets. */
+.opm-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  background: #040b0a;
+  opacity: 0;
+  transition: opacity .4s ease;
+}
+:root[data-xenodys="corrompue"] .opm-loading { background: #0b040a; }
+.opm-loading[data-visible] { opacity: 1; }
+.opm-loading[hidden] { display: none; }
+.opm-loading canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}

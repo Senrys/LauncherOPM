@@ -33,6 +33,7 @@ import { createAmbiance } from './components/ambiance.js';
 import { createSfx } from './components/sfx.js';
 import { createVideoCircuits } from './components/circuits.js';
 import { createLab } from './components/lab.js';
+import { createLoadingScene } from './components/loadingScene.js';
 import { frameBuilt } from './components/intro.js';
 
 /** Pont exposé par le preload (docs/IPC.md). */
@@ -787,6 +788,20 @@ const XENODYS_POLL_MS = 60_000;
  */
 /** La musique, une fois créée : le fond bat sur ses temps. */
 let ambianceRef = null;
+/**
+ * La musique continue pendant le chargement du jeu (scène du launcher, puis
+ * écran du mod), fenêtre masquée comprise, jusqu'à ce que le jeu la reprenne
+ * (`music`, `[OPM:MUSIC]`) : d'une fenêtre à l'autre, elle ne s'arrête pas.
+ */
+let musicHold = false;
+let musicHoldTimer = 0;
+let refreshAmbiance = () => {};
+function holdMusic(on, maxMs = 0) {
+  clearTimeout(musicHoldTimer);
+  musicHold = Boolean(on);
+  if (on && maxMs) musicHoldTimer = setTimeout(() => holdMusic(false), maxMs);
+  refreshAmbiance();
+}
 
 function wireAmbiance() {
   let ambiance;
@@ -805,8 +820,9 @@ function wireAmbiance() {
       ambiance.setVolume(state.volumePreview ?? launcher.volume);
     }
     ambiance.setEtat(state.xenodys?.etat ?? 'creatrice');
-    ambiance.setSilenced(document.hidden || PLAYING.has(state.game?.state));
+    ambiance.setSilenced(!musicHold && (document.hidden || PLAYING.has(state.game?.state)));
   };
+  refreshAmbiance = () => apply(store.get());
   store.subscribe((state, changed) => {
     if (changed.has('config') || changed.has('volumePreview') || changed.has('xenodys') || changed.has('game')) apply(state);
   });
@@ -831,7 +847,38 @@ function wireCinematic(xen) {
   let returnPending = false;
   const OVER = new Set(['closed', 'error', 'idle']);
 
+  // La scène de chargement (mod OPM présent) : annoncée par `scene`, montrée à
+  // l'éclair du passage, effacée quand l'écran du mod a pris le relais.
+  const sceneHost = document.querySelector('[data-el="loading-scene"]');
+  const scene = sceneHost
+    ? createLoadingScene(sceneHost, { etat: () => document.documentElement.dataset.xenodys })
+    : null;
+  let sceneExpected = false;
+  let sceneLoaded = false;
+  let cineDone = false;
+
+  const showScene = () => {
+    if (!scene || !sceneExpected || scene.visible) return;
+    scene.show();
+    // La scène est opaque : la fenêtre peut couvrir tout l'écran sans que rien ne saute.
+    setTimeout(() => opm.window.sceneCover(), 450);
+  };
+  /** Fin de la cinématique, scène comprise : la fenêtre peut se masquer. */
+  const endAll = () => {
+    if (!cineDone) return;
+    if (sceneExpected && !sceneLoaded) return;
+    opm.window.cinematicEnd();
+    phase = 'gone';
+    const keepOpen = store.get().config?.launcher?.close_on_launch === false;
+    if (returnPending || keepOpen) setTimeout(comeBack, keepOpen ? 1200 : 0);
+  };
+  const hideScene = () => {
+    sceneExpected = false;
+    return scene ? scene.hide() : Promise.resolve();
+  };
+
   const comeBack = () => {
+    void hideScene();
     xen.comeBack(sfx);
     phase = 'idle';
     returnPending = false;
@@ -847,18 +894,40 @@ function wireCinematic(xen) {
 
   const begin = () => {
     phase = 'playing';
-    xen.begin(sfx, { progress: () => store.get().game, onAbort: abortToLauncher }).then((done) => {
+    cineDone = false;
+    sceneLoaded = false;
+    xen.begin(sfx, { progress: () => store.get().game, onAbort: abortToLauncher, onFlash: showScene }).then((done) => {
       if (!done) return;
-      opm.window.cinematicEnd();
-      phase = 'gone';
-      // Launcher gardé ouvert pendant la partie : il revient aussitôt.
-      const keepOpen = store.get().config?.launcher?.close_on_launch === false;
-      if (returnPending || keepOpen) setTimeout(comeBack, keepOpen ? 1200 : 0);
+      cineDone = true;
+      if (sceneExpected && sceneLoaded) {
+        // Le jeu a chargé avant la fin du passage : la scène n'a plus lieu d'être.
+        hideScene().then(endAll);
+        return;
+      }
+      showScene();
+      endAll();
     });
   };
 
   opm.game.on((event) => {
-    if (event?.type === 'prepare' && phase === 'idle') begin();
+    if (event?.type === 'prepare' && phase === 'idle') {
+      sceneExpected = false;
+      begin();
+    }
+    if (event?.type === 'music') holdMusic(false);
+    if (event?.type === 'scene') {
+      // La musique continue jusqu'à ce que le jeu la reprenne (au plus 4 min).
+      holdMusic(true, 240_000);
+      sceneExpected = true;
+      scene?.setGallery(event.gallery);
+    }
+    if (event?.type === 'loading') scene?.progress(event.ratio, event.step);
+    if (event?.type === 'loaded') {
+      // L'écran du mod est à l'écran, derrière : la scène s'efface sur lui.
+      scene?.progress(0.4, null);
+      sceneLoaded = true;
+      if (cineDone) hideScene().then(endAll);
+    }
   });
 
   store.subscribe((state, changed) => {
@@ -868,6 +937,12 @@ function wireCinematic(xen) {
       if (phase === 'idle') begin();
       if (phase === 'playing') xen.release();
       return;
+    }
+    if (OVER.has(g) && musicHold) holdMusic(false);
+    if (OVER.has(g) && sceneExpected) {
+      // Le jeu s'est arrêté pendant le chargement : plus rien à couvrir.
+      sceneLoaded = true;
+      void hideScene();
     }
     if (OVER.has(g) && phase !== 'idle') {
       // Pendant l'attente (préparation), le launcher revient tout de suite ;

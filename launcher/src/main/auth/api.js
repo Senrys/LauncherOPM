@@ -353,6 +353,15 @@ function bootstrap() {
   return request('GET', `${API}/bootstrap`, { query: { platform: platformName() } });
 }
 
+/**
+ * Skins de joueurs OPM tirés au hasard, pour la scène de chargement. Anonyme :
+ * des URL de textures, sans pseudonyme. Non authentifié.
+ * @returns {Promise<{skins: {url: string, slim: boolean}[]}>}
+ */
+function skinGallery() {
+  return request('GET', `${API}/skins/gallery`, { attempts: 1, timeoutMs: 3_000 });
+}
+
 /* ============================================================ 1.2 Comptes OPM ========= */
 
 /**
@@ -676,6 +685,7 @@ module.exports = {
   baseUrl,
   request,
   bootstrap,
+  skinGallery,
   register,
   login,
   refresh,

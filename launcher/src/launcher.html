@@ -62,6 +62,9 @@
     <canvas data-el="xeno-canvas"></canvas>
   </div>
   <!-- La ligne de scan qui construit le cadre à l'ouverture (components/intro.js). -->
+  <!-- La scène de chargement (components/loadingScene.js) : après le passage,
+       le launcher couvre l'écran pendant que le jeu charge ses mods. -->
+  <div class="opm-loading" data-el="loading-scene" data-hit aria-hidden="true" hidden></div>
   <div class="opm-buildline" aria-hidden="true"></div>
   <!-- Devant le cadre : ce qui l'incruste dans le décor (bords tramés, cristaux). -->
   <canvas class="opm-surround opm-surround--front" data-el="surround-front" aria-hidden="true"></canvas>
