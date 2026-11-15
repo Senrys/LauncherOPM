@@ -672,6 +672,9 @@ function register(windowGetter) {
   handle('content:status', () => content.status());
   handle('content:next-event', () => content.nextEvent());
   handle('content:votes', () => content.votes());
+  handle('content:xenodys', (options) => content.xenodys({
+    fresh: Boolean(options && typeof options === 'object' && options.fresh),
+  }));
   handle('content:donations', (options) => content.donations({
     fresh: Boolean(options && typeof options === 'object' && options.fresh),
   }));

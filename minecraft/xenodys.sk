@@ -1,0 +1,64 @@
+# ============================================================================
+#  Xenodys — bascule de l'état du monde (créatrice / corrompue)
+# ----------------------------------------------------------------------------
+#  /xenodys creatrice [annonce]   Xenodys redevient elle-même (thème cyan)
+#  /xenodys corrompue [annonce]   l'ennemi la contrôle (thème rouge et violet)
+#  /xenodys                       affiche l'état actuel
+#
+#  La commande écrit dans la table « launcher_xenodys » de la base partagée.
+#  Le launcher de chaque joueur la relit toutes les 60 secondes et change de
+#  thème ; le site lit la même ligne (docs/XENODYS.md).
+#
+#  Prérequis : skript-db, et la variable {sql} ouverte par sql.sk au
+#  chargement. Rien d'autre : pas de clé, pas d'appel HTTP.
+#
+#  SÉCURITÉ : les requêtes ci-dessous n'utilisent PAS « execute unsafe ». Sans
+#  « unsafe », skript-db transmet chaque %valeur% comme un paramètre séparé de
+#  la requête : une annonce contenant une apostrophe ou du SQL ne peut ni
+#  casser la requête ni en modifier le sens.
+# ============================================================================
+
+options:
+    permission: opm.xenodys
+    # Couleurs des messages en jeu, assorties aux deux thèmes.
+    creatrice: &b
+    corrompue: &5
+
+command /xenodys [<text>] [<text>]:
+    permission: {@permission}
+    permission message: &cSeul le staff peut agir sur Xenodys.
+    usage: &7/xenodys <creatrice|corrompue> [annonce]
+    trigger:
+        # Sans argument : lire l'état actuel.
+        if arg-1 is not set:
+            execute "SELECT etat, message, par, depuis FROM launcher_xenodys WHERE id = 1" in {sql} and store the result in {_r::*}
+            send "&7Xenodys est actuellement : &f%{_r::etat::1}%&7 (depuis %{_r::depuis::1}%, par %{_r::par::1}%)."
+            if {_r::message::1} is set:
+                send "&7Annonce : &f%{_r::message::1}%"
+            stop
+
+        set {_etat} to arg-1 in lowercase
+        if {_etat} is not "creatrice":
+            if {_etat} is not "corrompue":
+                send "&cÉtat inconnu : « %arg-1% ». Utilise &fcreatrice&c ou &fcorrompue&c."
+                stop
+
+        set {_par} to "%sender%"
+
+        if arg-2 is set:
+            set {_annonce} to arg-2
+            if length of {_annonce} > 280:
+                send "&cL'annonce dépasse 280 caractères : raccourcis-la."
+                stop
+            execute "UPDATE launcher_xenodys SET etat = %{_etat}%, message = %{_annonce}%, par = %{_par}%, depuis = (now() at time zone 'utc') WHERE id = 1" in {sql}
+        else:
+            execute "UPDATE launcher_xenodys SET etat = %{_etat}%, message = NULL, par = %{_par}%, depuis = (now() at time zone 'utc') WHERE id = 1" in {sql}
+
+        if {_etat} is "corrompue":
+            send "{@corrompue}Xenodys est corrompue. Les launchers basculent dans la minute."
+            if arg-2 is set:
+                broadcast "{@corrompue}&l✦ Xenodys &r{@corrompue}%arg-2%"
+        else:
+            send "{@creatrice}Xenodys est redevenue elle-même. Les launchers basculent dans la minute."
+            if arg-2 is set:
+                broadcast "{@creatrice}&l✦ Xenodys &r{@creatrice}%arg-2%"

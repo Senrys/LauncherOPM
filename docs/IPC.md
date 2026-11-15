@@ -250,7 +250,7 @@ game:instances       game:launch            game:cancel         game:is-running
 game:verify          game:clear-cache       game:files-stat     game:event (→ renderer)
 
 content:news         content:status         content:next-event  content:votes
-content:donations    content:donate
+content:donations    content:donate         content:xenodys
 
 textures:pick        textures:upload        textures:remove
 

@@ -144,6 +144,13 @@
       </div>
     </div>
 
+    <!-- Xenodys parle : accueil, attente, téléchargement, lancement, pannes.
+         Rempli par home.js à partir de utils/xenodys.js. -->
+    <p class="opm-voice opm-scene__voice" data-el="xenodys-voice" aria-live="polite">
+      <span class="opm-voice__name">XENODYS</span>
+      <span data-bind="xenodys-line"></span>
+    </p>
+
     <div class="opm-scene__halo" aria-hidden="true"></div>
 
     <!-- Le personnage, en 3D quand c'est possible : skin complet, tête aux

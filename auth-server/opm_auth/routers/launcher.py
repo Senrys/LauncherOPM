@@ -80,8 +80,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from opm_auth.config import Settings, get_settings
 from opm_auth.db import SessionDep
-from opm_auth.models import STATS_ROW_ID, Article, Equipage, Ile, Instance, Paiement, Statistiques
+from opm_auth.models import STATS_ROW_ID, Article, Equipage, Ile, Instance, Paiement, Statistiques, Xenodys
 from opm_auth.schemas import (
+    XenodysOut,
     AuthInfoOut,
     BootstrapOut,
     DonateCheckoutIn,
@@ -389,6 +390,43 @@ async def _collecte(session: AsyncSession) -> tuple[_Collecte | None, bool]:
         return None, True
 
 
+#: Cache de l'état de Xenodys. Court : quand le staff lance une invasion, les
+#: launchers ouverts doivent basculer en moins d'une minute (ils interrogent
+#: toutes les 60 s) — mais pas au point d'interroger la base à chaque requête.
+XENODYS_TTL: Final[float] = 10.0
+
+
+async def _load_xenodys(session: AsyncSession) -> XenodysOut:
+    """Lit la ligne unique de ``launcher_xenodys``."""
+    row = await session.get(Xenodys, 1)
+    if row is None:
+        return XenodysOut()
+    etat = row.etat if row.etat in ("creatrice", "corrompue") else "creatrice"
+    message = (row.message or "").strip() or None
+    return XenodysOut(etat=etat, depuis=row.depuis, message=message)
+
+
+async def _xenodys(session: AsyncSession) -> XenodysOut:
+    """L'état de Xenodys — **jamais une erreur**.
+
+    Table absente (migration 0002 pas encore passée), base injoignable : on rend
+    « créatrice », l'état normal du monde. Un incident technique ne doit jamais
+    faire basculer le launcher de tous les joueurs dans le thème de l'invasion.
+    """
+    settings = get_settings()
+    try:
+        value, _stale = await _cache.fetch(
+            "xenodys", _ttl(XENODYS_TTL, settings), lambda: _load_xenodys(session)
+        )
+        return value
+    except ApiError:
+        logger.warning("« launcher_xenodys » illisible : Xenodys reste « créatrice ».")
+        # Une requête en échec laisse la transaction PostgreSQL inutilisable :
+        # on la referme pour que la suite de la requête puisse encore lire.
+        await session.rollback()
+        return XenodysOut()
+
+
 async def _stats_soft(session: AsyncSession) -> tuple[_Stats | None, bool]:
     """Comme :func:`_stats`, mais ne fait jamais échouer la requête.
 
@@ -670,6 +708,7 @@ async def bootstrap(
         ),
         server=ServerInfoOut(host=host, port=port),
         links=_links(settings),
+        xenodys=await _xenodys(session),
     )
     return _respond(payload, stale=stale)
 
@@ -779,6 +818,16 @@ async def votes(session: SessionDep) -> Any:
     stats, stale = await _stats(session)
     payload = VotesOut.from_stats(stats) if stats is not None else VotesOut()
     return _respond(payload, stale=stale)
+
+
+@router.get("/xenodys", response_model=XenodysOut, summary="État de Xenodys")
+async def xenodys(session: SessionDep) -> XenodysOut:
+    """Créatrice ou corrompue : le launcher l'interroge toutes les 60 secondes
+    pour changer de thème sans redémarrer. Publique, sans authentification —
+    c'est un état du monde, pas une donnée de joueur. Ne répond jamais en erreur
+    (voir :func:`_xenodys`).
+    """
+    return await _xenodys(session)
 
 
 @router.get("/donations", response_model=DonationsOut, summary="Cagnotte du mois")

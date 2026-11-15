@@ -41,6 +41,7 @@ from typing import Any
 
 from sqlalchemy import (
     CHAR,
+    CheckConstraint,
     JSON,
     BigInteger,
     Boolean,
@@ -1050,6 +1051,39 @@ class Paiement(Base):
     date: Mapped[datetime] = mapped_column(TS, nullable=False)
 
 
+#: États possibles de Xenodys, l'entité créatrice du monde de One Piece Minecraft.
+XENODYS_STATES: tuple[str, ...] = ("creatrice", "corrompue")
+
+
+class Xenodys(Base):
+    """``launcher_xenodys`` — l'état du monde, partagé par le jeu, le launcher et le site.
+
+    Une seule ligne (``id = 1``). Xenodys est la Créatrice — bienveillante,
+    couleur cyan — sauf pendant un événement RP où l'ennemi la corrompt : le
+    launcher et le site passent alors au rouge et au violet.
+
+    Écrite par le staff depuis le jeu (commande Skript ``/xenodys``, qui passe
+    par skript-db), lue par ce serveur (``GET /api/v1/xenodys``, ``/bootstrap``)
+    et par le site. Elle appartient à la famille du launcher : le site la lit,
+    il ne la crée pas (docs/XENODYS.md).
+    """
+
+    __tablename__ = "launcher_xenodys"
+    __table_args__ = (
+        CheckConstraint("etat IN ('creatrice', 'corrompue')", name="ck_launcher_xenodys_etat"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    etat: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="creatrice", server_default=text("'creatrice'")
+    )
+    #: Annonce facultative du staff, affichée telle quelle au joueur.
+    message: Mapped[str | None] = mapped_column(String(280), nullable=True)
+    #: Qui a déclenché la bascule (pseudo du membre du staff), pour mémoire.
+    par: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    depuis: Mapped[datetime] = mapped_column(TS, nullable=False, server_default=func.now())
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 #   PROPRIÉTÉ DES TABLES — le garde-fou
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1078,6 +1112,7 @@ LAUNCHER_TABLES: tuple[Table, ...] = (
     Texture.__table__,
     UserTexture.__table__,
     Instance.__table__,
+    Xenodys.__table__,
 )
 
 #: Noms des tables du launcher, pratiques pour la migration et les tests.

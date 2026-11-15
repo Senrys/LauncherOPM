@@ -225,6 +225,8 @@ const opm = {
     nextEvent: () => call('content:next-event'),
     votes: () => call('content:votes'),
     donations: (options) => call('content:donations', options && options.fresh ? { fresh: true } : undefined),
+    /** État de Xenodys, `{etat, depuis, message}` (docs/XENODYS.md). */
+    xenodys: (options) => call('content:xenodys', options && options.fresh ? { fresh: true } : undefined),
     donate: async (amountCents) => call('content:donate', assertNumber(amountCents, 'montant')),
   },
 

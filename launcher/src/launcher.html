@@ -9,6 +9,8 @@
   <!-- Ordre de chargement imposé : tokens → fonts → reset → layout → components → panels.
        Aucun style n'est écrit hors de ces fichiers. -->
   <link rel="stylesheet" href="assets/css/base/tokens.css">
+  <!-- Les deux visages de Xenodys : redéfinit les tokens quand elle est corrompue. -->
+  <link rel="stylesheet" href="assets/css/base/xenodys.css">
   <link rel="stylesheet" href="assets/css/base/fonts.css">
   <link rel="stylesheet" href="assets/css/base/reset.css">
 
@@ -71,6 +73,8 @@
          alt="One Piece Minecraft">
 
     <p class="opm-splash__label">CONNEXION AU SERVEUR D'AUTHENTIFICATION</p>
+    <!-- La voix de Xenodys, sous l'état technique (utils/xenodys.js). -->
+    <p class="opm-voice opm-splash__voice" data-el="splash-voice" aria-live="polite"></p>
 
     <div class="opm-splash__track" data-el="splash-track"
          role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"

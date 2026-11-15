@@ -608,6 +608,15 @@ function donations() {
 }
 
 /**
+ * État de Xenodys — `creatrice` ou `corrompue` (docs/XENODYS.md). Public,
+ * sans jeton : c'est un état du monde, pas une donnée de joueur.
+ * @returns {Promise<{etat: string, depuis: string|null, message: string|null}>}
+ */
+function xenodys() {
+  return request('GET', `${API}/xenodys`);
+}
+
+/**
  * Ouvre une intention de don et renvoie l'URL de paiement à afficher dans le navigateur.
  * @param {number} amountCents  montant en centimes
  * @param {string} [token]      facultatif : rattache le don au compte connecté
@@ -672,6 +681,7 @@ module.exports = {
   refresh,
   logout,
   me,
+  xenodys,
   myTextures,
   uploadTexture,
   deleteTexture,

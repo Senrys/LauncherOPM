@@ -173,6 +173,19 @@ class LauncherInfoOut(ApiModel):
     download_url: str | None = None
 
 
+class XenodysOut(ApiModel):
+    """État de Xenodys, l'entité créatrice du monde (docs/XENODYS.md).
+
+    ``creatrice`` : thème cyan, Xenodys bienveillante. ``corrompue`` : thème
+    rouge et violet, Xenodys contrôlée par l'ennemi pendant un événement RP.
+    ``message`` : annonce facultative du staff, affichée telle quelle.
+    """
+
+    etat: Literal["creatrice", "corrompue"] = "creatrice"
+    depuis: datetime | None = None
+    message: str | None = None
+
+
 class MaintenanceOut(ApiModel):
     """État de maintenance : bloque le bouton JOUER quand il est actif."""
 
@@ -214,6 +227,8 @@ class BootstrapOut(ApiModel):
     auth: AuthInfoOut
     server: ServerInfoOut
     links: LinksOut
+    #: État du monde : le launcher change de thème selon Xenodys.
+    xenodys: XenodysOut = Field(default_factory=XenodysOut)
 
 
 # ---------------------------------------------------------------------------
