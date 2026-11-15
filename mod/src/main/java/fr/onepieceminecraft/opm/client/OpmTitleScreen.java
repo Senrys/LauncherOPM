@@ -198,8 +198,8 @@ public final class OpmTitleScreen extends Screen {
         for (int[] c : new int[][]{{left, top}, {right - 4, top}, {left, bottom - 1}, {right - 4, bottom - 1}}) {
             g.fill(c[0], c[1], c[0] + 4, c[1] + 1, argb(core(), 1));
         }
-        Sprites.Sheet banner = Sprites.get(session.corrupted() ? "bandeau_240_corrompue" : "bandeau_240");
-        if (banner != null) Sprites.draw(g, banner, 0, left + 12, top + 10, false, 1f, 0.5f);
+        Sprites.Sheet banner = Sprites.get(session.corrupted() ? "bandeau_960_corrompue" : "bandeau_960");
+        if (banner != null) Sprites.draw(g, banner, 0, left + 12, top + 10, false, 1f, 0.125f);
         int y = top + 58;
         String status = !OpmLive.known ? "Connexion au serveur…"
                 : !OpmLive.online ? "Serveur hors ligne"

@@ -39,6 +39,6 @@ public final class OpmMusic {
     public static void announce() {
         if (announced) return;
         announced = true;
-        Opm.LOG.info("[OPM:MUSIC] la musique du launcher reprend dans le jeu");
+        Signal.send("music", "la musique du launcher reprend dans le jeu");
     }
 }

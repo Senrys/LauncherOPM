@@ -67,7 +67,7 @@ public final class OpmLoadingOverlay extends Overlay {
         clock += dt;
         if (!readySent) {
             readySent = true;
-            Opm.LOG.info("[OPM:READY] écran de chargement OPM affiché");
+            Signal.send("ready", "écran de chargement OPM affiché");
         }
 
         float actual = reload.getActualProgress();

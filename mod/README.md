@@ -29,8 +29,10 @@ Ce qu'il fait (détail dans `docs/XENODYS.md`, « Du launcher au jeu ») :
   invisible, c'est le mod des joueurs qui la dessine.
 
 Il dialogue avec le launcher par `opm/session.json` (écrit par
-`launcher/src/main/services/bridge.js`) et par trois lignes du journal : `[OPM:HELLO]`,
-`[OPM:READY]`, `[OPM:MUSIC]`.
+`launcher/src/main/services/bridge.js`) et par trois signaux, `hello`, `ready`, `music`
+(`client/Signal`) : écrits dans `opm/signaux.properties` (que le launcher relit), sur la
+sortie standard et dans le journal. Le fichier est la voie sûre : avec certains modpacks
+(Sinytra Connector), le journal d'un mod n'atteint jamais la console.
 
 ## Compiler
 
