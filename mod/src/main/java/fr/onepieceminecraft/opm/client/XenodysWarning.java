@@ -54,22 +54,23 @@ public final class XenodysWarning {
             return;
         }
         var g = event.getGuiGraphics();
-        // Le bord de l'écran qui rougit, puis pâlit.
-        double a = Math.max(0, Math.min(1, t / 0.4)) * Math.max(0, 1 - (t - (LENGTH - 1.5)) / 1.5) * 0.45;
-        if (a > 0) {
-            int c = ((int) (a * 255) << 24) | 0xF0506E;
+        // Le bord de l'écran bat comme un cœur — deux pulsations par seconde et
+        // quelque — puis s'éteint avec elle.
+        double presence = Math.max(0, Math.min(1, t / 0.8)) * Math.max(0, Math.min(1, (LENGTH - t) / 1.2));
+        double beat = t % 1.15;
+        double pulse = Math.exp(-beat * 7) + 0.55 * Math.exp(-Math.max(0, beat - 0.28) * 7) * (beat >= 0.28 ? 1 : 0);
+        double a = presence * (0.12 + 0.3 * Math.min(1, pulse));
+        if (a > 0.004) {
             int w = g.guiWidth();
             int h = g.guiHeight();
-            for (int i = 0; i < 6; i++) {
-                int ci = ((int) (a * (6 - i) / 6 * 255) << 24) | 0xF0506E;
+            for (int i = 0; i < 8; i++) {
+                int ci = ((int) (a * (8 - i) / 8 * 255) << 24) | 0xF0506E;
                 g.fill(i, 0, i + 1, h, ci);
                 g.fill(w - i - 1, 0, w - i, h, ci);
                 g.fill(0, i, w, i + 1, ci);
                 g.fill(0, h - i - 1, w, h - i, ci);
             }
         }
-        if (t < LENGTH - 0.6) {
-            PausePeek.drawPeek(g, t, line, "corrompue", g.guiWidth() / 2.0, g.guiHeight() / 2.0, true);
-        }
+        PausePeek.drawPeek(g, t, line, "corrompue", g.guiWidth() / 2.0, g.guiHeight() / 2.0, true, LENGTH - t);
     }
 }
