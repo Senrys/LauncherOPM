@@ -102,8 +102,20 @@ demande de réduire les animations.
 - **Les circuits dans la vidéo** (`components/circuits.js`) : des pistes qui se dessinent
   par moments dans l'image, fondues en dégradé tramé, et un voile de teinte selon l'état.
 - **La musique** (`components/ambiance.js`, réglages `launcher.ambiance` et
-  `launcher.volume`) : `ambiance2` du site, passée par une voix mécanique (modulation en
-  anneau aiguë, filtre en peigne, quantification, bourdonnement grave), et `wave` (la mer),
-  très bas. Corrompue : plus
-  de machine, plus grave, des coupures. Silence pendant une partie et quand le launcher est
-  réduit.
+  `launcher.volume`) : `ambiance2` du site, remixée en direct. Créatrice : calme, comme
+  dans une simulation (ralentie, feutrée, grande réverbération, nappe d'accords, « pings »
+  de données). Corrompue : tendue, sous pression (voix mécanique dure, bourdon dissonant,
+  battement de cœur, souffle qui monte, coupures). Silence pendant une partie et quand le
+  launcher est réduit.
+- **Les sons de l'interface** (`components/sfx.js`, réglage `launcher.sfx`) : petits
+  bruits mécaniques et électroniques synthétisés (survol, clic, onglet, interrupteur,
+  cinématique).
+- **Le personnage du joueur** (`components/character3d.js`, `components/socle.js`) :
+  exposé sur un socle de circuit imprimé en voxels, tourné vers la droite, il respire ; les
+  circuits de Xenodys se dessinent autour de lui. Corrompue : il est enfermé dans un bocal
+  d'expérience, et il a peur.
+- **La cinématique du lancement** (fenêtre ouverte) : quand le jeu démarre, Xenodys lâche
+  le cadre, vole devant lui, nous tourne le dos ; le launcher rétrécit entre ses mains
+  jusqu'à n'être qu'un orbe ; elle ouvre les bras et une onde de lumière (ou de blocs
+  rouges et violets) envahit la fenêtre. La fenêtre ne se masque qu'ensuite. Au retour du
+  jeu, le launcher regrandit depuis ses mains.

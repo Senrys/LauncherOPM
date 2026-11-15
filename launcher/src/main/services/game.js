@@ -642,6 +642,7 @@ function onData(run, raw) {
     run.launching = true;
     taskbar(2);
     logger.info('Démarrage de la machine virtuelle Java…');
+    cinematicStart();
     emit({ type: 'launching' });
     armStartFallback(run);
   }
@@ -895,14 +896,46 @@ function abort(run, note) {
   emit({ type: 'error', message: note });
 }
 
+/**
+ * La cinématique du lancement (fenêtre ouverte) : Xenodys emporte le launcher
+ * dans ses mains. Elle commence quand la machine virtuelle démarre ; la
+ * fenêtre n'est masquée qu'une fois la cinématique jouée — le renderer
+ * l'annonce —, et au plus tard après CINEMATIC_MAX_MS.
+ */
+const CINEMATIC_MAX_MS = 9_000;
+let cinematic = null;
+
+function cinematicStart() {
+  if (cinematic || mainWindow.windowMode() !== 'ouvert') return;
+  let resolve;
+  const done = new Promise((r) => {
+    resolve = r;
+  });
+  const timer = setTimeout(cinematicEnd, CINEMATIC_MAX_MS);
+  cinematic = { done, resolve, timer };
+}
+
+/** Fin de la cinématique, annoncée par le renderer (ou par le délai de garde). */
+function cinematicEnd() {
+  if (!cinematic) return;
+  clearTimeout(cinematic.timer);
+  cinematic.resolve();
+  cinematic = null;
+}
+
 /** Masque le launcher pendant la partie, si le joueur l'a demandé. */
 function hideForGame(run) {
   if (!run.config.launcher.close_on_launch) return;
-  const win = mainWindow.getWindow();
-  if (!win) return;
-  win.hide();
-  run.hidden = true;
-  logger.info('Launcher masqué pendant la partie.');
+  const hide = () => {
+    if (run.finished) return;
+    const win = mainWindow.getWindow();
+    if (!win) return;
+    win.hide();
+    run.hidden = true;
+    logger.info('Launcher masqué pendant la partie.');
+  };
+  if (cinematic) cinematic.done.then(hide);
+  else hide();
 }
 
 /** Remonte la fenêtre masquée au lancement. */
@@ -1291,5 +1324,6 @@ module.exports = {
   clearCache,
   filesStat,
   ownsTaskbar,
+  cinematicEnd,
   onEvent,
 };

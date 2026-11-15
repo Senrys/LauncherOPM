@@ -74,6 +74,8 @@ const DEFAULT_CONFIG = deepFreeze({
     // La musique de Xenodys (components/ambiance.js). Nouvelle clé : l'ancienne
     // `music`, jamais branchée, valait `false` partout et serait restée muette.
     ambiance: true,
+    // Les petits bruits mécaniques de l'interface (components/sfx.js).
+    sfx: true,
     volume: 40,
     auto_launch: false,
     download_multi: 5,
@@ -244,6 +246,7 @@ function normalizeConfig(input, pinned = null) {
       auto_update: toBool(launcher.auto_update, DEFAULT_CONFIG.launcher.auto_update),
       rp_notifications: toBool(launcher.rp_notifications, DEFAULT_CONFIG.launcher.rp_notifications),
       ambiance: toBool(launcher.ambiance, DEFAULT_CONFIG.launcher.ambiance),
+      sfx: toBool(launcher.sfx, DEFAULT_CONFIG.launcher.sfx),
       volume: clampInt(launcher.volume, VOLUME_MIN, VOLUME_MAX, DEFAULT_CONFIG.launcher.volume),
       auto_launch: toBool(launcher.auto_launch, DEFAULT_CONFIG.launcher.auto_launch),
       window_open: toBool(launcher.window_open, DEFAULT_CONFIG.launcher.window_open),

@@ -194,6 +194,47 @@ function setPassthrough(passthrough) {
   live.setIgnoreMouseEvents(Boolean(passthrough), { forward: true });
 }
 
+/* ------------------------------------------------------------- déplacement */
+
+/** Glisser en cours : décalage curseur → coin de la fenêtre, et minuterie. */
+let drag = null;
+
+/**
+ * Début d'un glisser de la fenêtre (mode ouvert). Une fenêtre transparente ne
+ * peut pas utiliser les zones de déplacement natives (`-webkit-app-region:
+ * drag`) : elles ne transmettent pas les mouvements de souris à la page, qui
+ * ne saurait plus alors quand rendre la main au bureau — les clics près des
+ * boutons partaient sur l'application de dessous. On suit donc le curseur.
+ */
+function dragStart() {
+  const live = getWindow();
+  if (!live || drag) return;
+  const cursor = screen.getCursorScreenPoint();
+  const [x, y] = live.getPosition();
+  drag = {
+    dx: cursor.x - x,
+    dy: cursor.y - y,
+    timer: setInterval(() => {
+      const w = getWindow();
+      if (!w) return dragEnd();
+      const c = screen.getCursorScreenPoint();
+      w.setPosition(Math.round(c.x - drag.dx), Math.round(c.y - drag.dy));
+    }, 8),
+  };
+}
+
+/** Fin du glisser. */
+function dragEnd() {
+  if (!drag) return;
+  clearInterval(drag.timer);
+  drag = null;
+  // Une fenêtre déplacée n'est plus « agrandie ».
+  if (restoreBounds) {
+    restoreBounds = null;
+    send(MAXIMIZE_CHANNEL, false);
+  }
+}
+
 /**
  * Recrée la fenêtre — le mode ouvert ou compact se décide à la création
  * (une fenêtre ne devient pas transparente après coup).
@@ -307,8 +348,10 @@ function create() {
   win.on('unmaximize', () => send(MAXIMIZE_CHANNEL, false));
 
   win.on('closed', () => {
+    dragEnd();
     win = null;
   });
+  win.on('blur', dragEnd);
 
   win.webContents.on('did-fail-load', (_event, code, description, url) => {
     logger.error(`Chargement de l'interface impossible (${code} ${description}) : ${url}`);
@@ -367,4 +410,6 @@ module.exports = {
   isMaximized,
   resizeFrame,
   setPassthrough,
+  dragStart,
+  dragEnd,
 };
