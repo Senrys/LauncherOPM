@@ -49,6 +49,15 @@ public final class Opm {
             Screen next = event.getNewScreen();
             // L'écran titre d'OPM ; et ni solo ni liste de serveurs : on ne joue
             // que sur One Piece Minecraft, depuis le launcher.
+            if (next instanceof net.minecraft.client.gui.screens.DisconnectedScreen lost) {
+                try {
+                    var details = ((fr.onepieceminecraft.opm.mixin.DisconnectedScreenAccessor) lost).opm$details();
+                    fr.onepieceminecraft.opm.client.Signal.disconnected(lost.getTitle().getString(),
+                            details == null ? "" : details.reason().getString());
+                } catch (RuntimeException e) {
+                    LOG.warn("Écran de déconnexion illisible : {}", e.toString());
+                }
+            }
             if (next instanceof TitleScreen || next instanceof JoinMultiplayerScreen || next instanceof SelectWorldScreen) {
                 event.setNewScreen("1".equals(System.getProperty("opm.debug.scene", ""))
                         ? new fr.onepieceminecraft.opm.client.ScenePreview() : new OpmTitleScreen());

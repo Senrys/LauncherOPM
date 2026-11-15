@@ -45,4 +45,24 @@ public final class Signal {
             Opm.LOG.warn("Signal « {} » non écrit : {}", name, e.toString());
         }
     }
+
+    /**
+     * La connexion au serveur a échoué ou a été coupée : le message affiché au
+     * joueur est recopié dans `opm/deconnexion.txt` (et le journal), pour que le
+     * launcher l'inscrive dans le sien — l'écran du jeu, lui, ne laisse aucune trace.
+     */
+    public static void disconnected(String title, String reason) {
+        String text = (title == null ? "" : title) + " : " + (reason == null ? "" : reason);
+        System.out.println("[OPM:DISCONNECT] " + text);
+        System.out.flush();
+        Opm.LOG.info("[OPM:DISCONNECT] {}", text);
+        try {
+            Path dir = FMLPaths.GAMEDIR.get().resolve("opm");
+            Files.createDirectories(dir);
+            Files.writeString(dir.resolve("deconnexion.txt"), System.currentTimeMillis() + "\n" + text + "\n",
+                    StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            Opm.LOG.warn("Message de déconnexion non écrit : {}", e.toString());
+        }
+    }
 }
