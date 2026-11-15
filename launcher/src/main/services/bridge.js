@@ -152,7 +152,9 @@ function gameManifest() {
  */
 function ownedPaths() {
   const m = gameManifest();
-  return ['opm', 'config/fml.toml', INJECTOR_FILE, ...(m.mod ? [`mods/${m.mod.fichier}`] : [])];
+  // `downloads` : le pack de ressources du serveur, que Minecraft garde en cache.
+  // Effacé à chaque lancement, il serait retéléchargé à chaque connexion.
+  return ['opm', 'config/fml.toml', 'downloads', INJECTOR_FILE, ...(m.mod ? [`mods/${m.mod.fichier}`] : [])];
 }
 
 async function sameFile(file, sha) {

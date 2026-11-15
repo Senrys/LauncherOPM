@@ -117,8 +117,13 @@ qui l'installe lui-même dans le jeu) se passent le relais sans que rien ne se v
    suit la souris, regarde le bouton survolé, revient au joueur, et elle tend la main
    quand on rejoint le serveur. Corrompue, elle le tient sous son emprise : main en
    griffe au-dessus de lui, fils rouges, et lui qui se protège le visage.
-6. **Les autres menus** (options, pause, connexion…) : la salle de simulation en fond,
-   boutons et curseurs aux couleurs du launcher ; dans le menu pause, « Donner son avis »
+6. **Les autres menus, hors partie** (options depuis l'écran titre, connexion,
+   déconnexion) : la salle de simulation en fond, boutons et curseurs aux couleurs du
+   launcher. **En jeu, rien ne change** : le menu pause et les écrans de la partie gardent
+   l'apparence que leur donne le pack de ressources du serveur (le style OPM ne
+   s'applique ni dans le monde, ni dès qu'un pack du serveur est actif). Le pack du serveur,
+   mis en cache par Minecraft (`downloads/`), n'est plus effacé par la vérification des
+   fichiers : il n'est pas retéléchargé à chaque connexion. Dans le menu pause, « Donner son avis »
    et « Signaler un bug » deviennent le site et le Discord d'OPM. Dans le menu pause,
    Xenodys passe parfois la tête par le coin bas-droit et dit un mot (l'annonce du staff
    s'il y en a une).

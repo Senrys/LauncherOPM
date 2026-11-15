@@ -13,8 +13,10 @@ Ce qu'il fait (détail dans `docs/XENODYS.md`, « Du launcher au jeu ») :
 - **l'écran titre** d'OPM (`client/OpmTitleScreen`) : Xenodys en 3D (`client/GeoModel`,
   le modèle GeckoLib sans GeckoLib), le joueur sur son socle (`client/PlayerRaster`) ;
   ni solo ni liste de serveurs ;
-- **les menus** aux couleurs du launcher (`assets/minecraft/textures/gui/…`,
-  `mixin/ScreenMixin`) et la **musique** du launcher (`client/OpmMusic`) ;
+- **les menus hors partie** aux couleurs du launcher (`client/MenuStyle`,
+  `mixin/GuiGraphicsMixin`, `mixin/ScreenMixin`) — jamais en jeu ni par-dessus le pack de
+  ressources du serveur, qui garde la main sur l'apparence de la partie — et la
+  **musique** du launcher dans les menus (`client/OpmMusic`) ;
 - **l'écran titre réagit au serveur** (`client/OpmLive`, relu toutes les 20 s) : hors
   ligne, Xenodys se détourne et cherche ; complet, elle lève la main (« patience ») ;
 - **la connexion** (`client/ConnectFx`) : le joueur se défait en pixels vers un orbe ;
@@ -48,8 +50,8 @@ ouvre le menu pause. `run/opm/session.json` simule ce qu'écrit le launcher.
 ## Ressources générées
 
 Ne pas retoucher à la main : `python3 xenodys/sprites.py` régénère les planches de
-sprites (`assets/opm/textures/gui/sprites/`), le modèle GeckoLib (`assets/opm/geckolib/`,
-`assets/opm/textures/entity/`) et les textures des menus (`assets/minecraft/…`). La
+sprites (`assets/opm/scene/`), le modèle GeckoLib (`assets/opm/geckolib/`,
+`assets/opm/textures/entity/`) et les textures des menus (`assets/opm/textures/gui/sprites/widget/`, `assets/minecraft/textures/gui/`). La
 musique (`assets/opm/sounds/music/`) vient de `xenodys/musique/`.
 
 ## Anti-triche
