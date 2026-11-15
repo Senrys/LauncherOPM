@@ -5,12 +5,12 @@
  * (la mer), plus discrète, dessous. La musique passe par une chaîne Web Audio
  * qui lui donne une voix MÉCANIQUE — celle de Xenodys :
  *
- *   - modulation en anneau (la musique multipliée par une sinusoïde grave) :
- *     un timbre métallique, robotique ;
+ *   - modulation en anneau (la musique multipliée par une sinusoïde aiguë,
+ *     quelques centaines de hertz) : le timbre métallique d'une voix de robot.
+ *     Grave (sous ~100 Hz), elle s'entendrait comme un tremblement ;
  *   - filtre en peigne (un écho de quelques millisecondes, réinjecté, dont la
  *     longueur ondule) : une résonance de machine ;
  *   - quantification (« bitcrusher ») : le grain numérique ;
- *   - une pulsation mécanique (le volume battu par un oscillateur carré) ;
  *   - un léger ralenti : la musique descend, plus grave ;
  *   - le tout mêlé au son d'origine, qui reste reconnaissable ;
  *   - et dessous, le bourdonnement grave de la machine.
@@ -37,12 +37,12 @@ const FADE = 0.6;
 /** Les deux visages de la chaîne. */
 const PROFILES = {
   creatrice: {
-    dry: 0.5, ring: 0.34, ringHz: 47, comb: 0.42, feedback: 0.62, crush: 0.16, steps: 12,
-    rate: 0.97, cutoff: 7600, gate: 0.18, gateHz: 3.2, hum: 0.07, humHz: [55, 82.5], glitch: false,
+    dry: 0.55, ring: 0.26, ringHz: 420, comb: 0.4, feedback: 0.6, crush: 0.14, steps: 12,
+    rate: 0.97, cutoff: 7600, hum: 0.06, humHz: [55, 82.5], glitch: false,
   },
   corrompue: {
-    dry: 0.34, ring: 0.52, ringHz: 71, comb: 0.5, feedback: 0.76, crush: 0.34, steps: 7,
-    rate: 0.92, cutoff: 4600, gate: 0.36, gateHz: 6.4, hum: 0.11, humHz: [52, 77.6], glitch: true,
+    dry: 0.4, ring: 0.4, ringHz: 290, comb: 0.48, feedback: 0.72, crush: 0.3, steps: 7,
+    rate: 0.92, cutoff: 4600, hum: 0.1, humHz: [52, 77.6], glitch: true,
   },
 };
 
@@ -98,14 +98,7 @@ export function createAmbiance() {
     const tone = ctx.createBiquadFilter();
     tone.type = 'lowpass';
     tone.Q.value = 0.7;
-    // La pulsation : un gain battu par un oscillateur carré.
-    const gate = ctx.createGain();
-    const gateLfo = ctx.createOscillator();
-    gateLfo.type = 'square';
-    const gateDepth = ctx.createGain();
-    gateLfo.connect(gateDepth).connect(gate.gain);
-    gateLfo.start();
-    bus.connect(tone).connect(gate).connect(master);
+    bus.connect(tone).connect(master);
 
     // Le bourdonnement de la machine : deux scies graves, très filtrées.
     const humGain = ctx.createGain();
@@ -142,7 +135,8 @@ export function createAmbiance() {
     const lfo = ctx.createOscillator();
     lfo.frequency.value = 0.13;
     const lfoDepth = ctx.createGain();
-    lfoDepth.gain.value = 0.0025;
+    // Ondulation très faible : plus forte, elle fait « trembler » la hauteur.
+    lfoDepth.gain.value = 0.0004;
     lfo.connect(lfoDepth).connect(delay.delayTime);
     lfo.start();
     const combWet = ctx.createGain();
@@ -161,7 +155,7 @@ export function createAmbiance() {
     seaGain.gain.value = SEA_LEVEL;
     sea.connect(seaGain).connect(master);
 
-    nodes = { master, bus, tone, dry, carrier, ringWet, feedback, combWet, crusher, crushWet, gate, gateLfo, gateDepth, humGain, hums };
+    nodes = { master, bus, tone, dry, carrier, ringWet, feedback, combWet, crusher, crushWet, humGain, hums };
     applyProfile(true);
   }
 
@@ -177,9 +171,6 @@ export function createAmbiance() {
     set(nodes.feedback.gain, p.feedback);
     set(nodes.crushWet.gain, p.crush);
     set(nodes.tone.frequency, p.cutoff);
-    set(nodes.gate.gain, 1 - p.gate);
-    set(nodes.gateDepth.gain, p.gate);
-    set(nodes.gateLfo.frequency, p.gateHz);
     set(nodes.humGain.gain, p.hum);
     nodes.hums.forEach((o, i) => set(o.frequency, p.humHz[i]));
     nodes.crusher.curve = staircase(p.steps);

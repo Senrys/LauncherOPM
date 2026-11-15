@@ -544,8 +544,8 @@ export async function createXenodys(canvas, stage, frame) {
     const edge = frameBox.x + frameBox.w;
     // Le petit curieux : caché derrière le coin bas-gauche, il passe la tête.
     fitBot(bots[0], Math.min(110, frameBox.h * 0.16), { x: frameBox.x - 4, y: frameBox.y + frameBox.h - 28 });
-    // Le fidèle : debout dans la marge de droite, près d'elle, sur la mer.
-    fitBot(bots[1], Math.min(120, frameBox.h * 0.17), { x: edge + Math.max(46, (W - edge) * 0.62), y: H - 30 });
+    // Le fidèle : debout dans la marge de droite, près d'elle, au pied du cadre.
+    fitBot(bots[1], Math.min(120, frameBox.h * 0.17), { x: edge + Math.max(46, (W - edge) * 0.62), y: frameBox.y + frameBox.h });
     poseXen(0);
     refresh();
     mask(renderHands());
