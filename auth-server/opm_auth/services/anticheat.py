@@ -48,6 +48,11 @@ OPM_MOD = re.compile(r"^mods/opm-\d[\w.+-]*\.jar$")
 MANIFEST_TTL = 300.0
 #: Mods intégrés au jeu, que le mod OPM liste sans fichier.
 BUILTIN_MODS = frozenset({"minecraft", "neoforge", "opm"})
+#: Sinytra Connector charge un mod Fabric depuis une copie convertie, rangée dans
+#: ``mods/.connector/`` : ``continuity-3.0.0+1.21.neoforge.jar`` y devient
+#: ``continuity-3.0.0+1.21.neoforge_mapped_moj_1.21.1.jar``. Le mod OPM rapporte le
+#: nom de cette copie ; on le ramène à celui du fichier d'origine avant comparaison.
+CONNECTOR_COPY = re.compile(r"_mapped_[a-z]+_[\w.+-]+\.jar$")
 
 _manifest: tuple[float, dict[str, str]] | None = None
 _manifest_lock = asyncio.Lock()
@@ -207,6 +212,7 @@ def evaluate_report(
         file = str(m.get("file") or "")
         if mod_id in BUILTIN_MODS or not file or re.match(r"^opm-\d", file):
             continue
+        file = CONNECTOR_COPY.sub(".jar", file)
         if names is not None and file not in names:
             reasons.append(f"mod inconnu : {file} ({mod_id})")
     for p in packs:

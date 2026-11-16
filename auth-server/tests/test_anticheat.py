@@ -161,6 +161,17 @@ async def test_rapport_du_mod_propre(app: FastAPI, client: AsyncClient) -> None:
     assert response.json() == {"ok": True, "message": None, "reasons": [], "extra": [], "modified": []}
 
 
+def test_copie_connector_reconnue() -> None:
+    """Un mod Fabric chargé par Connector est rapporté sous le nom de sa copie convertie."""
+    official = {"mods/continuity-3.0.0+1.21.neoforge.jar": "d" * 40}
+    copy = {"id": "continuity", "file": "continuity-3.0.0+1.21.neoforge_mapped_moj_1.21.1.jar"}
+    assert anticheat.evaluate_report([copy], [], official) == []
+    stranger = {"id": "xray", "file": "xray-1.0_mapped_moj_1.21.1.jar"}
+    assert anticheat.evaluate_report([stranger], [], official) == [
+        "mod inconnu : xray-1.0.jar (xray)"
+    ]
+
+
 async def test_rapport_sans_jeton_de_jeu(client: AsyncClient) -> None:
     response = await client.post(f"{API_PREFIX}/game/report", json={"phase": "join"})
     assert response.status_code == 401
