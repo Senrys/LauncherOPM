@@ -300,13 +300,36 @@ async function setEarlyWindow(instanceDir, earlyWindow) {
 }
 
 /**
- * Passe l'écran d'accessibilité que Minecraft montre au tout premier lancement
- * (« Welcome to Minecraft… ») : il s'intercalerait entre le chargement d'OPM et
- * l'écran titre, et bloquerait la connexion directe. Les réglages du joueur
- * restent intacts ; seule la clé `onboardAccessibility` est fixée.
+ * Retire d'une ligne `resourcePacks:[…]` d'options.txt les packs posés par le
+ * joueur (`file/…`). Les packs du jeu, des mods et celui du serveur restent.
+ * @param {string} text
+ * @param {string} key  `resourcePacks` ou `incompatibleResourcePacks`
+ * @returns {string}
+ */
+function withoutPlayerPacks(text, key) {
+  return text.replace(new RegExp(`^${key}:(.*)$`, 'm'), (whole, json) => {
+    try {
+      const list = JSON.parse(json);
+      if (!Array.isArray(list)) return whole;
+      const kept = list.filter((id) => !(typeof id === 'string' && id.startsWith('file/')));
+      return kept.length === list.length ? whole : `${key}:${JSON.stringify(kept)}`;
+    } catch {
+      return whole;
+    }
+  });
+}
+
+/**
+ * Prépare options.txt avant chaque partie :
+ *   - passe l'écran d'accessibilité que Minecraft montre au tout premier lancement
+ *     (« Welcome to Minecraft… ») : il s'intercalerait entre le chargement d'OPM et
+ *     l'écran titre, et bloquerait la connexion directe ;
+ *   - désactive les packs de ressources ajoutés par le joueur : sur OPM, seul le
+ *     pack du serveur s'applique (le mod retire aussi l'écran des packs).
+ * Les autres réglages du joueur restent intacts.
  * @param {string} instanceDir
  */
-async function skipOnboarding(instanceDir) {
+async function prepareOptions(instanceDir) {
   const file = path.join(instanceDir, 'options.txt');
   let text = '';
   try {
@@ -318,7 +341,8 @@ async function skipOnboarding(instanceDir) {
   }
   const pattern = /^onboardAccessibility:.*$/m;
   const line = 'onboardAccessibility:false';
-  const next = pattern.test(text) ? text.replace(pattern, line) : `${text}${text.endsWith('\n') ? '' : '\n'}${line}\n`;
+  let next = pattern.test(text) ? text.replace(pattern, line) : `${text}${text.endsWith('\n') ? '' : '\n'}${line}\n`;
+  next = withoutPlayerPacks(withoutPlayerPacks(next, 'resourcePacks'), 'incompatibleResourcePacks');
   if (next === text) return;
   await fsp.mkdir(instanceDir, { recursive: true });
   await fsp.writeFile(file, next, 'utf8');
@@ -521,6 +545,6 @@ module.exports = {
   directConnectArguments,
   writeSession,
   setEarlyWindow,
-  skipOnboarding,
+  prepareOptions,
   readLine,
 };

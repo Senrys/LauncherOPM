@@ -58,6 +58,14 @@ public final class Opm {
                     LOG.warn("Écran de déconnexion illisible : {}", e.toString());
                 }
             }
+            // Les packs de ressources : seul celui du serveur s'applique sur OPM.
+            // (Le même écran sert aux packs de données d'un monde solo : on ne bloque
+            // que celui des packs de ressources, reconnu à son titre.)
+            if (next instanceof net.minecraft.client.gui.screens.packs.PackSelectionScreen
+                    && "resourcePack.title".equals(key(next.getTitle()))) {
+                event.setCanceled(true);
+                return;
+            }
             if (next instanceof TitleScreen || next instanceof JoinMultiplayerScreen || next instanceof SelectWorldScreen) {
                 event.setNewScreen("1".equals(System.getProperty("opm.debug.scene", ""))
                         ? new fr.onepieceminecraft.opm.client.ScenePreview() : new OpmTitleScreen());
@@ -65,6 +73,7 @@ public final class Opm {
         });
         NeoForge.EVENT_BUS.addListener(ScreenEvent.Init.Post.class, event -> {
             if (event.getScreen() instanceof PauseScreen pause) relinkPause(event, pause);
+            if (event.getScreen() instanceof net.minecraft.client.gui.screens.options.OptionsScreen) lockResourcePacks(event);
         });
         // L'écran de connexion : le joueur se défait en pixels vers l'orbe.
         NeoForge.EVENT_BUS.addListener(ScreenEvent.BackgroundRendered.class, event -> {
@@ -108,6 +117,20 @@ public final class Opm {
 
     private static String key(Component c) {
         return c.getContents() instanceof TranslatableContents t ? t.getKey() : "";
+    }
+
+    /**
+     * Les options : le bouton « Packs de ressources » reste à sa place (la grille
+     * ne se troue pas) mais grisé, avec une bulle qui dit pourquoi.
+     */
+    private static void lockResourcePacks(ScreenEvent.Init.Post event) {
+        for (var listener : event.getListenersList()) {
+            if (listener instanceof Button b && "options.resourcepack".equals(key(b.getMessage()))) {
+                b.active = false;
+                b.setTooltip(net.minecraft.client.gui.components.Tooltip.create(
+                        Component.literal("Sur One Piece Minecraft, le pack de ressources est fourni par le serveur.")));
+            }
+        }
     }
 
     /**

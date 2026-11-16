@@ -1261,7 +1261,7 @@ async function launch(instanceName) {
       await bridge.resetSignals(instanceDir);
       options.JVM_ARGS.unshift(...bridge.authArguments(instanceDir, api.baseUrl()));
       await bridge.setEarlyWindow(instanceDir, !scene);
-      await bridge.skipOnboarding(instanceDir).catch((err) => logger.warn(`options.txt : ${err.message}`));
+      await bridge.prepareOptions(instanceDir).catch((err) => logger.warn(`options.txt : ${err.message}`));
       await bridge.writeSession(instanceDir, {
         launcherVersion: electronApp.getVersion(),
         etat: world.etat,
