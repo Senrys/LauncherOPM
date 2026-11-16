@@ -485,7 +485,11 @@ function buildOptions(instance, config, authenticator, verify, extraGameArgs = [
     verify: Boolean(verify || instance.verify),
     // Le mod OPM, authlib-injector, opm/ et fml.toml sont posés par le launcher
     // (services/bridge.js) : la vérification du modpack ne doit pas les retirer.
-    ignored: [...instance.ignored, ...bridge.ownedPaths()],
+    // Les dossiers du joueur (réglages des mods…) non plus : seul mods/ est contrôlé.
+    ignored: [
+      ...instance.ignored,
+      ...bridge.ownedPaths(path.join(paths.gameDir, 'instances', instance.name)),
+    ],
 
     // `javaPath` de l'ancien launcher s'appelle `java.path` depuis la version 4.2 :
     // chemin complet de l'exécutable, ou `null` pour laisser la bibliothèque
