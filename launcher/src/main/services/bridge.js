@@ -153,7 +153,36 @@ function gameManifest() {
  * ne doit pas supprimer : ce sont ceux que le launcher pose lui-même.
  * @returns {string[]}
  */
-function ownedPaths() {
+function ownedPaths(instanceDir) {
+  return [...launcherPaths(), ...(instanceDir ? playerPaths(instanceDir) : [])];
+}
+
+/**
+ * Les dossiers du joueur : réglages des mods (`config/`), données de CustomNPCs,
+ * cartes, etc. La vérification ne contrôle que `mods/` (ce que l'anti-triche
+ * surveille) ; effacer le reste à chaque lancement ramènerait chaque mod à ses
+ * réglages par défaut (le mode « push to talk » d'OPMVocal, par exemple).
+ * Un fichier que le modpack impose reste retéléchargé s'il manque ou diffère :
+ * la bibliothèque n'ignore que les chemins exacts, pas le contenu d'un dossier.
+ * `mods/.connector` : les mods Fabric déjà convertis par Connector, gardés pour ne
+ * pas les reconvertir à chaque démarrage.
+ * @param {string} instanceDir
+ * @returns {string[]}
+ */
+function playerPaths(instanceDir) {
+  let dirs = [];
+  try {
+    dirs = fs
+      .readdirSync(instanceDir, { withFileTypes: true })
+      .filter((e) => e.isDirectory() && e.name !== 'mods')
+      .map((e) => e.name);
+  } catch {
+    /* instance neuve : rien à préserver */
+  }
+  return [...dirs, 'mods/.connector'];
+}
+
+function launcherPaths() {
   const m = gameManifest();
   // `downloads` : le pack de ressources du serveur, que Minecraft garde en cache.
   // Effacé à chaque lancement, il serait retéléchargé à chaque connexion.
