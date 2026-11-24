@@ -196,7 +196,8 @@ def _build_rules() -> dict[str, Rule]:
         "link.microsoft.account": Rule(10, 3_600, scope="account", fail_open=False),
         "game.session.account": Rule(20, 3_600, scope="account"),
         "game.attest.account": Rule(30, 3_600, scope="account"),
-        "game.report.account": Rule(60, 3_600, scope="account"),
+        "game.report.account": Rule(120, 3_600, scope="account"),
+        "game.arrivee.account": Rule(60, 3_600, scope="account"),
         "donations.checkout.account": Rule(10, 3_600, scope="account"),
     }
 

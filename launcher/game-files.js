@@ -78,6 +78,8 @@ async function prepareGameFiles({ skipMod = process.env.OPM_SKIP_MOD === '1' } =
     const name = path.basename(jar);
     await fsp.writeFile(path.join(OUT_DIR, name), data);
     manifest.mod = { fichier: name, sha256: sha256(data) };
+    // À reporter, si on le souhaite, dans OPM_MOD_SHA1 (serveur d'authentification).
+    console.log(`Mod OPM ${name} — SHA-1 ${crypto.createHash('sha1').update(data).digest('hex')}`);
   }
   const ali = await authlib();
   await fsp.writeFile(path.join(OUT_DIR, 'authlib-injector.jar'), ali);

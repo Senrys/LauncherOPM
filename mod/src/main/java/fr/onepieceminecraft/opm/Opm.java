@@ -3,7 +3,6 @@ package fr.onepieceminecraft.opm;
 import fr.onepieceminecraft.opm.client.ConnectFx;
 import fr.onepieceminecraft.opm.client.OpmLive;
 import fr.onepieceminecraft.opm.client.OpmSession;
-import fr.onepieceminecraft.opm.client.PausePeek;
 import fr.onepieceminecraft.opm.client.WorldXenodys;
 import net.minecraft.client.gui.screens.ConnectScreen;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
@@ -79,12 +78,6 @@ public final class Opm {
         NeoForge.EVENT_BUS.addListener(ScreenEvent.BackgroundRendered.class, event -> {
             if (event.getScreen() instanceof ConnectScreen) ConnectFx.render(event.getScreen(), event.getGuiGraphics());
         });
-        // Le menu pause : Xenodys passe parfois la tête par le coin.
-        NeoForge.EVENT_BUS.addListener(ScreenEvent.Render.Post.class, event -> {
-            if (event.getScreen() instanceof PauseScreen) {
-                PausePeek.render(event.getScreen(), event.getGuiGraphics(), event.getMouseX(), event.getMouseY());
-            }
-        });
         // Xenodys dans le monde : les apparitions du staff, la première arrivée.
         NeoForge.EVENT_BUS.addListener(RenderLevelStageEvent.class, WorldXenodys::onRender);
         NeoForge.EVENT_BUS.addListener(RenderNameTagEvent.class, WorldXenodys::onNameTag);
@@ -92,11 +85,13 @@ public final class Opm {
             WorldXenodys.onLogin(event);
             fr.onepieceminecraft.opm.client.AntiCheat.onJoin();
         });
-        NeoForge.EVENT_BUS.addListener(ClientPlayerNetworkEvent.LoggingOut.class,
-                event -> fr.onepieceminecraft.opm.client.AntiCheat.onLeave());
-        // Anti-triche : « Je te vois… » (pack X-ray, rapport refusé, ou le Skript du serveur).
+        NeoForge.EVENT_BUS.addListener(ClientPlayerNetworkEvent.LoggingOut.class, event -> {
+            WorldXenodys.onLogout();
+            fr.onepieceminecraft.opm.client.AntiCheat.onLeave();
+        });
+        // Les appels du serveur Minecraft (Skript) : avertissement, contrôle, arrivée.
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.client.event.ClientChatReceivedEvent.class,
-                fr.onepieceminecraft.opm.client.XenodysWarning::onChat);
+                fr.onepieceminecraft.opm.client.ServerCalls::onChat);
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, event -> {
             WorldXenodys.onClientTick();
             fr.onepieceminecraft.opm.client.DebugShots.worldTick();

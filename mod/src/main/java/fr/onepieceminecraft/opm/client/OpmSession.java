@@ -20,6 +20,8 @@ public final class OpmSession {
     public record Skin(String url, boolean slim) {}
 
     public final boolean fromLauncher;
+    /** Version du launcher ; vide si le jeu est lancé autrement. */
+    public final String launcher;
     /** Mis à jour en direct par {@link OpmLive} (la commande /xenodys du staff). */
     public volatile String etat;
     public volatile String message;
@@ -44,6 +46,8 @@ public final class OpmSession {
         JsonObject j = o != null ? o : new JsonObject();
         etat = "corrompue".equals(str(j, "etat")) ? "corrompue" : "creatrice";
         message = str(j, "message");
+        String version = str(j, "launcher");
+        launcher = version == null ? "" : version.substring(0, Math.min(24, version.length()));
         JsonObject joueur = j.has("joueur") && j.get("joueur").isJsonObject() ? j.getAsJsonObject("joueur") : new JsonObject();
         playerName = str(joueur, "nom");
         playerUuid = str(joueur, "uuid");

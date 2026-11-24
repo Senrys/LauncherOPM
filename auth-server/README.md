@@ -384,14 +384,18 @@ ouvrent le serveur (migration `0003_ygg_session_origin`). Côté client, le jeu 
 le launcher porte `authlib-injector.jar`, embarqué dans le launcher et posé par lui dans le
 dossier du jeu (`launcher/game-files.js`) : rien à déposer à la main.
 
-**Anti-triche** (migration `0004_anticheat`) : au clic sur JOUER, le launcher déclare les
+**Anti-triche** (migrations `0004_anticheat` et `0005_anticheat_suivi`) : au clic sur JOUER, le launcher déclare les
 mods et packs de l'instance (`POST /api/v1/game/attest`) ; comparés au modpack officiel
 (`OPM_MODPACK_MANIFEST`), un mod en trop ou modifié ferme le serveur à cette session
 (`OPM_JOIN_REQUIRE_ATTESTATION`). En jeu, le mod OPM envoie toutes les 5 minutes les mods
-chargés et les packs actifs, X-ray compris (`POST /api/v1/game/report`). Le serveur
+chargés (avec leur empreinte) et les packs actifs, X-ray compris
+(`POST /api/v1/game/report`) ; `opm_controle` garde le dernier contrôle de chacun. Le serveur
 Minecraft écrit ses propres soupçons (`minecraft/anticheat.sk` → table `opm_alerte`).
-Une tâche de fond relaie toutes les alertes au staff (`OPM_ANTICHEAT_WEBHOOK`). Rien
-n'est sanctionné automatiquement.
+Une tâche de fond regroupe les répétitions et relaie les alertes au staff
+(`OPM_ANTICHEAT_WEBHOOK`) ; le site en affiche l'historique et n'écrit dans `opm_alerte`
+que leur traitement (`statut`, `note`, `traite_par`, `traite_le`). Conservation : 12 mois
+pour une alerte ou un écart, 30 jours pour un contrôle conforme. Rien n'est sanctionné
+automatiquement.
 
 Le repli existe si vous changez d'avis : `OPM_YGG_MOJANG_FALLBACK=true` laisse
 entrer les joueurs premium venus du launcher officiel quand leur pseudo est

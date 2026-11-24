@@ -77,6 +77,12 @@ TABLES_LAUNCHER: frozenset[str] = frozenset(
         "texture",
         "user_texture",
         "launcher_instance",
+        "launcher_xenodys",
+        "game_report",
+        "opm_alerte",
+        "opm_controle",
+        "opm_arrivee",
+        "opm_modpack",
     }
 )
 

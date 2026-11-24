@@ -41,8 +41,10 @@ from typing import Annotated
 from fastapi import APIRouter, Header, Response, status
 
 from opm_auth.db import SessionDep
+from opm_auth.models import User
 from opm_auth.schemas import (
     AntiCheatOut,
+    ArriveeOut,
     GameAttestIn,
     GameReportIn,
     GameSessionEndIn,
@@ -128,6 +130,14 @@ async def attest(payload: GameAttestIn, user: CurrentUser, session: SessionDep) 
     return AntiCheatOut(**{k: result[k] for k in ("ok", "message", "extra", "modified")})
 
 
+async def _game_user(session: SessionDep, authorization: str | None) -> User:
+    """Le porteur du jeton de **jeu** (Yggdrasil) du client Minecraft."""
+    try:
+        return await service.resolve_bearer(session, authorization)
+    except service.YggdrasilError as exc:
+        raise ApiError("unauthorized", "Jeton de jeu invalide.", status_code=401) from exc
+
+
 @router.post(
     "/report",
     response_model=AntiCheatOut,
@@ -142,16 +152,44 @@ async def report(
     Minecraft. Un écart : alerte au staff, et un message pour le joueur (Xenodys
     s'affiche dans son coin d'écran).
     """
-    try:
-        user = await service.resolve_bearer(session, authorization)
-    except service.YggdrasilError as exc:
-        raise ApiError("unauthorized", "Jeton de jeu invalide.", status_code=401) from exc
+    user = await _game_user(session, authorization)
     await enforce("game.report.account", str(user.id))
     result = await anticheat.report(
         session,
         user,
         phase=payload.phase,
+        launcher=payload.launcher,
         mods=[m.model_dump() for m in payload.mods],
         packs=[p.model_dump() for p in payload.resourcepacks],
     )
     return AntiCheatOut(ok=result["ok"], message=result["message"], reasons=result["reasons"])
+
+
+@router.get(
+    "/arrivee",
+    response_model=ArriveeOut,
+    summary="La scène de première arrivée a-t-elle déjà été vue par ce compte ?",
+)
+async def arrivee(
+    session: SessionDep, authorization: Annotated[str | None, Header()] = None
+) -> ArriveeOut:
+    """Le mod OPM ne joue la scène que sur un ``vue`` faux : une panne ne la rejoue pas."""
+    user = await _game_user(session, authorization)
+    await enforce("game.arrivee.account", str(user.id))
+    return ArriveeOut(vue=await anticheat.arrivee_vue(session, user))
+
+
+@router.post(
+    "/arrivee",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    summary="Noter que la scène de première arrivée a été jouée",
+)
+async def marquer_arrivee(
+    session: SessionDep, authorization: Annotated[str | None, Header()] = None
+) -> Response:
+    """Idempotent : appelé par le mod OPM une fois la scène terminée."""
+    user = await _game_user(session, authorization)
+    await enforce("game.arrivee.account", str(user.id))
+    await anticheat.marquer_arrivee(session, user)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

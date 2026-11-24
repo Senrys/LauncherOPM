@@ -51,6 +51,13 @@ tasks.withType(ProcessResources).configureEach {
     }
 }
 
+// Le même code donne le même fichier, quelle que soit la machine : son empreinte peut
+// être connue du serveur (OPM_MOD_SHA1).
+tasks.withType(AbstractArchiveTask).configureEach {
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}
+
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }

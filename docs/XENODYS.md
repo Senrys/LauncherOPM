@@ -131,12 +131,11 @@ qui l'installe lui-même dans le jeu) se passent le relais sans que rien ne se v
    s'applique ni dans le monde, ni dès qu'un pack du serveur est actif). Le pack du serveur,
    mis en cache par Minecraft (`downloads/`), n'est plus effacé par la vérification des
    fichiers : il n'est pas retéléchargé à chaque connexion. Dans le menu pause, « Donner son avis »
-   et « Signaler un bug » deviennent le site et le Discord d'OPM. Dans le menu pause,
-   Xenodys passe parfois la tête par le coin bas-droit et dit un mot (l'annonce du staff
-   s'il y en a une).
+   et « Signaler un bug » deviennent le site et le Discord d'OPM. Xenodys n'y apparaît pas.
 7. **La connexion** : le joueur, sur son socle, se défait en pixels qui filent vers un
    orbe, qu'un anneau entoure jusqu'à l'entrée dans le monde.
-8. **La première arrivée** sur le serveur : un éclair, et Xenodys, immense, tout près, la
+8. **La première arrivée** d'un compte sur le serveur (une seule fois, quel que soit le
+   PC ; `/xenodys arrivee <joueur>` la rejoue) : un éclair, et Xenodys, immense, tout près, la
    main tendue — elle dépose le joueur sur Grand Line, puis s'envole.
 9. **Xenodys en jeu** : `/xenodys apparaitre [anim]` (staff) — elle apparaît à 8 blocs,
    immense, et suit les joueurs du regard. Aucune installation sur le serveur.
@@ -147,11 +146,19 @@ qui l'installe lui-même dans le jeu) se passent le relais sans que rien ne se v
 **Anti-triche, de bout en bout** (rien n'est sanctionné automatiquement : le staff juge) :
 le launcher refuse de lancer un jeu dont les mods ne sont pas ceux du modpack, et en
 déclare l'empreinte au serveur d'authentification, qui n'ouvre le serveur de jeu qu'à une
-session conforme ; en jeu, le mod OPM rapporte mods et packs (X-ray repérés) ; le serveur
-Minecraft surveille vol, vitesse, portée et minerais (`minecraft/anticheat.sk`). Chaque
-soupçon arrive au staff (en jeu, `/alertes`, et sur Discord) et le joueur voit Xenodys
-corrompue surgir au coin de son écran : « Je te vois… ». `/surveiller <joueur>` la fait
-apparaître près de lui, immense.
+session conforme ; en jeu, le mod OPM rapporte mods (avec leur empreinte) et packs (X-ray
+repérés) à l'arrivée, toutes les 5 minutes, et quand le staff le demande (`/controle`) ; le
+serveur Minecraft surveille vol, vitesse, portée, minerais, et les joueurs dont le mod se
+tait (`minecraft/anticheat.sk`). Deux niveaux :
+- une **preuve** (mod étranger, fichier modifié, pack X-ray) : le staff est prévenu, et le
+  joueur voit Xenodys corrompue surgir au coin de son écran (« Je te vois… »), une fois par
+  motif et par connexion ;
+- un **soupçon** (le reste) : le staff seul est prévenu.
+
+Tout arrive au staff en jeu (`/alertes`, `/fiche <joueur>`), sur Discord et dans
+l'administration du site, les répétitions regroupées. `/surveiller <joueur>` fait apparaître
+Xenodys près de lui, immense. La liste des mods admis est le modpack lui-même
+(`/var/www/opm-launcher/mods/`) ; un mod retiré reste admis 24 h pour qui est déjà en jeu.
 
 Le launcher écrit pour le mod `opm/session.json` (état, pseudo, serveur, galerie,
 liens ; jamais de jeton) ; le mod n'en a pas besoin pour fonctionner (valeurs par

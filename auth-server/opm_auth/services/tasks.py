@@ -415,6 +415,17 @@ async def purge(*, settings: Settings | None = None) -> dict[str, int]:
             delete(RefreshToken).where(RefreshToken.expires_at < token_cutoff),
         )
 
+        # L'anti-triche : 12 mois pour une alerte, 30 jours pour un contrôle sans écart.
+        try:
+            from opm_auth.services import anticheat
+
+            await anticheat.purge(session)
+        except asyncio.CancelledError:
+            raise
+        except Exception:  # une purge partielle vaut mieux qu'aucune
+            await session.rollback()
+            logger.warning("Purge « anti-triche » impossible.", exc_info=True)
+
     return removed
 
 

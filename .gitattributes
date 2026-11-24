@@ -1,0 +1,2 @@
+# Le mod se compile à l’identique sur Windows, macOS et Linux : fins de ligne LF.
+mod/** text=auto eol=lf

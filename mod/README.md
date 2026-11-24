@@ -20,12 +20,11 @@ Ce qu'il fait (détail dans `docs/XENODYS.md`, « Du launcher au jeu ») :
 - **l'écran titre réagit au serveur** (`client/OpmLive`, relu toutes les 20 s) : hors
   ligne, Xenodys se détourne et cherche ; complet, elle lève la main (« patience ») ;
 - **la connexion** (`client/ConnectFx`) : le joueur se défait en pixels vers un orbe ;
-- **le menu pause** (`client/PausePeek`) : Xenodys passe parfois la tête par le coin bas-droit
-  et dit un mot — toujours l'annonce du staff quand il y en a une ;
+- **le menu pause** : les liens vers le site et le Discord d'OPM. Xenodys n'y vient plus ;
 - **Xenodys dans le monde** (`client/WorldXenodys`) : partout où le serveur pose un marqueur
   nommé `opm:xenodys[:animation]` (`/xenodys apparaitre`, minecraft/xenodys.sk), immense,
-  la tête vers le joueur ; et **la première arrivée** de chaque joueur, qu'elle dépose
-  dans le monde. Rien à installer sur le serveur : le marqueur est un support d'armure
+  la tête vers le joueur ; et **la première arrivée** de chaque compte (une seule fois, retenue
+  par le serveur d'authentification : `GET`/`POST /api/v1/game/arrivee`). Rien à installer sur le serveur : le marqueur est un support d'armure
   invisible, c'est le mod des joueurs qui la dessine.
 
 Il dialogue avec le launcher par `opm/session.json` (écrit par
@@ -58,14 +57,16 @@ musique (`assets/opm/sounds/music/`) vient de `xenodys/musique/`.
 
 ## Anti-triche
 
-- `client/AntiCheat` : à l'arrivée sur le serveur, puis toutes les 5 minutes, les mods
-  chargés et les packs actifs partent au serveur d'authentification
-  (`POST /api/v1/game/report`, jeton de jeu). Le mod repère lui-même un pack X-ray (pierre,
-  ardoise, terre, netherrack… rendus transparents).
+- `client/AntiCheat` : à l'arrivée sur le serveur, puis toutes les 5 minutes, et quand le
+  staff le demande (`/controle`), les mods chargés (avec l'empreinte de leur fichier) et les
+  packs actifs partent au serveur d'authentification (`POST /api/v1/game/report`, jeton de
+  jeu). Le mod repère lui-même un pack X-ray (pierre, ardoise, terre, netherrack… rendus
+  transparents).
 - `client/XenodysWarning` : « Je te vois… » — Xenodys corrompue au coin bas-droit, le bord
-  de l'écran qui rougit. Déclenchée par un pack X-ray, un rapport refusé, ou un message du
-  serveur commençant par `[OPM:XENODYS]` (caché au joueur) : c'est ainsi que
-  `minecraft/anticheat.sk` l'appelle.
+  de l'écran qui rougit. Déclenchée par un rapport refusé (une fois par motif et par
+  connexion) ou par le staff (`/surveiller`). Un soupçon du Skript ne la fait pas venir.
+- `client/ServerCalls` : les messages système `[OPM:XENODYS]`, `[OPM:CONTROLE]` et
+  `[OPM:ARRIVEE]` du serveur, cachés au joueur.
 
 ## Livraison
 
@@ -81,6 +82,7 @@ modpack. Rien à faire sur le serveur.
 /xenodys apparaitre [idle|greet|fly|cradle|unveil|lean]   devant soi, à 8 blocs
 /xenodys animation <anim>                                 la plus proche
 /xenodys disparaitre                                      la plus proche
+/xenodys arrivee <joueur>                                 rejoue sa première arrivée
 ```
 
 Ou à la main : un support d'armure `Invisible`, `Marker`, `NoGravity`, nommé

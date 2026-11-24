@@ -217,6 +217,10 @@ class Settings(BaseSettings):
     #: l'héberge, ``/var/www/opm-launcher/files.json``) ou une URL. Vide :
     #: ``<OPM_PUBLIC_URL>/launcher/files.json``.
     modpack_manifest: str | None = None
+    #: Empreintes SHA-1 acceptées du mod OPM embarqué par le launcher, séparées par des
+    #: virgules (affichées à la compilation, ``game-files.js``). Vide : non vérifiées.
+    #: Une empreinte inconnue n'est qu'un **soupçon** : jamais de refus.
+    mod_sha1: str = ""
     #: Webhook (Discord ou compatible : ``{"content": …}``) où relayer au staff les
     #: soupçons de triche. Vide : alertes seulement en base et dans le journal.
     anticheat_webhook: str | None = None

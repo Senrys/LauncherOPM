@@ -248,6 +248,10 @@ Erreurs au format Mojang, HTTP 403 :
 illisible : une panne de notre côté ne ferme pas le serveur). Sinon `403` : « mettez le
 launcher à jour » (rien de déclaré) ou « fichiers non conformes ».
 
+En jeu, le mod OPM appelle avec le jeton de jeu : `POST /api/v1/game/report` (`phase` :
+`join`, `periodic` ou `controle`), `GET /api/v1/game/arrivee` → `{"vue": bool}` et
+`POST /api/v1/game/arrivee` (`204`, la scène de première arrivée a été jouée).
+
 **Le serveur ne s'ouvre qu'au launcher OPM** (`OPM_JOIN_LAUNCHER_ONLY`, actif par
 défaut) : `join` n'accepte que les sessions délivrées par `POST /api/v1/game/session`
 (clic sur JOUER, `ygg_session.origin = 'launcher'`). Une session ouverte par

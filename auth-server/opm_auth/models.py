@@ -1103,9 +1103,11 @@ class Xenodys(Base):
 class GameReport(Base):
     """``game_report`` — ce que déclarent le launcher et le jeu (anti-triche).
 
-    ``kind`` : ``launch`` (empreinte du launcher au clic sur JOUER), ``join`` ou
-    ``periodic`` (rapport du mod OPM en jeu). ``ok`` faux : quelque chose ne
-    correspond pas au modpack officiel ; ``details`` dit quoi (JSON).
+    ``kind`` : ``launch`` (empreinte du launcher au clic sur JOUER), ``join``,
+    ``periodic`` ou ``controle`` (rapport du mod OPM en jeu ; ``controle`` : demandé
+    par le staff). ``ok`` faux : quelque chose ne correspond pas au modpack
+    officiel ; ``details`` dit quoi (JSON). Un rapport ``periodic`` sans écart n'est
+    pas conservé : il ne met à jour que ``opm_controle``.
     """
 
     __tablename__ = "game_report"
@@ -1126,27 +1128,109 @@ class Alerte(Base):
     """``opm_alerte`` — les soupçons de triche, d'où qu'ils viennent.
 
     Écrite par le serveur Minecraft (``minecraft/anticheat.sk``, via skript-db :
-    vol, vitesse, portée, minerais) et par ce serveur (rapports refusés). Une
-    tâche de fond les relaie au staff (``OPM_ANTICHEAT_WEBHOOK``) puis coche
-    ``relayee``. Rien n'y est sanctionné automatiquement : c'est au staff de juger.
+    vol, vitesse, portée, minerais, muet) et par ce serveur (rapports refusés). Une
+    tâche de fond regroupe les répétitions (``occurrences``, ``vu_le``), les relaie
+    au staff (``OPM_ANTICHEAT_WEBHOOK``) puis coche ``relayee``. Rien n'y est
+    sanctionné automatiquement : c'est au staff de juger.
+
+    Le site (administration, onglet « Anti-triche ») lit cette table et n'y écrit
+    que le **traitement** : ``statut``, ``note``, ``traite_par``, ``traite_le``.
     """
 
     __tablename__ = "opm_alerte"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    #: Le compte, quand il est connu. Sans clé étrangère en cascade : l'historique
+    #: survit à la suppression d'un compte.
+    user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     joueur: Mapped[str] = mapped_column(String(32), nullable=False)
     uuid: Mapped[str | None] = mapped_column(String(36), nullable=True)
     type: Mapped[str] = mapped_column(String(24), nullable=False)
+    #: ``preuve`` (mod étranger, fichier modifié, pack X-ray) ou ``soupcon``.
+    niveau: Mapped[str] = mapped_column(
+        String(8), nullable=False, default="soupcon", server_default="soupcon"
+    )
     detail: Mapped[str | None] = mapped_column(String(280), nullable=True)
     source: Mapped[str] = mapped_column(
         String(12), nullable=False, default="serveur", server_default="serveur"
     )
+    #: Combien de fois le même motif est revenu depuis ``cree_le``.
+    occurrences: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=1, server_default=text("1")
+    )
+    #: Dernière fois (``NULL`` : une seule fois, voir ``cree_le``).
+    vu_le: Mapped[datetime | None] = mapped_column(TS, nullable=True)
     relayee: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=text("false")
     )
+    #: Traitement par le staff : ``nouvelle``, ``vue``, ``confirmee``, ``fausse``.
+    statut: Mapped[str] = mapped_column(
+        String(12), nullable=False, default="nouvelle", server_default="nouvelle"
+    )
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    traite_par: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    traite_le: Mapped[datetime | None] = mapped_column(TS, nullable=True)
     cree_le: Mapped[datetime] = mapped_column(
         TS, nullable=False, default=utcnow, server_default=func.now()
     )
+
+
+class Controle(Base):
+    """``opm_controle`` — le dernier contrôle de chaque joueur (une ligne par compte).
+
+    Mise à jour à chaque rapport du mod OPM. Le serveur Minecraft la lit
+    (``/controle``, ``/fiche``, et pour repérer un joueur en jeu dont le mod ne
+    répond pas) ; le site aussi.
+    """
+
+    __tablename__ = "opm_controle"
+
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, autoincrement=False
+    )
+    joueur: Mapped[str] = mapped_column(String(32), nullable=False)
+    #: UUID Minecraft sans tirets, en minuscules.
+    uuid: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
+    phase: Mapped[str] = mapped_column(String(12), nullable=False)
+    ok: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    motifs: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    mods: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default=text("0"))
+    packs: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default=text("0"))
+    #: Version du launcher, telle que le mod la rapporte.
+    launcher: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    le: Mapped[datetime] = mapped_column(TS, nullable=False, default=utcnow)
+
+
+class Arrivee(Base):
+    """``opm_arrivee`` — les comptes qui ont déjà vu Xenodys les déposer sur Grand Line.
+
+    La scène ne se joue qu'une fois par **compte**, quel que soit le PC.
+    """
+
+    __tablename__ = "opm_arrivee"
+
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, autoincrement=False
+    )
+    vue_le: Mapped[datetime] = mapped_column(
+        TS, nullable=False, default=utcnow, server_default=func.now()
+    )
+
+
+class ModpackFichier(Base):
+    """``opm_modpack`` — les mods qui sont, ou ont été récemment, dans le modpack.
+
+    Un joueur déjà en jeu garde les mods chargés à son lancement : si le modpack
+    change pendant sa partie, ses fichiers ne doivent pas passer pour étrangers.
+    """
+
+    __tablename__ = "opm_modpack"
+
+    fichier: Mapped[str] = mapped_column(String(255), primary_key=True)
+    sha1: Mapped[str] = mapped_column(String(40), primary_key=True)
+    vu_le: Mapped[datetime] = mapped_column(TS, nullable=False, default=utcnow)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1180,6 +1264,9 @@ LAUNCHER_TABLES: tuple[Table, ...] = (
     Xenodys.__table__,
     GameReport.__table__,
     Alerte.__table__,
+    Controle.__table__,
+    Arrivee.__table__,
+    ModpackFichier.__table__,
 )
 
 #: Noms des tables du launcher, pratiques pour la migration et les tests.

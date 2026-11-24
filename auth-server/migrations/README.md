@@ -264,6 +264,25 @@ GRANT INSERT             ON users        TO opm_auth;
 GRANT USAGE, SELECT ON SEQUENCE users_id_seq TO opm_auth;
 ```
 
+Et pour les tables venues ensuite (migrations 0002 à 0005), si le rôle applicatif n'est pas
+propriétaire des tables :
+
+```sql
+GRANT SELECT, INSERT, UPDATE, DELETE ON
+    launcher_xenodys, game_report, opm_alerte, opm_controle, opm_arrivee, opm_modpack
+  TO opm_auth;
+GRANT USAGE, SELECT ON SEQUENCE game_report_id_seq, opm_alerte_id_seq TO opm_auth;
+
+-- Le site (son rôle) : lire l'historique, n'écrire que le traitement des alertes.
+-- GRANT SELECT ON opm_alerte, opm_controle, game_report TO <rôle du site>;
+-- GRANT UPDATE (statut, note, traite_par, traite_le) ON opm_alerte TO <rôle du site>;
+
+-- Le serveur Minecraft (rôle de skript-db) : écrire des soupçons, lire les contrôles.
+-- GRANT SELECT, INSERT ON opm_alerte TO <rôle de skript-db>;
+-- GRANT USAGE, SELECT ON SEQUENCE opm_alerte_id_seq TO <rôle de skript-db>;
+-- GRANT SELECT ON opm_controle TO <rôle de skript-db>;
+```
+
 Volontairement **non accordés** : `CREATE` sur `public`, `DELETE` sur `users`,
 toute écriture sur `alembic_version`, sur `contact`, et sur les colonnes RP de
 `users` (`prime`, `berry`, `niveau*`, `faction`, `equipage`…). Si un jour une

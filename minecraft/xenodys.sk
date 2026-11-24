@@ -7,6 +7,7 @@
 #  /xenodys apparaitre [anim]     Xenodys apparaît dans le monde, devant toi
 #  /xenodys animation <anim>      change l'animation de la plus proche
 #  /xenodys disparaitre           la plus proche disparaît
+#  /xenodys arrivee <joueur>      rejoue pour lui la scène de première arrivée
 #
 #  Animations : idle, greet, fly, cradle, unveil, lean. Corrompue, « idle » et
 #  « lean » deviennent d'eux-mêmes leur version corrompue.
@@ -37,7 +38,7 @@ options:
 command /xenodys [<text>] [<text>]:
     permission: {@permission}
     permission message: &cSeul le staff peut agir sur Xenodys.
-    usage: &7/xenodys <creatrice|corrompue> [annonce] · /xenodys <apparaitre|animation> [anim] · /xenodys disparaitre
+    usage: &7/xenodys <creatrice|corrompue> [annonce] · /xenodys <apparaitre|animation> [anim] · /xenodys disparaitre · /xenodys arrivee <joueur>
     trigger:
         # Sans argument : lire l'état actuel.
         if arg-1 is not set:
@@ -66,6 +67,15 @@ command /xenodys [<text>] [<text>]:
             else:
                 execute console command "execute at %player% run data merge entity @e[tag=opm_xenodys,sort=nearest,limit=1] {CustomName:'""opm:xenodys:%{_anim}%""'}"
                 send "{@creatrice}Xenodys : animation « %{_anim}% »."
+            stop
+        if {_cmd} is "arrivee":
+            set {_cible} to arg-2 parsed as player
+            if {_cible} is not set:
+                send "&cIndique un joueur connecté : /xenodys arrivee <joueur>."
+                stop
+            # Un appel au mod OPM (client/ServerCalls) : le joueur ne voit pas ce message.
+            send "[OPM:ARRIVEE]" to {_cible}
+            send "{@creatrice}Xenodys dépose %{_cible}% sur Grand Line."
             stop
         if {_cmd} is "disparaitre":
             if sender is a player:

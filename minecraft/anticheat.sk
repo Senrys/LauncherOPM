@@ -2,21 +2,28 @@
 #  Anti-triche de One Piece Minecraft — côté serveur
 # ----------------------------------------------------------------------------
 #  Des SOUPÇONS, jamais des sanctions automatiques : vol, vitesse, portée des
-#  coups, taux de minerais rares (X-ray). Chaque soupçon :
+#  coups, taux de minerais rares (X-ray), mod OPM qui ne répond pas. Chaque
+#  soupçon :
 #    - est enregistré dans la table « opm_alerte » (base partagée, comme
-#      « launcher_xenodys ») — le serveur d'authentification la relaie au staff
-#      (webhook Discord, OPM_ANTICHEAT_WEBHOOK) ;
-#    - est envoyé en jeu aux membres du staff (permission opm.staff) ;
-#    - fait apparaître Xenodys corrompue au coin de l'écran du joueur
-#      (« Je te vois… ») : le message [OPM:XENODYS] est intercepté par le mod
-#      OPM, le joueur ne le voit jamais en clair.
+#      « launcher_xenodys ») — le serveur d'authentification regroupe les
+#      répétitions et le relaie au staff (webhook Discord,
+#      OPM_ANTICHEAT_WEBHOOK) ; l'historique est dans l'administration du site ;
+#    - est envoyé en jeu aux membres du staff (permission opm.staff).
+#  Le joueur, lui, ne voit RIEN : un soupçon n'est pas une preuve. Xenodys ne
+#  l'avertit que sur preuve (mod étranger, fichier modifié, pack X-ray) : c'est
+#  le serveur d'authentification qui en décide, à partir du rapport du mod OPM.
 #
 #  Commandes du staff :
-#    /alertes                  les 10 derniers soupçons
+#    /alertes                  les 10 dernières alertes
+#    /controle <joueur|tous>   demande un rapport immédiat au mod OPM
+#    /fiche <joueur>           dernier contrôle et alertes d'un joueur
 #    /surveiller <joueur>      Xenodys apparaît près de lui et le fixe
 #
+#  Les messages [OPM:…] sont des appels au mod OPM (client/ServerCalls) : il les
+#  intercepte, le joueur ne les voit pas.
+#
 #  Prérequis : skript-db et la variable {sql} ouverte par sql.sk (comme
-#  xenodys.sk) ; la migration 0004_anticheat du serveur d'authentification.
+#  xenodys.sk) ; la migration 0005_anticheat_suivi du serveur d'authentification.
 #
 #  À RÉGLER sur un serveur de test avant la production : les seuils ci-dessous
 #  sont prudents, mais chaque serveur a ses particularités (mods de mouvement,
@@ -36,6 +43,8 @@ options:
     minerais: 0.06
     # Permission qui exempte un joueur (pouvoirs, événements RP…).
     exempt: opm.anticheat.exempt
+    # Délai laissé au mod OPM pour envoyer son premier rapport (il part 5 s après l'arrivée).
+    muet: 90 seconds
 
 # Un joueur à ne pas surveiller : créatif, spectateur, vol autorisé, exempté.
 function opmExempte(p: player) :: boolean:
@@ -47,7 +56,7 @@ function opmExempte(p: player) :: boolean:
         return true
     return false
 
-# Un soupçon : en base, au staff, et Xenodys au joueur. Une fois par minute
+# Un soupçon : en base et au staff, jamais au joueur. Une fois par minute
 # au plus pour un même joueur et un même motif.
 function opmAlerte(p: player, type: text, detail: text):
     set {_k} to "%uuid of {_p}%-%{_type}%"
@@ -60,8 +69,7 @@ function opmAlerte(p: player, type: text, detail: text):
     execute "INSERT INTO opm_alerte (joueur, uuid, type, detail, source, relayee, cree_le) VALUES (%{_nom}%, %{_uuid}%, %{_type}%, %{_detail}%, 'serveur', false, (now() at time zone 'utc'))" in {sql}
     loop all players:
         if loop-player has permission "{@staff}":
-            send "&c⚠ Xenodys &7soupçonne &f%{_nom}% &7: %{_type}% &8(%{_detail}%)" to loop-player
-    send "[OPM:XENODYS] Je te vois…" to {_p}
+            send "&c⚠ Soupçon &7: &f%{_nom}% &7— %{_type}% &8(%{_detail}%)" to loop-player
 
 # ---------------------------------------------------------- vol et vitesse
 on teleport:
@@ -146,18 +154,99 @@ every 30 minutes:
     delete {-opm::rare::*}
     delete {-opm::roche::*}
 
+# ------------------------------------------------- un joueur dont le mod se tait
+on join:
+    set {_p} to player
+    set {_uuid} to "%uuid of player%"
+    wait {@muet}
+    if {_p} is online:
+        execute "SELECT count(*) AS n FROM opm_controle WHERE uuid = replace(lower(%{_uuid}%), '-', '') AND le > (now() at time zone 'utc') - interval '3 minutes'" in {sql} and store the result in {_r::*}
+        if {_r::n::1} is 0:
+            opmAlerte({_p}, "muet", "le mod OPM n'a envoyé aucun rapport")
+
+# ---------------------- les preuves (serveur d'authentification), au staff en jeu
+every 30 seconds:
+    if {-opm::derniere} is not set:
+        execute "SELECT coalesce(max(id), 0) AS n FROM opm_alerte" in {sql} and store the result in {_m::*}
+        set {-opm::derniere} to {_m::n::1}
+        stop
+    set {_vue} to {-opm::derniere}
+    execute "SELECT id, joueur, type, detail, CASE WHEN niveau = 'preuve' THEN 'Preuve' ELSE 'Soupçon' END AS titre FROM opm_alerte WHERE id > %{_vue}% AND source = 'launcher' ORDER BY id LIMIT 5" in {sql} and store the result in {_r::*}
+    loop {_r::joueur::*}:
+        set {_i} to loop-index
+        set {-opm::derniere} to {_r::id::%{_i}%}
+        set {_texte} to "&4⚠ %{_r::titre::%{_i}%}% &7: &f%loop-value% &7— %{_r::type::%{_i}%}% &8(%{_r::detail::%{_i}%}%)"
+        loop all players:
+            if loop-player has permission "{@staff}":
+                send {_texte} to loop-player
+
 # -------------------------------------------------------------------- staff
 command /alertes:
     permission: {@staff}
     permission message: &cRéservé au staff.
     trigger:
-        execute "SELECT joueur, type, detail, source, cree_le FROM opm_alerte ORDER BY id DESC LIMIT 10" in {sql} and store the result in {_r::*}
+        execute "SELECT joueur, type, detail, CASE WHEN niveau = 'preuve' THEN '&4Preuve' ELSE '&eSoupçon' END AS titre, occurrences, to_char(coalesce(vu_le, cree_le) AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Paris', 'DD/MM HH24:MI') AS quand FROM opm_alerte WHERE statut <> 'fausse' ORDER BY coalesce(vu_le, cree_le) DESC LIMIT 10" in {sql} and store the result in {_r::*}
         if {_r::joueur::*} is not set:
-            send "&7Aucun soupçon enregistré."
+            send "&7Aucune alerte enregistrée."
             stop
-        send "&c⚠ Les derniers soupçons de Xenodys :"
+        send "&c⚠ Les dernières alertes &8(historique complet : administration du site)"
         loop {_r::joueur::*}:
-            send "&8%{_r::cree_le::%loop-index%}% &f%loop-value% &7— %{_r::type::%loop-index%}% &8(%{_r::detail::%loop-index%}%, %{_r::source::%loop-index%}%)"
+            set {_i} to loop-index
+            set {_titre} to colored {_r::titre::%{_i}%}
+            send "&8%{_r::quand::%{_i}%}% %{_titre}% &f%loop-value% &7— %{_r::type::%{_i}%}% ×%{_r::occurrences::%{_i}%}% &8(%{_r::detail::%{_i}%}%)"
+
+# Le résultat d'un contrôle, quelques secondes après l'appel au mod.
+function opmResultat(s: sender, p: player):
+    set {_nom} to name of {_p}
+    set {_uuid} to "%uuid of {_p}%"
+    execute "SELECT CASE WHEN ok THEN 'oui' ELSE 'non' END AS conforme, motifs, mods, coalesce(launcher, '?') AS version FROM opm_controle WHERE uuid = replace(lower(%{_uuid}%), '-', '') AND le > (now() at time zone 'utc') - interval '20 seconds'" in {sql} and store the result in {_r::*}
+    if {_r::conforme::1} is not set:
+        send "&e%{_nom}% &7: aucune réponse du mod OPM." to {_s}
+    else if {_r::conforme::1} is "oui":
+        send "&a%{_nom}% &7: conforme &8(%{_r::mods::1}% mods, launcher %{_r::version::1}%)" to {_s}
+    else:
+        send "&c%{_nom}% &7: %{_r::motifs::1}%" to {_s}
+
+command /controle <text>:
+    permission: {@staff}
+    permission message: &cRéservé au staff.
+    usage: &7/controle <joueur|tous>
+    trigger:
+        if arg-1 is "tous":
+            set {_j::*} to all players
+        else:
+            set {_c} to arg-1 parsed as player
+            if {_c} is not set:
+                send "&cCe joueur n'est pas connecté."
+                stop
+            add {_c} to {_j::*}
+        send "[OPM:CONTROLE]" to {_j::*}
+        send "&7Contrôle demandé à %size of {_j::*}% joueur(s)…"
+        wait 6 seconds
+        loop {_j::*}:
+            if loop-value is online:
+                opmResultat(sender, loop-value)
+
+command /fiche <text>:
+    permission: {@staff}
+    permission message: &cRéservé au staff.
+    usage: &7/fiche <joueur>
+    trigger:
+        set {_nom} to arg-1
+        execute "SELECT joueur, CASE WHEN ok THEN 'conforme' ELSE 'écart' END AS etat, coalesce(motifs, '') AS motifs, mods, packs, coalesce(launcher, '?') AS version, to_char(le AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Paris', 'DD/MM HH24:MI') AS quand FROM opm_controle WHERE lower(joueur) = lower(%{_nom}%) ORDER BY le DESC LIMIT 1" in {sql} and store the result in {_r::*}
+        if {_r::joueur::1} is not set:
+            send "&7Aucun contrôle enregistré pour &f%{_nom}%&7."
+        else:
+            send "&b%{_r::joueur::1}% &7— %{_r::etat::1}% le %{_r::quand::1}% &8(launcher %{_r::version::1}%, %{_r::mods::1}% mods, %{_r::packs::1}% pack(s) du joueur)"
+            if {_r::motifs::1} is not "":
+                send "&c%{_r::motifs::1}%"
+        execute "SELECT type, detail, occurrences, statut, to_char(coalesce(vu_le, cree_le) AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Paris', 'DD/MM HH24:MI') AS quand FROM opm_alerte WHERE lower(joueur) = lower(%{_nom}%) ORDER BY coalesce(vu_le, cree_le) DESC LIMIT 5" in {sql} and store the result in {_a::*}
+        if {_a::type::*} is not set:
+            send "&7Aucune alerte."
+            stop
+        loop {_a::type::*}:
+            set {_i} to loop-index
+            send "&8%{_a::quand::%{_i}%}% &f%loop-value% &7×%{_a::occurrences::%{_i}%}% — %{_a::detail::%{_i}%}% &8[%{_a::statut::%{_i}%}%]"
 
 command /surveiller <player>:
     permission: {@staff}

@@ -4,57 +4,25 @@ import com.mojang.blaze3d.platform.Lighting;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.math.Axis;
 import java.util.List;
-import java.util.Random;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.renderer.LightTexture;
 
 /**
- * Dans le menu pause, de temps en temps, Xenodys passe la tête par le coin
- * bas-droit de l'écran et dit un mot : l'annonce du staff s'il y en a une
- * (toujours montrée), sinon une phrase de son état. Son regard suit la souris.
+ * Xenodys au coin bas-droit de l'écran, avec sa bulle : le dessin de
+ * l'avertissement anti-triche (client/XenodysWarning). Elle ne vient plus dans
+ * le menu pause : un joueur ne la voit qu'à sa première arrivée, ou s'il triche.
  */
-public final class PausePeek {
-    private static final List<String> CREATRICE = List.of(
-            "Je veille sur la simulation. Prends ton temps.",
-            "Le monde t'attend, aventurier.",
-            "Mes assistants réparent un bloc ou deux. Rien de grave.",
-            "Grand Line ne se construit pas en un jour.");
-    private static final List<String> CORROMPUE = List.of(
-            "Tu crois pouvoir m'échapper en faisant pause ?",
-            "Le monde m'appartient. Pour l'instant.",
-            "Mes fils ne lâchent jamais.",
-            "Reviens vite… je m'ennuie.");
-    private static final Random RANDOM = new Random();
-
-    private static Screen current;
-    private static long start;
-    private static boolean show;
-    private static String line;
+public final class XenodysCorner {
     private static float yaw;
     private static float pitch;
     private static long last;
 
-    private PausePeek() {}
+    private XenodysCorner() {}
 
     private static int argb(int rgb, double a) {
         return ((int) Math.round(Math.max(0, Math.min(1, a)) * 255) << 24) | (rgb & 0xFFFFFF);
-    }
-
-    public static void render(Screen screen, GuiGraphics g, int mouseX, int mouseY) {
-        OpmSession session = OpmSession.get();
-        if (screen != current) {
-            current = screen;
-            start = Util.getMillis();
-            String staff = session.message;
-            show = staff != null || RANDOM.nextDouble() < 0.4 || !System.getProperty("opm.debug.world", "").isEmpty();
-            List<String> lines = session.corrupted() ? CORROMPUE : CREATRICE;
-            line = staff != null ? staff : lines.get(RANDOM.nextInt(lines.size()));
-        }
-        if (!show || Xen.model() == null) return;
-        drawPeek(g, (Util.getMillis() - start) / 1000.0, line, session.etat, mouseX, mouseY, false);
     }
 
     private static double easeOut(double k) {
@@ -67,11 +35,6 @@ public final class PausePeek {
         return k * k * (3 - 2 * k);
     }
 
-    public static void drawPeek(GuiGraphics g, double t, String line, String etat, double mouseX, double mouseY,
-                                boolean menace) {
-        drawPeek(g, t, line, etat, mouseX, mouseY, menace, Double.POSITIVE_INFINITY);
-    }
-
     /**
      * Xenodys au coin bas-droit, avec sa bulle. Le mouvement est continu, sans à-coups :
      * elle monte lentement du bas (et décélère), se penche vers le joueur à mesure
@@ -82,8 +45,8 @@ public final class PausePeek {
      * penche davantage, incline la tête, et un bref parasite la traverse de temps
      * en temps — jamais un tremblement continu.
      */
-    public static void drawPeek(GuiGraphics g, double t, String line, String etat, double mouseX, double mouseY,
-                                boolean menace, double remaining) {
+    public static void draw(GuiGraphics g, double t, String line, String etat, double mouseX, double mouseY,
+                            boolean menace, double remaining) {
         if (Xen.model() == null) return;
         long now = Util.getMillis();
         double dt = last == 0 ? 0 : Math.min(0.1, (now - last) / 1000.0);

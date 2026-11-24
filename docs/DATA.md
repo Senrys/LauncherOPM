@@ -141,7 +141,7 @@ CREATE TABLE ygg_session (
 CREATE TABLE game_report (
     id serial PRIMARY KEY,
     user_id integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    kind varchar(12) NOT NULL,             -- launch / join / periodic
+    kind varchar(12) NOT NULL,             -- launch / join / periodic / controle
     ok boolean NOT NULL,
     details text,                          -- JSON : mods en trop, modifiés, packs, X-ray
     created_at timestamp NOT NULL DEFAULT now()
@@ -154,7 +154,32 @@ CREATE TABLE opm_alerte (
     detail varchar(280),
     source varchar(12) NOT NULL DEFAULT 'serveur',  -- serveur / launcher
     relayee boolean NOT NULL DEFAULT false,         -- relayée au staff (webhook)
-    cree_le timestamp NOT NULL DEFAULT now()
+    cree_le timestamp NOT NULL DEFAULT now(),
+    -- migration 0005 : suivi
+    user_id integer REFERENCES users(id) ON DELETE SET NULL,
+    niveau varchar(8) NOT NULL DEFAULT 'soupcon',   -- preuve / soupcon
+    occurrences integer NOT NULL DEFAULT 1,         -- répétitions regroupées
+    vu_le timestamp,                                -- dernière fois (NULL : une seule)
+    statut varchar(12) NOT NULL DEFAULT 'nouvelle', -- nouvelle / vue / confirmee / fausse
+    note text, traite_par varchar(64), traite_le timestamp  -- écrits par le SITE
+);
+-- Le dernier contrôle de chaque joueur (0005), lu par le Skript et le site
+CREATE TABLE opm_controle (
+    user_id integer PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    joueur varchar(32) NOT NULL, uuid varchar(32),  -- uuid sans tirets
+    phase varchar(12) NOT NULL, ok boolean NOT NULL, motifs varchar(500),
+    mods integer NOT NULL DEFAULT 0, packs integer NOT NULL DEFAULT 0,
+    launcher varchar(24), le timestamp NOT NULL
+);
+-- Les comptes qui ont vu la scène de première arrivée (0005)
+CREATE TABLE opm_arrivee (
+    user_id integer PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    vue_le timestamp NOT NULL DEFAULT now()
+);
+-- Les mods qui sont, ou ont été récemment, dans le modpack (0005)
+CREATE TABLE opm_modpack (
+    fichier varchar(255), sha1 varchar(40), vu_le timestamp NOT NULL,
+    PRIMARY KEY (fichier, sha1)
 );
 CREATE TABLE ygg_join (
     server_id  varchar(64) PRIMARY KEY,

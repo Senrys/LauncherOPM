@@ -1,49 +1,57 @@
 package fr.onepieceminecraft.opm.client;
 
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Set;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.sounds.SoundEvents;
-import net.neoforged.neoforge.client.event.ClientChatReceivedEvent;
 import net.neoforged.neoforge.client.event.RenderGuiEvent;
 
 /**
  * « Je te vois… » : Xenodys, corrompue, surgit au coin bas-droit de l'écran
- * d'un joueur soupçonné de triche, et le bord de l'écran rougit un instant.
+ * d'un joueur qui triche, et le bord de l'écran rougit un instant.
  *
- * <p>Trois déclencheurs : un pack X-ray repéré par le mod lui-même, un rapport
- * refusé par le serveur d'authentification (client/AntiCheat), ou un message
- * du serveur Minecraft commençant par {@code [OPM:XENODYS]} — c'est ainsi que
- * le Skript anti-triche la fait apparaître ; le message est caché au joueur.
+ * <p>Deux déclencheurs : un rapport refusé par le serveur d'authentification
+ * (client/AntiCheat) — une seule fois par motif et par connexion —, ou le staff
+ * ({@code /surveiller}, client/ServerCalls). Un simple soupçon ne la fait pas venir.
  */
 public final class XenodysWarning {
     private static final double LENGTH = 9.0;
-    private static final String PREFIX = "[OPM:XENODYS]";
+    /** Les motifs déjà reprochés depuis la connexion. */
+    private static final Set<String> WARNED = new HashSet<>();
     private static long start = -1;
+    private static long last = -1;
     private static String line = "Je te vois…";
 
     private XenodysWarning() {}
+
+    public static void reset() {
+        Minecraft.getInstance().execute(WARNED::clear);
+    }
+
+    /** Des preuves : elle ne vient que si l'une d'elles n'a pas encore été reprochée. */
+    static void accuse(Collection<String> reasons, String message) {
+        Minecraft.getInstance().execute(() -> {
+            if (!WARNED.containsAll(reasons)) {
+                WARNED.addAll(reasons);
+                show(message);
+            }
+        });
+    }
 
     public static void show(String message) {
         Minecraft mc = Minecraft.getInstance();
         mc.execute(() -> {
             // Pas deux fois de suite : une apparition toutes les 30 s au plus.
-            if (start >= 0 && Util.getMillis() - start < 30_000) return;
-            start = Util.getMillis();
+            if (last >= 0 && Util.getMillis() - last < 30_000) return;
+            start = last = Util.getMillis();
             line = message == null || message.isBlank() ? "Je te vois…" : message;
             if (mc.getSoundManager() != null) {
                 mc.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.WARDEN_HEARTBEAT, 0.7f, 0.9f));
             }
         });
-    }
-
-    /** Les messages {@code [OPM:XENODYS] …} du serveur : jamais affichés, ils l'appellent. */
-    public static void onChat(ClientChatReceivedEvent event) {
-        String text = event.getMessage().getString();
-        if (!text.startsWith(PREFIX)) return;
-        event.setCanceled(true);
-        String rest = text.substring(PREFIX.length()).trim();
-        show(rest.isEmpty() ? "Je te vois…" : rest);
     }
 
     public static void onGui(RenderGuiEvent.Post event) {
@@ -71,6 +79,6 @@ public final class XenodysWarning {
                 g.fill(0, h - i - 1, w, h - i, ci);
             }
         }
-        PausePeek.drawPeek(g, t, line, "corrompue", g.guiWidth() / 2.0, g.guiHeight() / 2.0, true, LENGTH - t);
+        XenodysCorner.draw(g, t, line, "corrompue", g.guiWidth() / 2.0, g.guiHeight() / 2.0, true, LENGTH - t);
     }
 }

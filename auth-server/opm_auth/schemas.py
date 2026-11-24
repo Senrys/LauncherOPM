@@ -591,6 +591,9 @@ class ReportModIn(ApiInput):
     id: str = Field(max_length=80)
     version: str = Field(default="", max_length=80)
     file: str = Field(default="", max_length=255)
+    #: Empreinte du fichier ; vide pour les mods intégrés, les copies de Connector,
+    #: et les versions du mod OPM qui ne la calculent pas.
+    sha1: str = Field(default="", max_length=40)
 
 
 class ReportPackIn(ApiInput):
@@ -604,7 +607,8 @@ class ReportPackIn(ApiInput):
 class GameReportIn(ApiInput):
     """Le rapport du mod OPM en jeu."""
 
-    phase: Literal["join", "periodic"] = "join"
+    phase: Literal["join", "periodic", "controle"] = "join"
+    launcher: str = Field(default="", max_length=24)
     mods: list[ReportModIn] = Field(default_factory=list, max_length=1000)
     resourcepacks: list[ReportPackIn] = Field(default_factory=list, max_length=200)
 
@@ -617,6 +621,12 @@ class AntiCheatOut(ApiModel):
     reasons: list[str] = []
     extra: list[str] = []
     modified: list[str] = []
+
+
+class ArriveeOut(ApiModel):
+    """La scène de première arrivée : ce compte l'a-t-il déjà vue ?"""
+
+    vue: bool
 
 
 # ---------------------------------------------------------------------------
