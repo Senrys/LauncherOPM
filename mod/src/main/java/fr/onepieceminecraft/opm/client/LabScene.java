@@ -50,9 +50,9 @@ public final class LabScene {
     private static final double DROP = 0.65;
     private static final int CHUNK = 64;
     /** Xenodys, les joueurs, les assistants : blocs par unité de modèle. */
-    private static final float XS = 1.34f / 16;
+    private static final float XS = 1.9f / 16;
     private static final float PS = 1.22f / 16;
-    private static final float BOT = 1.25f / 16;
+    private static final float BOT = 1.3f / 16;
     private static final float CX = 15.5f;
     private static final float CZ = 12.5f;
     private static final float TOP = 3f;
@@ -109,8 +109,10 @@ public final class LabScene {
     }
 
     private final LabData data = LabData.get();
-    private final GeoModel xen = Xen.model();
-    private final GeoModel bot = GeoModel.load("xenodys_assistant", "animation.xenodys_assistant");
+    private final Rig xen = Xen.model();
+    private final Rig graine = Rig.assistant("graine");
+    private final Rig luciole = Rig.assistant("luciole");
+    private final Rig fileuse = Rig.assistant("fileuse");
     private final GeoModel player = GeoModel.load("joueur", null);
     private final GeoModel playerSlim = GeoModel.load("joueur_fin", null);
     private final List<Chunk> chunks = new ArrayList<>();
@@ -333,6 +335,30 @@ public final class LabScene {
             flush(bb);
             additive(false);
         }
+    }
+
+    /** Xenodys ou un assistant, en couches : la matière, ses lueurs, le verre et l'énergie. */
+    private void rig(Rig m, Rig.Pose p, Matrix4f world, Rig.Options options, int rgb) {
+        m.solve(p, new Matrix4f(view).mul(world), options);
+        ResourceLocation tex = Xen.texture(m.id(), etat, false);
+        texture(tex);
+        RenderSystem.depthMask(true);
+        BufferBuilder bb = quads();
+        m.emitFlat(bb, Rig.Layer.BASE, true, rgb, 1);
+        flush(bb);
+        RenderSystem.setShaderTexture(0, Xen.texture(m.id(), etat, true));
+        additive(true);
+        bb = quads();
+        m.emitFlat(bb, Rig.Layer.GLOW, false, 0xFFFFFF, 1);
+        flush(bb);
+        additive(false);
+        RenderSystem.setShaderTexture(0, tex);
+        RenderSystem.depthMask(false);
+        bb = quads();
+        m.emitFlat(bb, Rig.Layer.GLASS, true, rgb, 1);
+        m.emitFlat(bb, Rig.Layer.ENERGY, false, 0xFFFFFF, 1);
+        flush(bb);
+        RenderSystem.depthMask(true);
     }
 
     /** Un rectangle libre, texturé en blanc. */
@@ -767,7 +793,7 @@ public final class LabScene {
         int slot;
         Vector3f base;
         Matrix4f world;
-        GeoModel.Pose pose;
+        Rig.Pose pose;
         Vector3f right;
         Vector3f left;
         /** 0 → 1 : elle est à l'ouvrage. */
@@ -785,12 +811,12 @@ public final class LabScene {
 
     private static Vector3f place(Post p) {
         return switch (p) {
-            case HOME -> v(CX + 0.9, 3.9, 7.6);
-            case TANK -> v(CX, 4.5, 8.0);
-            case REACTOR -> v(12.4, 2.4, 5.0);
-            case BUILD -> v(17.9, 2.9, 6.6);
-            case HOLO -> v(13.3, 2.4, 6.6);
-            case SPECIMEN -> v(22.0, 2.4, 5.2);
+            case HOME -> v(CX + 0.9, 3.6, 7.6);
+            case TANK -> v(CX, 3.6, 8.8);
+            case REACTOR -> v(6.9, 1.9, 5.8);
+            case BUILD -> v(18.9, 1.9, 7.2);
+            case HOLO -> v(6.7, 1.7, 7.4);
+            case SPECIMEN -> v(21.6, 1.9, 5.8);
         };
     }
 
@@ -863,20 +889,29 @@ public final class LabScene {
         x.world = new Matrix4f().translate(base).rotateY(yawR).rotateX((float) Math.toRadians(-Math.max(-14, Math.min(16, ahead * 4))))
                 .rotateZ((float) Math.toRadians(-Math.max(-14, Math.min(14, side * 4)))).scale(XS);
 
-        GeoModel.Pose pose = xen.pose(corrupted ? "corrupted_idle" : "idle", (float) t);
+        // Au repos, les mains en coupe autour du monde qu'elle crée ; à l'ouvrage, elles servent.
+        float rest = 1 - armWeight;
+        Rig.Pose pose = Rig.blend(xen.pose(corrupted ? "corrupted_idle" : "idle", t), xen.pose(corrupted ? "vol_corrompu" : "vol", t), rest);
         float travel = Math.min(1, speed / 2.5f);
         if (travel > 0.02f) {
             float flap = (float) Math.sin(t * 8) * 14 * travel;
-            GeoModel.add(pose, "wing_left", new float[]{0, flap, 0}, null);
-            GeoModel.add(pose, "wing_right", new float[]{0, -flap, 0}, null);
-            GeoModel.add(pose, "skirt_front", new float[]{-16 * travel, 0, 0}, null);
+            Rig.add(pose, "wing_left", new float[]{0, flap, 0}, null);
+            Rig.add(pose, "wing_right", new float[]{0, -flap, 0}, null);
+            Rig.add(pose, "skirt_front", new float[]{-16 * travel, 0, 0}, null);
         }
+        boolean gripping = corrupted && s.inMenu && x.post == Post.HOME && s.greet < 0;
+        busy = damp(busy, s.greet >= 0 || (s.waiting && x.post == Post.HOME) || gripping ? 1 : 0, 5, dt);
         if (s.greet >= 0) {
-            pose = GeoModel.blend(pose, xen.pose("greet", (float) (s.greet * 1.6)), (float) Math.min(1, s.greet * 4));
+            pose = Rig.blend(pose, xen.pose("greet", s.greet * 1.6), (float) Math.min(1, s.greet * 4));
         } else if (s.waiting && x.post == Post.HOME) {
-            pose = GeoModel.blend(pose, xen.pose("greet", 1.0f), 0.8f);
+            pose = Rig.blend(pose, xen.pose("greet", 1.0), 0.8f);
         }
-        GeoModel.add(pose, "chest", new float[]{x.post == Post.HOME ? 7 : 5 + 5 * (float) x.work, 0, 0}, null);
+        // Près des machines, les ailes se replient : elles ne traversent rien.
+        fold = damp(fold, x.post == Post.TANK || x.post == Post.HOME ? 0 : 50 * (1 - travel * 0.3f), 2.2, dt);
+        Rig.add(pose, "wing_left", new float[]{0, 0, fold}, null);
+        Rig.add(pose, "wing_right", new float[]{0, 0, -fold}, null);
+        Rig.add(pose, "body", new float[]{10 * (float) x.work, 0, 0}, null);
+        Rig.add(pose, "chest", new float[]{x.post == Post.HOME ? 7 : 4 + 8 * (float) x.work, 0, 0}, null);
 
         // Ses mains : ce qu'elles visent, selon l'ouvrage.
         Vector3f wr = null;
@@ -900,25 +935,25 @@ public final class LabScene {
             }
             case BUILD -> {
                 Vector3f cur = buildFocus(x);
-                wr = new Vector3f(cur).lerp(new Vector3f(base).add(0, 4.3f, 0), 0.45f);
-                wl = new Vector3f(base).add(1.4f, (float) (4.4 + 0.3 * Math.sin(w * 2.2)), 1.6f);
+                wr = new Vector3f(cur).lerp(new Vector3f(base).add(0, 5.2f, 0), 0.35f);
+                wl = new Vector3f(base).add(1.5f, (float) (5 + 0.3 * Math.sin(w * 2.2)), 1.4f);
             }
             case TANK -> {
                 double press = 0.5 + 0.5 * Math.sin(w * 0.8);
-                wr = v(CX - 1.5, 6.4 + 0.25 * Math.sin(w * 1.3), 10.1 + 0.15 * press);
-                wl = v(CX + 1.5, 6.4 + 0.25 * Math.sin(w * 1.3 + 2), 10.1 + 0.15 * press);
+                wr = v(CX - 1.3, 7.3 + 0.12 * Math.sin(w * 1.3), 10.4 + 0.15 * press);
+                wl = v(CX + 1.3, 7.3 + 0.12 * Math.sin(w * 1.3 + 2), 10.4 + 0.15 * press);
                 if (w > 3.2 && w < 6.2) {
                     // Elle forme une étincelle de vie au-dessus de la cuve, et l'y laisse tomber.
-                    wr = v(CX - 0.5, 8.1, 10.4);
-                    wl = v(CX + 0.5, 8.1, 10.4);
+                    wr = v(CX - 0.5, 7.9, 10.1);
+                    wl = v(CX + 0.5, 7.9, 10.1);
                 }
             }
             default -> { }
         }
         armWeight = damp(armWeight, wr != null ? (float) x.work : 0, 4, dt);
         if (wr == null) {
-            wr = new Vector3f(base).add(-1.5f, 3.6f, 1.2f);
-            wl = new Vector3f(base).add(1.5f, 3.6f, 1.2f);
+            wr = new Vector3f(base).add(-1.5f, 4.2f, 1.2f);
+            wl = new Vector3f(base).add(1.5f, 4.2f, 1.2f);
         }
         handR = damp(handR, wr, 5, dt);
         handL = damp(handL, wl, 5, dt);
@@ -926,20 +961,20 @@ public final class LabScene {
             float busy = (float) (x.work * 26 * Math.max(0, Math.sin(t * 5 + f)));
             curls[f] = damp(curls[f], busy, 8, dt);
             curls[f + 4] = damp(curls[f + 4], (float) (x.work * 26 * Math.max(0, Math.sin(t * 5 + f + 2))), 8, dt);
-            GeoModel.add(pose, "finger_right_" + f, new float[]{curls[f], 0, 0}, null);
-            GeoModel.add(pose, "finger_right_" + f + "_tip", new float[]{curls[f] * 0.8f, 0, 0}, null);
-            GeoModel.add(pose, "finger_left_" + f, new float[]{curls[f + 4], 0, 0}, null);
-            GeoModel.add(pose, "finger_left_" + f + "_tip", new float[]{curls[f + 4] * 0.8f, 0, 0}, null);
+            Rig.add(pose, "finger_right_" + f, new float[]{curls[f], 0, 0}, null);
+            Rig.add(pose, "finger_right_" + f + "_tip", new float[]{curls[f] * 0.8f, 0, 0}, null);
+            Rig.add(pose, "finger_left_" + f, new float[]{curls[f + 4], 0, 0}, null);
+            Rig.add(pose, "finger_left_" + f + "_tip", new float[]{curls[f + 4] * 0.8f, 0, 0}, null);
         }
-        if (corrupted && s.inMenu && x.post == Post.HOME && s.greet < 0) {
+        if (gripping) {
             // L'emprise : la main droite en griffe au-dessus du joueur, les fils tendus.
             float pull = (float) Math.sin(t * 2.1) * 6;
-            GeoModel.add(pose, "arm_right", new float[]{-62 + pull, -18, 24}, null);
-            GeoModel.add(pose, "forearm_right", new float[]{-28 - pull, 0, 0}, null);
+            Rig.add(pose, "arm_right", new float[]{-62 + pull, -18, 24}, null);
+            Rig.add(pose, "forearm_right", new float[]{-28 - pull, 0, 0}, null);
             for (int f = 0; f < 4; f++) {
                 float c = 38 + (float) Math.sin(t * 3 + f) * 10;
-                GeoModel.add(pose, "finger_right_" + f, new float[]{c, 0, 0}, null);
-                GeoModel.add(pose, "finger_right_" + f + "_tip", new float[]{c * 0.8f, 0, 0}, null);
+                Rig.add(pose, "finger_right_" + f, new float[]{c, 0, 0}, null);
+                Rig.add(pose, "finger_right_" + f + "_tip", new float[]{c * 0.8f, 0, 0}, null);
             }
         }
 
@@ -954,8 +989,8 @@ public final class LabScene {
         float pitch = (float) Math.max(-35, Math.min(42, Math.toDegrees(Math.atan2(-d.y, Math.hypot(d.x, d.z)))));
         headYaw = damp(headYaw, yaw, 4, dt);
         headPitch = damp(headPitch, pitch, 4, dt);
-        GeoModel.add(pose, "head", new float[]{headPitch * 0.7f, headYaw * 0.7f, 0}, null);
-        GeoModel.add(pose, "neck", new float[]{headPitch * 0.3f, headYaw * 0.3f, 0}, null);
+        Rig.add(pose, "head", new float[]{headPitch * 0.7f, headYaw * 0.7f, 0}, null);
+        Rig.add(pose, "neck", new float[]{headPitch * 0.3f, headYaw * 0.3f, 0}, null);
 
         if (armWeight > 0.01f) {
             solve(pose, x.world, "right", handR, solvedR);
@@ -968,14 +1003,15 @@ public final class LabScene {
             apply(pose, "left", armL, armWeight);
         }
         x.pose = pose;
-        String xt = "xenodys_" + etat + (Xen.blinking(t, 5) ? "_blink" : "");
-        model(xen, pose, x.world, tex(xt), tex(xt + "_glowmask"), 1f, corrupted ? 0xF2E6F0 : 0xFFFFFF);
+        rig(xen, pose, x.world, new Rig.Options().hands(rest * (1 - busy)).blink(Xen.blinking(t, 5)), corrupted ? 0xF7EDF5 : 0xFFFFFF);
         x.right = x.world.transformPosition(xen.point(pose, "hand_right"), new Vector3f());
         x.left = x.world.transformPosition(xen.point(pose, "hand_left"), new Vector3f());
         return x;
     }
 
     private float home;
+    private float busy;
+    private float fold;
 
     /** Un point du monde, à `dist` blocs de la caméra, sous un point de l'écran (−1 … 1). */
     private Vector3f unproject(float sx, float sy, float dist) {
@@ -984,20 +1020,19 @@ public final class LabScene {
         return new Vector3f(far).sub(eye).normalize(dist).add(eye);
     }
 
-    private static void apply(GeoModel.Pose p, String side, float[] a, float k) {
-        GeoModel.add(p, "arm_" + side, new float[]{a[0] * k, a[1] * k, a[2] * k}, null);
-        GeoModel.add(p, "forearm_" + side, new float[]{a[3] * k, 0, 0}, null);
+    private static void apply(Rig.Pose p, String side, float[] a, float k) {
+        Rig.add(p, "arm_" + side, new float[]{a[0] * k, a[1] * k, a[2] * k}, null);
+        Rig.add(p, "forearm_" + side, new float[]{a[3] * k, 0, 0}, null);
     }
 
-    private float error(GeoModel.Pose base, Matrix4f world, String side, Vector3f target, float[] a) {
-        GeoModel.Pose p = base.copy();
-        apply(p, side, a, 1);
-        Vector3f hand = world.transformPosition(xen.point(p, "hand_" + side), new Vector3f());
+    private float error(Rig.Pose base, Matrix4f world, String side, Vector3f target, float[] a) {
+        Vector3f hand = world.transformPosition(xen.point(base, "hand_" + side, "arm_" + side, a, "forearm_" + side,
+                new float[]{a[3], 0, 0}), new Vector3f());
         return hand.distanceSquared(target) + 0.00003f * (a[0] * a[0] + a[1] * a[1] + a[2] * a[2] + a[3] * a[3]);
     }
 
     /** L'épaule et le coude d'un bras, pour que la main atteigne sa cible, repartis de l'image précédente. */
-    private void solve(GeoModel.Pose base, Matrix4f world, String side, Vector3f target, float[] state) {
+    private void solve(Rig.Pose base, Matrix4f world, String side, Vector3f target, float[] state) {
         float[] best = state.clone();
         float bestE = error(base, world, side, target, best);
         float step = 10;
@@ -1266,17 +1301,19 @@ public final class LabScene {
     /* --------------------------------------------------- les assistants */
 
     private void bots(View s) {
-        if (bot == null || shown < shownAt.length * 0.4) return;
-        ResourceLocation bt = tex("xenodys_assistant_" + etat);
-        ResourceLocation bg = tex("xenodys_assistant_" + etat + "_glowmask");
-        // L'un tape aux serveurs.
-        GeoModel.Pose p = bot.pose("idle", (float) t);
-        double type = t * 2 * Math.PI;
-        GeoModel.add(p, "arm_left", new float[]{(float) (-85 + 22 * Math.sin(type * 1.3)), 0, -10}, null);
-        GeoModel.add(p, "arm_right", new float[]{(float) (-85 + 22 * Math.sin(type * 1.3 + Math.PI)), 0, 10}, null);
-        GeoModel.add(p, "head", new float[]{(float) (6 * Math.sin(t * 0.9)), (float) (16 * Math.sin(t * 0.5)), 0}, null);
-        model(bot, p, new Matrix4f().translate(28.1f, 1, 6.5f).rotateY((float) Math.toRadians(-90)).scale(BOT), bt, bg, 1, 0xFFFFFF);
-        // L'autre fait sa ronde devant la plateforme, un bloc dans les bras, et trébuche parfois.
+        if (graine == null || luciole == null || fileuse == null || shown < shownAt.length * 0.4) return;
+        // La fileuse tisse, près des serveurs.
+        Rig.Pose p = fileuse.pose("idle", t);
+        Rig.add(p, "head", new float[]{(float) (6 * Math.sin(t * 0.9)), (float) (16 * Math.sin(t * 0.5)), 0}, null);
+        rig(fileuse, p, new Matrix4f().translate(27.4f, 1, 6.6f).rotateY((float) Math.toRadians(-62 + 10 * Math.sin(t * 0.3))).scale(BOT * 1.25f),
+                null, 0xFFFFFF);
+        // La luciole éclaire la salle, à droite de la plateforme.
+        double la = t * 0.33;
+        double dir = Math.cos(la);
+        rig(luciole, luciole.pose("idle", t), new Matrix4f().translate((float) (CX + 6.6 + Math.sin(la) * 1.5),
+                        (float) (7.4 + Tisseuse.lucioleFloat(t) + 0.5 * Math.sin(t * 0.8)), (float) (CZ + 1.2 + 0.9 * Math.sin(t * 0.5)))
+                .rotateY((float) Math.toRadians(180 - 55 * dir)).rotateZ((float) Math.toRadians(-10 * dir)).scale(BOT), null, 0xFFFFFF);
+        // Le bâtisseur fait sa ronde, son cube de monde dans les bras, et trébuche parfois.
         double window = 9;
         int idx = (int) Math.floor(t / window);
         double paused = 0;
@@ -1297,33 +1334,23 @@ public final class LabScene {
         float bx = (float) (CX + Math.sin(at) * radius);
         float bz = (float) (CZ + Math.cos(at) * radius);
         float facing = (float) Math.toDegrees(at) + (right ? -90 : 90);
-        GeoModel.Pose w = bot.pose("idle", (float) t);
+        Rig.Pose w = graine.pose("idle", t);
         float rx = 0;
+        float pace = 0;
         if (fall >= 0) {
             double k = fall < 0.6 ? ease(fall / 0.6) : fall < 1.4 ? 1 : 1 - ease((fall - 1.4) / 0.9);
             rx = (float) (-88 * k);
-            GeoModel.add(w, "arm_left", new float[]{(float) (-140 * k), 0, -20}, null);
-            GeoModel.add(w, "arm_right", new float[]{(float) (-140 * k), 0, 20}, null);
+            Rig.add(w, "arm_left", new float[]{(float) (-140 * k), 0, -20}, null);
+            Rig.add(w, "arm_right", new float[]{(float) (-140 * k), 0, 20}, null);
         } else {
             double st = Math.sin(walk * 2 * Math.PI * 1.2);
-            GeoModel.add(w, "leg_left", new float[]{(float) (35 * st), 0, 0}, null);
-            GeoModel.add(w, "leg_right", new float[]{(float) (-35 * st), 0, 0}, null);
-            GeoModel.add(w, "arm_left", new float[]{-78, 0, -6}, null);
-            GeoModel.add(w, "arm_right", new float[]{-78, 0, 6}, null);
-            GeoModel.add(w, "body", null, new float[]{0, (float) Math.abs(st) * 0.8f, 0});
+            Rig.add(w, "leg_left", new float[]{(float) (35 * st), 0, 0}, null);
+            Rig.add(w, "leg_right", new float[]{(float) (-35 * st), 0, 0}, null);
+            Rig.add(w, "body", null, new float[]{0, (float) Math.abs(st) * 0.8f, 0});
+            pace = 1;
         }
-        Matrix4f m = new Matrix4f().translate(bx, TOP - 1, bz).rotateY((float) Math.toRadians(facing)).rotateX((float) Math.toRadians(rx)).scale(BOT);
-        model(bot, w, m, bt, bg, 1, 0xFFFFFF);
-        // Son bloc : dans ses bras, ou qui roule au sol.
-        double fwd = fall < 0 ? 0.72 : 0.72 + 0.45 * ease(fall / 0.8);
-        double hgt = fall < 0 ? 0.92 : 0.92 - 0.69 * ease(fall / 0.5);
-        double fa = Math.toRadians(facing);
-        Matrix4f b = new Matrix4f().translate((float) (bx - Math.sin(fa) * fwd), (float) (TOP - 1 + hgt), (float) (bz - Math.cos(fa) * fwd))
-                .rotateY((float) fa).rotateX((float) (fall < 0 ? 0 : -1.57 * ease(fall / 0.8)));
-        texture(data.atlas(etat, false, t));
-        BufferBuilder bb = quads();
-        block(bb, null, b.scale(0.46f), C + "cote", C + "puce");
-        flush(bb);
+        rig(graine, w, new Matrix4f().translate(bx, TOP - 1, bz).rotateY((float) Math.toRadians(facing)).rotateX((float) Math.toRadians(rx)).scale(BOT),
+                new Rig.Options().walk(pace), 0xFFFFFF);
     }
 
     /* ------------------------------------- verre, liquide, effets */

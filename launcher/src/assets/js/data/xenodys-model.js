@@ -1,18 +1,35 @@
 /**
- * Xenodys en cubes : la géométrie et les animations GeckoLib (les mêmes que le jeu),
- * lues dans le paquet de ressources. `null` si le paquet est fermé.
+ * Xenodys la Tisseuse et ses assistants : modèles et animations, lus dans le paquet de
+ * ressources. `null` si le paquet est fermé.
  */
 
-import { packJson } from '../utils/pack.js';
+import { packBytes, packJson } from '../utils/pack.js';
 
-const [geo, animations, assistantGeo, assistantAnimations, joueur, joueurFin] = await Promise.all(
-  ['geo/xenodys.geo', 'animations/xenodys.animation', 'geo/xenodys_assistant.geo', 'animations/xenodys_assistant.animation',
-    'geo/joueur.geo', 'geo/joueur_fin.geo'].map((n) => packJson(`geckolib/${n}.json`).catch(() => null))
-);
+async function rig(id) {
+  const [meta, bytes] = await Promise.all([packJson(`modeles/${id}.json`), packBytes(`modeles/${id}.bin`)]);
+  if (!meta || !bytes) return null;
+  // Une copie alignée : 24 float32 par face.
+  return { id, meta, faces: new Float32Array(bytes.slice().buffer) };
+}
 
-export const GEO = geo;
+const quiet = (p) => p.catch(() => null);
+const [tisseuse, graine, luciole, fileuse, animations, assistants] = await Promise.all([
+  quiet(rig('xenodys_tisseuse')), quiet(rig('assistant_graine')), quiet(rig('assistant_luciole')), quiet(rig('assistant_fileuse')),
+  quiet(packJson('geckolib/animations/xenodys_tisseuse.animation.json')), quiet(packJson('geckolib/animations/xenodys_assistant.animation.json')),
+]);
+
+export const RIGS = tisseuse && graine && luciole && fileuse
+  ? { xenodys_tisseuse: tisseuse, assistant_graine: graine, assistant_luciole: luciole, assistant_fileuse: fileuse } : null;
 export const ANIMATIONS = animations;
-export const ASSISTANT_GEO = assistantGeo;
-export const ASSISTANT_ANIMATIONS = assistantAnimations;
-export const JOUEUR_GEO = joueur;
-export const JOUEUR_FIN_GEO = joueurFin;
+export const ASSISTANT_ANIMATIONS = assistants;
+
+/** Les couches d'un modèle : `[première face, nombre]`. */
+export function layersOf({ meta }) {
+  const out = {};
+  let at = 0;
+  for (const k of ['base', 'verre', 'lueur', 'energie']) {
+    out[k] = [at, meta.couches[k]];
+    at += meta.couches[k];
+  }
+  return out;
+}

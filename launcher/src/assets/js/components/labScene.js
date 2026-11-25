@@ -12,22 +12,24 @@
  */
 
 import { packImage } from '../utils/pack.js';
-import { BASE, GLOW, GeoModel, LabData, M4, Painter, TRANS, add, copyPose } from './labGl.js';
+import { ANIMATIONS, ASSISTANT_ANIMATIONS, RIGS } from '../data/xenodys-model.js';
+import { BASE, GLOW, GeoModel, LabData, M4, Painter, Rig, TRANS, add, blend } from './labGl.js';
+import { floatOf } from './tisseuse.js';
 
 const SLOT = 11;
 const TRAVEL = 2.2;
 const DROP = 0.65;
 const CHUNK = 64;
-const XS = 1.34 / 16;
+const XS = 1.9 / 16;
 const PS = 1.22 / 16;
-const BOT = 1.25 / 16;
+const BOT = 1.3 / 16;
 const CX = 15.5;
 const CZ = 12.5;
 const TOP = 3;
 const TANK_FLOOR = 3.72;
 const TANK_TOP = 6.75;
 const PROGRAM = ['TANK', 'REACTOR', 'BUILD', 'HOLO', 'TANK', 'BUILD', 'SPECIMEN'];
-const PLACE = { TANK: [CX, 4.5, 8], REACTOR: [12.4, 2.4, 5], BUILD: [17.9, 2.9, 6.6], HOLO: [13.3, 2.4, 6.6], SPECIMEN: [22, 2.4, 5.2] };
+const PLACE = { TANK: [CX, 3.6, 8.8], REACTOR: [6.9, 1.9, 5.8], BUILD: [18.9, 1.9, 7.2], HOLO: [6.7, 1.7, 7.4], SPECIMEN: [21.6, 1.9, 5.8] };
 const UP = { REACTOR: 1.7, HOLO: 2, SPECIMEN: 2, BUILD: 2.2, TANK: 2 };
 const RAD = Math.PI / 180;
 
@@ -102,17 +104,16 @@ export async function createLabScene(canvas, { actors }) {
   const data = await LabData.load(P);
   const none = Promise.resolve(null);
   const [xen, bot, wide, slim] = await Promise.all([
-    actors ? GeoModel.load('xenodys', 'animation.xenodys') : none,
-    GeoModel.load('xenodys_assistant', 'animation.xenodys_assistant'),
+    actors && RIGS ? new Rig(RIGS.xenodys_tisseuse, ANIMATIONS, 'animation.xenodys') : none,
+    RIGS ? Object.fromEntries(['graine', 'luciole', 'fileuse'].map((n) => [n, new Rig(RIGS[`assistant_${n}`], ASSISTANT_ANIMATIONS, 'animation.xenodys_assistant')])) : null,
     actors ? GeoModel.load('joueur', null) : none,
     actors ? GeoModel.load('joueur_fin', null) : none,
   ]);
   if (!bot || (actors && !xen)) throw new Error('modèles absents du paquet');
   const entity = new Map();
   await Promise.all(['creatrice', 'corrompue'].flatMap((e) => [
-    ...(actors ? [`xenodys_${e}`, `xenodys_${e}_glowmask`, `xenodys_${e}_blink`, `xenodys_${e}_blink_glowmask`] : []),
-    `xenodys_assistant_${e}`, `xenodys_assistant_${e}_glowmask`,
-  ].map(async (n) => entity.set(n, P.texture(await packImage(`entity/${n}.png`))))));
+    ...(actors ? ['xenodys_tisseuse'] : []), 'assistant_graine', 'assistant_luciole', 'assistant_fileuse',
+  ].flatMap((id) => [`${id}_${e}`, `${id}_${e}_glowmask`]).map(async (n) => entity.set(n, P.texture(await packImage(`entity/${n}.png`))))));
 
   const entries = data.entries;
   const tankIndex = entries.findIndex((e) => e.poste === 'cuve');
@@ -209,6 +210,26 @@ export async function createLabScene(canvas, { actors }) {
       P.flush();
       P.additive(false);
     }
+  }
+
+  /** La Tisseuse ou un assistant : matière, lueur, puis verre et énergie. */
+  function rig(m, id, pose, world, rgb = [1, 1, 1], options = {}) {
+    m.solve(pose, world, options);
+    const tex = entity.get(`${id}_${etat}`);
+    P.use(tex);
+    m.emit(batch, 'base', viewRot, rgb, 1);
+    P.flush();
+    P.use(entity.get(`${id}_${etat}_glowmask`));
+    P.additive(true);
+    m.emit(batch, 'lueur', null, [1, 1, 1], 1);
+    P.flush();
+    P.additive(false);
+    P.use(tex);
+    P.depth(false);
+    m.emit(batch, 'verre', viewRot, rgb, 1);
+    m.emit(batch, 'energie', null, [1, 1, 1], 1);
+    P.flush();
+    P.depth(true);
   }
 
   /* ------------------------------------------------------------- la salle */
@@ -421,18 +442,11 @@ export async function createLabScene(canvas, { actors }) {
   };
 
   function solve(pose, world, side, target, st) {
-    // Seuls le bras et l'avant-bras bougent : on ne recopie que leurs rotations.
-    const arm = pose.rot.get(`arm_${side}`);
-    const fore = pose.rot.get(`forearm_${side}`);
-    const a0 = [...arm];
-    const f0 = [...fore];
+    const over = {};
     const error = (a) => {
-      for (let i = 0; i < 3; i += 1) {
-        arm[i] = a0[i];
-        fore[i] = f0[i];
-      }
-      applyArm(pose, side, a, 1);
-      const h = world.point(...xen.point(pose, `hand_${side}`));
+      over[`arm_${side}`] = a;
+      over[`forearm_${side}`] = [a[3], 0, 0];
+      const h = world.point(...xen.point(pose, `hand_${side}`, over));
       return (h[0] - target[0]) ** 2 + (h[1] - target[1]) ** 2 + (h[2] - target[2]) ** 2
         + 0.00003 * (a[0] ** 2 + a[1] ** 2 + a[2] ** 2 + a[3] ** 2);
     };
@@ -453,10 +467,6 @@ export async function createLabScene(canvas, { actors }) {
         }
       }
       step *= 0.6;
-    }
-    for (let i = 0; i < 3; i += 1) {
-      arm[i] = a0[i];
-      fore[i] = f0[i];
     }
     for (let i = 0; i < 4; i += 1) st[i] = best[i];
   }
@@ -481,7 +491,9 @@ export async function createLabScene(canvas, { actors }) {
     x.world = new M4().translate(...base).rotY(yawR).rotX(-Math.max(-14, Math.min(16, ahead * 4)) * RAD)
       .rotZ(-Math.max(-14, Math.min(14, side * 4)) * RAD).scale(XS);
 
-    const pose = xen.pose(corrupted() ? 'corrupted_idle' : 'idle', t);
+    // Au repos, les mains en coupe autour du monde qu'elle crée ; à l'ouvrage, elles servent.
+    const rest = 1 - S.armWeight;
+    const pose = blend(xen.pose(corrupted() ? 'corrupted_idle' : 'idle', t), xen.pose(corrupted() ? 'vol_corrompu' : 'vol', t), rest);
     const travel = Math.min(1, Math.hypot(...vel) / 2.5);
     if (travel > 0.02) {
       const flap = sin(t * 8) * 14 * travel;
@@ -489,7 +501,12 @@ export async function createLabScene(canvas, { actors }) {
       add(pose, 'wing_right', [0, -flap, 0]);
       add(pose, 'skirt_front', [-16 * travel, 0, 0]);
     }
-    add(pose, 'chest', [5 + 5 * x.work, 0, 0]);
+    // Près des machines, les ailes se replient : elles ne traversent rien.
+    S.fold = damp(S.fold ?? 0, x.post === 'TANK' ? 0 : 50 * (1 - travel * 0.3), 2.2, dt);
+    add(pose, 'wing_left', [0, 0, S.fold]);
+    add(pose, 'wing_right', [0, 0, -S.fold]);
+    add(pose, 'body', [10 * x.work, 0, 0]);
+    add(pose, 'chest', [4 + 8 * x.work, 0, 0]);
 
     let wr = null;
     let wl = null;
@@ -506,15 +523,15 @@ export async function createLabScene(canvas, { actors }) {
       wr = plus(aim, -0.7 + 0.25 * sin(w * 0.9), 0.5 * sin(w * 0.7), 1.25);
       wl = plus(aim, -1.3, 0.9 + 0.15 * sin(w * 2), 1.6);
     } else if (x.post === 'BUILD') {
-      wr = lerp(buildFocus(x), plus(base, 0, 4.3, 0), 0.45);
-      wl = plus(base, 1.4, 4.4 + 0.3 * sin(w * 2.2), 1.6);
+      wr = lerp(buildFocus(x), plus(base, 0, 5.2, 0), 0.35);
+      wl = plus(base, 1.5, 5 + 0.3 * sin(w * 2.2), 1.4);
     } else {
       const press = 0.5 + 0.5 * sin(w * 0.8);
-      wr = [CX - 1.5, 6.4 + 0.25 * sin(w * 1.3), 10.1 + 0.15 * press];
-      wl = [CX + 1.5, 6.4 + 0.25 * sin(w * 1.3 + 2), 10.1 + 0.15 * press];
+      wr = [CX - 1.3, 7.3 + 0.12 * sin(w * 1.3), 10.4 + 0.15 * press];
+      wl = [CX + 1.3, 7.3 + 0.12 * sin(w * 1.3 + 2), 10.4 + 0.15 * press];
       if (w > 3.2 && w < 6.2) {
-        wr = [CX - 0.5, 8.1, 10.4];
-        wl = [CX + 0.5, 8.1, 10.4];
+        wr = [CX - 0.5, 7.9, 10.1];
+        wl = [CX + 0.5, 7.9, 10.1];
       }
     }
     S.armWeight = damp(S.armWeight, x.work, 4, dt);
@@ -547,8 +564,7 @@ export async function createLabScene(canvas, { actors }) {
       applyArm(pose, 'left', S.armL, S.armWeight);
     }
     const blink = (t + 5 * 0.37) % (3.5 + 5 * 0.4) < 0.13;
-    const name = `xenodys_${etat}${blink ? '_blink' : ''}`;
-    model(xen, pose, x.world, entity.get(name), entity.get(`${name}_glowmask`), 1, corrupted() ? [0.95, 0.9, 0.94] : [1, 1, 1]);
+    rig(xen, 'xenodys_tisseuse', pose, x.world, corrupted() ? [0.97, 0.93, 0.96] : [1, 1, 1], { hands: rest, blink });
     x.pose = pose;
     x.right = x.world.point(...xen.point(pose, 'hand_right'));
     x.left = x.world.point(...xen.point(pose, 'hand_left'));
@@ -675,16 +691,20 @@ export async function createLabScene(canvas, { actors }) {
 
   /* --------------------------------------------------------- les assistants */
 
-  function bots(atlases) {
+  function bots() {
     if (shown < entries.length * 0.4) return;
-    const tex = entity.get(`xenodys_assistant_${etat}`);
-    const glow = entity.get(`xenodys_assistant_${etat}_glowmask`);
-    const p = bot.pose('idle', t);
-    const type = t * 2 * Math.PI;
-    add(p, 'arm_left', [-85 + 22 * sin(type * 1.3), 0, -10]);
-    add(p, 'arm_right', [-85 + 22 * sin(type * 1.3 + Math.PI), 0, 10]);
+    // La fileuse tisse, près des serveurs.
+    const p = bot.fileuse.pose('idle', t);
     add(p, 'head', [6 * sin(t * 0.9), 16 * sin(t * 0.5), 0]);
-    model(bot, p, new M4().translate(28.1, 1, 6.5).rotY(-90 * RAD).scale(BOT), tex, glow);
+    rig(bot.fileuse, 'assistant_fileuse', p, new M4().translate(27.4, 1, 6.6).rotY((-62 + 10 * sin(t * 0.3)) * RAD).scale(BOT * 1.25));
+    // La luciole éclaire la salle, à droite de la plateforme.
+    const la = t * 0.33;
+    const lx = CX + 6.6 + sin(la) * 1.5;
+    const l = bot.luciole.pose('idle', t);
+    const dir = cos(la);
+    rig(bot.luciole, 'assistant_luciole', l, new M4().translate(lx, 7.4 + floatOf('assistant_luciole', t) + 0.5 * sin(t * 0.8), CZ + 1.2 + 0.9 * sin(t * 0.5))
+      .rotY((180 - 55 * dir) * RAD).rotZ(-10 * dir * RAD).scale(BOT));
+    // Le bâtisseur fait sa ronde, son cube de monde dans les bras, et trébuche parfois.
     const window = 9;
     const idx = Math.floor(t / window);
     let paused = 0;
@@ -703,8 +723,9 @@ export async function createLabScene(canvas, { actors }) {
     const bx = CX + sin(at) * 4.75;
     const bz = CZ + cos(at) * 4.75;
     const facing = at / RAD + (toRight ? -90 : 90);
-    const w = bot.pose('idle', t);
+    const w = bot.graine.pose('idle', t);
     let rx = 0;
+    let pace = 0;
     if (fall >= 0) {
       const k = fall < 0.6 ? ease(fall / 0.6) : fall < 1.4 ? 1 : 1 - ease((fall - 1.4) / 0.9);
       rx = -88 * k;
@@ -714,17 +735,10 @@ export async function createLabScene(canvas, { actors }) {
       const st = sin(walk * 2 * Math.PI * 1.2);
       add(w, 'leg_left', [35 * st, 0, 0]);
       add(w, 'leg_right', [-35 * st, 0, 0]);
-      add(w, 'arm_left', [-78, 0, -6]);
-      add(w, 'arm_right', [-78, 0, 6]);
+      pace = 1;
       add(w, 'body', null, [0, Math.abs(st) * 0.8, 0]);
     }
-    model(bot, w, new M4().translate(bx, TOP - 1, bz).rotY(facing * RAD).rotX(rx * RAD).scale(BOT), tex, glow);
-    const fwd = fall < 0 ? 0.72 : 0.72 + 0.45 * ease(fall / 0.8);
-    const hgt = fall < 0 ? 0.92 : 0.92 - 0.69 * ease(fall / 0.5);
-    const fa = facing * RAD;
-    P.use(atlases[etat]);
-    block(new M4().translate(bx - sin(fa) * fwd, TOP - 1 + hgt, bz - cos(fa) * fwd).rotY(fa).rotX(fall < 0 ? 0 : -1.57 * ease(fall / 0.8)).scale(0.46), `${C}cote`, `${C}puce`, false);
-    P.flush();
+    rig(bot.graine, 'assistant_graine', w, new M4().translate(bx, TOP - 1, bz).rotY(facing * RAD).rotX(rx * RAD).scale(BOT), [1, 1, 1], { walk: pace });
   }
 
   /* ---------------------------------------------------- liquide et effets */
@@ -897,7 +911,7 @@ export async function createLabScene(canvas, { actors }) {
         construction(x, atlases);
         people(v.ratio ?? 1, dt);
       }
-      bots(atlases);
+      bots();
       P.depth(false);
       drawLayer(TRANS, atlases);
       P.use(atlases[etat]);

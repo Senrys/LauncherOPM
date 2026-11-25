@@ -61,7 +61,9 @@ public final class DebugShots {
                 net.minecraft.world.level.WorldDataConfiguration.DEFAULT);
         mc.createWorldOpenFlows().createFreshLevel("opm-test-" + System.currentTimeMillis(), settings,
                 new net.minecraft.world.level.levelgen.WorldOptions(42L, false, false),
-                net.minecraft.world.level.levelgen.presets.WorldPresets::createNormalWorldDimensions, mc.screen);
+                access -> access.registryOrThrow(net.minecraft.core.registries.Registries.WORLD_PRESET)
+                        .getHolderOrThrow(net.minecraft.world.level.levelgen.presets.WorldPresets.FLAT).value().createWorldDimensions(),
+                mc.screen);
         return true;
     }
 

@@ -66,12 +66,12 @@ public final class XenodysCorner {
         boolean corrupted = "corrompue".equals(etat);
 
         // La tête finit aux trois cinquièmes de la hauteur, au ras du bord droit.
-        float scale = vh * 0.5f / 104f;
+        float scale = vh * 0.5f / 60f;
         float breathe = (float) Math.sin(t * 1.3) * 0.8f;
-        float cx = vw - 20 * scale;
-        float baseY = vh * 0.7f + 89 * scale + (float) (1 - rise) * vh * 0.45f + breathe * scale;
-        double headX = cx - 16 * scale;
-        double headY = baseY - 87 * scale;
+        float cx = vw - 15 * scale;
+        float baseY = vh * 0.7f + 51 * scale + (float) (1 - rise) * vh * 0.45f + breathe * scale;
+        double headX = cx - 9 * scale;
+        double headY = baseY - 50 * scale;
         float ty = (float) Math.max(-40, Math.min(40, (mx - headX) / (vw * 0.5) * 50));
         float tp = (float) Math.max(-20, Math.min(30, (my - headY) / (vh * 0.5) * 35));
         // Un regard qui rattrape sa cible en douceur, plus lentement quand elle menace.
@@ -79,13 +79,16 @@ public final class XenodysCorner {
         yaw = (float) (ty + (yaw - ty) * damp);
         pitch = (float) (tp + (pitch - tp) * damp);
 
-        GeoModel.Pose p = Xen.model().pose(corrupted ? "corrupted_idle" : "idle", (float) t);
+        Rig.Pose p = Xen.model().pose(corrupted ? "vol_corrompu" : "vol", t);
         // Penchée vers le joueur à mesure qu'elle arrive ; la tête inclinée, lentement.
         float lean = (float) rise * (menace ? 16 : 8);
         float roll = menace ? 10 + (float) Math.sin(t * 0.7) * 6 : 14 + (float) Math.sin(t * 0.9) * 3;
-        GeoModel.add(p, "head", new float[]{pitch * 0.7f, -yaw * 0.7f, roll}, null);
-        GeoModel.add(p, "neck", new float[]{pitch * 0.3f, -yaw * 0.3f, roll * 0.3f}, null);
-        GeoModel.add(p, "chest", new float[]{lean, 0, 10 + (float) rise * 4}, null);
+        Rig.add(p, "head", new float[]{pitch * 0.7f, -yaw * 0.7f, roll}, null);
+        Rig.add(p, "neck", new float[]{pitch * 0.3f, -yaw * 0.3f, roll * 0.3f}, null);
+        Rig.add(p, "chest", new float[]{lean, 0, 10 + (float) rise * 4}, null);
+        // Les ailes repliées : elle tient dans son coin.
+        Rig.add(p, "wing_left", new float[]{0, 0, 44}, null);
+        Rig.add(p, "wing_right", new float[]{0, 0, -44}, null);
 
         // Le parasite : 90 ms toutes les ~2,7 s, une fois arrivée — décalée et pâlie.
         double cycle = (t + 0.4) % 2.7;
@@ -105,7 +108,7 @@ public final class XenodysCorner {
         // de plus en plus à mesure qu'elle sort du coin.
         ps.mulPose(Axis.ZP.rotationDegrees((float) (-6 - 7 * rise)));
         Lighting.setupForEntityInInventory();
-        Xen.render(ps, g.bufferSource(), p, etat, Xen.blinking(t, 3), LightTexture.FULL_BRIGHT, flicker ? 0.6f : 1f, null);
+        Xen.render(ps, g.bufferSource(), p, etat, new Rig.Options().blink(Xen.blinking(t, 3)), LightTexture.FULL_BRIGHT, flicker ? 0.6f : 1f);
         Lighting.setupFor3DItems();
         ps.popPose();
 
@@ -113,12 +116,13 @@ public final class XenodysCorner {
         // texte s'écrit lettre à lettre, et elle se referme avant son départ.
         double bubble = easeInOut((t - 1.2) / 0.35) * (remaining < 1.2 ? easeInOut((remaining - 0.6) / 0.6) : 1);
         if (bubble > 0) {
+            ps.translate(0, 0, 600);
             int accent = corrupted ? 0xF0506E : 0x91D9D1;
             int w = Math.min(124, PixelFont.width(line) + 12);
             List<String> lines = wrap(line, w - 12);
             int h = lines.size() * 10 + 8;
             int bx = vw - w - 6;
-            int by = (int) (headY - 22 * scale - h);
+            int by = (int) (headY - 24 * scale - h);
             g.fill(bx, by, bx + w, by + h, argb(0x071211, 0.92 * bubble));
             g.fill(bx, by, bx + w, by + 1, argb(accent, bubble));
             int tail = (int) Math.min(bx + w - 6, headX);

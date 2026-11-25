@@ -19,7 +19,7 @@ import org.joml.Quaternionf;
  * le portage exact de `buildModel` / `pose` du launcher (components/
  * xenodys3d.js) — même repère (Three.js, l'axe x de Bedrock inversé), mêmes
  * rotations « ZYX », mêmes UV « box », même interpolation (linéaire et
- * Catmull-Rom). L'écran titre l'utilise pour Xenodys en vraie 3D.
+ * Catmull-Rom). Sert aux joueurs du laboratoire ; Xenodys et ses assistants : client/Rig.
  */
 public final class GeoModel {
     private static final float DEG = (float) (Math.PI / 180);
@@ -36,7 +36,7 @@ public final class GeoModel {
         final List<Bone> children = new ArrayList<>();
     }
 
-    private record Track(float[] times, float[][] values, boolean[] smooth) {}
+    record Track(float[] times, float[][] values, boolean[] smooth) {}
 
     public record Animation(float length, boolean loop, Map<String, Track[]> bones) {}
 
@@ -81,9 +81,7 @@ public final class GeoModel {
         }
         root = bones.get(0);
         if (anims != null) {
-            for (var entry : anims.getAsJsonObject("animations").entrySet()) {
-                animations.put(entry.getKey().replace(prefix + ".", ""), compile(entry.getValue().getAsJsonObject()));
-            }
+            animations.putAll(animations(anims, prefix));
         }
     }
 
@@ -103,7 +101,7 @@ public final class GeoModel {
         return Pack.has(path) ? Pack.json(path) : null;
     }
 
-    private static float[] vec(JsonArray a) {
+    static float[] vec(JsonArray a) {
         float[] v = new float[a.size()];
         for (int i = 0; i < v.length; i++) v[i] = a.get(i).getAsFloat();
         return v;
@@ -132,6 +130,15 @@ public final class GeoModel {
         return new Track(times, values, smooth);
     }
 
+    /** Les animations d'un fichier GeckoLib, par nom court. */
+    static Map<String, Animation> animations(JsonObject file, String prefix) {
+        Map<String, Animation> out = new HashMap<>();
+        for (var e : file.getAsJsonObject("animations").entrySet()) {
+            out.put(e.getKey().replace(prefix + ".", ""), compile(e.getValue().getAsJsonObject()));
+        }
+        return out;
+    }
+
     private static Animation compile(JsonObject d) {
         Map<String, Track[]> map = new HashMap<>();
         if (d.has("bones")) {
@@ -147,7 +154,7 @@ public final class GeoModel {
         return new Animation(length, loop, map);
     }
 
-    private static float[] sample(Track tr, float t) {
+    static float[] sample(Track tr, float t) {
         float[] times = tr.times();
         float[][] v = tr.values();
         int last = times.length - 1;

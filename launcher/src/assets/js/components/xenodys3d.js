@@ -1,9 +1,8 @@
 /**
- * Xenodys en 3D — hors du cadre, en mode « fenêtre ouverte ».
+ * Xenodys la Tisseuse en 3D — hors du cadre, en mode « fenêtre ouverte ».
  *
- * Lit le modèle GeckoLib du paquet de ressources (assets/js/data/
- * xenodys-model.js : géométrie Bedrock et animations, les mêmes que dans le
- * jeu) et le fait vivre dans un canevas posé à cheval sur le bord droit du
+ * Lit son modèle dans le paquet de ressources (assets/js/data/xenodys-model.js :
+ * géométrie préparée et animations, les mêmes que dans le jeu) et le fait vivre dans un canevas posé à cheval sur le bord droit du
  * launcher (layout/frame.css, `.opm-xeno-stage`).
  *
  * Le rendu passe par un second `SkinViewer` de skinview3d, dont on cache le
@@ -27,15 +26,16 @@
  * `comeBack` (le launcher revient).
  */
 
-import { ANIMATIONS, ASSISTANT_ANIMATIONS, ASSISTANT_GEO, GEO } from '../data/xenodys-model.js';
+import { ANIMATIONS, ASSISTANT_ANIMATIONS, RIGS, layersOf } from '../data/xenodys-model.js';
 import { packImage } from '../utils/pack.js';
 import { liveCharacter } from './character3d.js';
 import { rebuildFrame } from './intro.js';
+import { DRIVERS } from './tisseuse.js';
 
 const NEAREST = 1003;
 const DEG = Math.PI / 180;
 /** Mise à l'échelle du modèle dans la scène de skinview3d. */
-const MODEL_SCALE = 0.3;
+const MODEL_SCALE = 0.5;
 
 /* ------------------------------------------------------------- géométrie */
 
@@ -43,98 +43,78 @@ const MODEL_SCALE = 0.3;
 const pivotOf = (p) => [-p[0], p[1], p[2]];
 
 /**
- * Applique à un pavé les coordonnées UV « box » d'un cube Bedrock.
- * Ordre des faces de BoxGeometry : +x, −x, +y, −y, +z, −z ; dans l'espace
- * Blockbench, +x = est, −z = nord (le visage).
+ * Construit un modèle préparé (xenodys/tisseuse.py) : un groupe par os, et au plus un
+ * maillage par os et par couche. Renvoie la racine et les os, par nom.
+ * @param {any} T  classes Three.js
+ * @param {{base: any, verre: any, energie: any}} materials
  */
-function applyBoxUv(geometry, [u, v], [w, h, d], tw, th) {
-  const rects = {
-    east: [u, v + d, d, h],
-    north: [u + d, v + d, w, h],
-    west: [u + d + w, v + d, d, h],
-    south: [u + 2 * d + w, v + d, w, h],
-    up: [u + d, v, w, d],
-    down: [u + d + w, v, w, d],
-  };
-  const order = ['east', 'west', 'up', 'down', 'south', 'north'];
-  const uv = geometry.attributes.uv;
-  order.forEach((face, f) => {
-    const [x, y, rw, rh] = rects[face];
-    let top = 1 - y / th;
-    let bottom = 1 - (y + rh) / th;
-    const left = x / tw;
-    const right = (x + rw) / tw;
-    // Dessus et dessous : le bord bas de la région touche la face avant.
-    if (face === 'up' || face === 'down') [top, bottom] = [bottom, top];
-    const i = f * 4;
-    uv.setXY(i, left, top);
-    uv.setXY(i + 1, right, top);
-    uv.setXY(i + 2, left, bottom);
-    uv.setXY(i + 3, right, bottom);
-  });
-  uv.needsUpdate = true;
-}
-
-/**
- * Construit le modèle. Renvoie la racine et les os, par nom, avec leur pose de repos.
- * @param {{Mesh: any, Box: any, Group: any}} T
- * @param {any} material
- */
-export function buildModel(T, material, doc = GEO) {
-  const geo = doc['minecraft:geometry'][0];
-  const { texture_width: tw, texture_height: th } = geo.description;
+function buildRig(T, { id, meta, faces }, materials) {
+  const layers = layersOf({ meta });
+  const defs = meta.os;
+  const root = new T.Group();
   const bones = new Map();
-
-  for (const def of geo.bones) {
+  const needsRoot = id.startsWith('assistant') && !defs.some((d) => d.nom === 'assistant');
+  let top = null;
+  if (needsRoot) {
+    top = { group: new T.Group(), pivot: [0, 0, 0], repos: [0, 0, 0] };
+    top.rest = { position: top.group.position.clone(), rotation: [0, 0, 0] };
+    root.add(top.group);
+    bones.set('assistant', top);
+  }
+  const pending = [...defs];
+  while (pending.length) {
+    const d = pending.shift();
+    if (d.parent && !bones.has(d.parent)) {
+      pending.push(d);
+      continue;
+    }
     const group = new T.Group();
     group.rotation.order = 'ZYX';
-    const pivot = pivotOf(def.pivot);
-    const parent = def.parent ? bones.get(def.parent) : null;
+    const pivot = pivotOf(d.pivot);
+    const parent = d.parent ? bones.get(d.parent) : top;
     const base = parent ? parent.pivot : [0, 0, 0];
     group.position.set(pivot[0] - base[0], pivot[1] - base[1], pivot[2] - base[2]);
-    const r = def.rotation ?? [0, 0, 0];
-    group.rotation.set(-r[0] * DEG, -r[1] * DEG, r[2] * DEG);
-
-    for (const cube of def.cubes ?? []) {
-      const [ox, oy, oz] = cube.origin;
-      const [sx, sy, sz] = cube.size;
-      const from = [-(ox + sx), oy, oz];
-      const center = [from[0] + sx / 2, from[1] + sy / 2, from[2] + sz / 2];
-      // Calques extérieurs (skins) : le pavé gonflé, les UV inchangées.
-      const inf = cube.inflate ?? 0;
-      const geometry = new T.Box(sx + 2 * inf, sy + 2 * inf, sz + 2 * inf);
-      applyBoxUv(geometry, cube.uv, cube.size, tw, th);
-      const mesh = new T.Mesh(geometry, material);
-
-      if (cube.rotation) {
-        const cp = pivotOf(cube.pivot);
-        const holder = new T.Group();
-        holder.rotation.order = 'ZYX';
-        holder.position.set(cp[0] - pivot[0], cp[1] - pivot[1], cp[2] - pivot[2]);
-        const cr = cube.rotation;
-        holder.rotation.set(-cr[0] * DEG, -cr[1] * DEG, cr[2] * DEG);
-        mesh.position.set(center[0] - cp[0], center[1] - cp[1], center[2] - cp[2]);
-        holder.add(mesh);
-        group.add(holder);
-      } else {
-        mesh.position.set(center[0] - pivot[0], center[1] - pivot[1], center[2] - pivot[2]);
-        group.add(mesh);
-      }
-    }
-
-    (parent ? parent.group : null)?.add(group);
-    bones.set(def.name, {
-      group,
-      pivot,
-      rest: {
-        position: group.position.clone(),
-        rotation: [group.rotation.x, group.rotation.y, group.rotation.z],
-      },
+    (parent ? parent.group : root).add(group);
+    bones.set(d.nom, {
+      group, pivot, repos: d.repos,
+      rest: { position: group.position.clone(), rotation: [-d.repos[0] * DEG, -d.repos[1] * DEG, d.repos[2] * DEG] },
     });
+    group.rotation.set(...bones.get(d.nom).rest.rotation);
   }
-
-  const root = bones.get(geo.bones[0].name).group;
-  return { root, bones };
+  for (const layer of ['base', 'verre', 'energie']) {
+    const [first, count] = layers[layer];
+    let i = first;
+    while (i < first + count) {
+      const bone = faces[i * 24];
+      let j = i;
+      while (j < first + count && faces[j * 24] === bone) j += 1;
+      const n = j - i;
+      const pos = new Float32Array(n * 12);
+      const nor = new Float32Array(n * 12);
+      const uv = new Float32Array(n * 8);
+      const idx = new Uint32Array(n * 6);
+      for (let f = 0; f < n; f += 1) {
+        const o = (i + f) * 24;
+        for (let k = 0; k < 4; k += 1) {
+          const q = o + 4 + k * 5;
+          pos.set([faces[q], faces[q + 1], faces[q + 2]], (f * 4 + k) * 3);
+          nor.set([faces[o + 1], faces[o + 2], faces[o + 3]], (f * 4 + k) * 3);
+          uv.set([faces[q + 3], 1 - faces[q + 4]], (f * 4 + k) * 2);
+        }
+        idx.set([f * 4, f * 4 + 1, f * 4 + 2, f * 4, f * 4 + 2, f * 4 + 3], f * 6);
+      }
+      const geometry = new T.Geometry();
+      geometry.setAttribute('position', new T.Attribute(pos, 3));
+      geometry.setAttribute('normal', new T.Attribute(nor, 3));
+      geometry.setAttribute('uv', new T.Attribute(uv, 2));
+      geometry.setIndex(new T.Attribute(idx, 1));
+      const mesh = new T.Mesh(geometry, materials[layer]);
+      if (layer !== 'base') mesh.renderOrder = layer === 'verre' ? 1 : 2;
+      bones.get(defs[bone].nom).group.add(mesh);
+      i = j;
+    }
+  }
+  return { root, bones, drive: DRIVERS[id], clock: 0, options: {} };
 }
 
 /* ------------------------------------------------------------ animations */
@@ -175,7 +155,7 @@ function sample({ times, values, smooth }, t) {
   });
 }
 
-export function compile(name, doc = ANIMATIONS, prefix = 'animation.xenodys') {
+function compile(name, doc = ANIMATIONS, prefix = 'animation.xenodys') {
   const def = doc.animations[`${prefix}.${name}`];
   const bones = {};
   for (const [bone, channels] of Object.entries(def.bones)) {
@@ -187,31 +167,54 @@ export function compile(name, doc = ANIMATIONS, prefix = 'animation.xenodys') {
 
 /* ------------------------------------------------------------------ scène */
 
-/** Applique une pose : le repos, puis l'animation au temps `t`, puis des
- *  décalages éventuels (en degrés, convention Bedrock), par os. */
-export function pose(bones, anim, t, extra = null) {
-  for (const bone of bones.values()) {
-    bone.group.position.copy(bone.rest.position);
-    bone.group.rotation.set(...bone.rest.rotation);
-  }
-  const apply = (name, r, q) => {
-    const bone = bones.get(name);
-    if (!bone) return;
-    if (r) {
-      bone.group.rotation.x += -r[0] * DEG;
-      bone.group.rotation.y += -r[1] * DEG;
-      bone.group.rotation.z += r[2] * DEG;
-    }
-    if (q) {
-      bone.group.position.x += -q[0];
-      bone.group.position.y += q[1];
-      bone.group.position.z += q[2];
-    }
+const ZERO = [0, 0, 0];
+
+/** Applique une pose à un modèle : pour chaque os animé `{r, p}` (degrés, pixels,
+ *  convention Bedrock), puis ce que les formules calculent (ailes, robe, cheveux…). */
+function applyMap(rig, map) {
+  const extra = new Map();
+  const inp = (n) => {
+    const r = map.get(n)?.r;
+    return r ? [r[0] * DEG, r[1] * DEG, r[2] * DEG] : ZERO;
   };
-  for (const [name, channels] of Object.entries(anim.bones)) {
-    apply(name, channels.rotation && sample(channels.rotation, t), channels.position && sample(channels.position, t));
+  rig.drive?.(rig.clock, inp, (n, r, p, s, abs) => extra.set(n, { r, p, s, abs }), rig.options);
+  for (const [name, bone] of rig.bones) {
+    const e = extra.get(name);
+    const m = map.get(name);
+    const a = e?.abs ? ZERO : m?.r ?? ZERO;
+    const d = e?.r ?? ZERO;
+    const g = bone.group;
+    const rest = bone.rest.rotation;
+    g.rotation.set(rest[0] - a[0] * DEG - d[0], rest[1] - a[1] * DEG - d[1], rest[2] + a[2] * DEG + d[2]);
+    const q = m?.p ?? ZERO;
+    const f = e?.p ?? ZERO;
+    const o = bone.rest.position;
+    g.position.set(o.x - q[0] - f[0], o.y + q[1] + f[1], o.z + q[2] + f[2]);
+    if (e?.s) g.scale.set(e.s[0], e.s[1] ?? e.s[0], e.s[2] ?? e.s[0]);
+    else if (g.scale.y !== 1 || g.scale.x !== 1) g.scale.set(1, 1, 1);
+    g.visible = !(e?.s && e.s[0] === 0);
   }
-  if (extra) for (const [name, r] of Object.entries(extra)) apply(name, r, null);
+}
+
+/** Les rotations (et positions) d'une animation au temps `t`, par os. */
+function sampleMap(anim, t, extra = null) {
+  const map = new Map();
+  for (const [name, ch] of Object.entries(anim.bones)) {
+    map.set(name, { r: ch.rotation ? sample(ch.rotation, t) : null, p: ch.position ? sample(ch.position, t) : null });
+  }
+  if (extra) {
+    for (const [name, r] of Object.entries(extra)) {
+      const cur = map.get(name) ?? { r: null, p: null };
+      cur.r = cur.r ? cur.r.map((v, i) => v + r[i]) : [...r];
+      map.set(name, cur);
+    }
+  }
+  return map;
+}
+
+/** Une animation au temps `t`, et des décalages éventuels (en degrés), par os. */
+function pose(rig, anim, t, extra = null) {
+  applyMap(rig, sampleMap(anim, t, extra));
 }
 
 /**
@@ -220,7 +223,7 @@ export function pose(bones, anim, t, extra = null) {
  * @param {HTMLElement} frame  le cadre du launcher
  */
 export async function createXenodys(canvas, stage, frame) {
-  if (!GEO || !ANIMATIONS) throw new Error('ressources de Xenodys absentes');
+  if (!RIGS || !ANIMATIONS) throw new Error('ressources de Xenodys absentes');
   const lib = window.skinview3d;
   if (!lib) throw new Error('skinview3d absent');
 
@@ -243,7 +246,8 @@ export async function createXenodys(canvas, stage, frame) {
   const sample3 = viewer.playerObject.skin.head.innerLayer;
   const T = {
     Mesh: sample3.constructor,
-    Box: sample3.geometry.constructor,
+    Geometry: Object.getPrototypeOf(sample3.geometry.constructor),
+    Attribute: Object.getPrototypeOf(sample3.geometry.attributes.position.constructor),
     Material: sample3.material.constructor,
     Texture: viewer.skinTexture.constructor,
     Group: Object.getPrototypeOf(lib.BodyPart.prototype).constructor,
@@ -260,62 +264,65 @@ export async function createXenodys(canvas, stage, frame) {
     return t;
   };
 
-  /** Les textures d'un modèle, dans ses deux états, et son matériau. */
-  async function skinned(name, { blink = false } = {}) {
+  /** Les textures d'un modèle, dans ses deux états, et ses matériaux : matière, verre, énergie. */
+  async function skinned(name) {
     const skins = {};
     for (const etat of ['creatrice', 'corrompue']) {
-      const [map, glow] = await Promise.all([
-        load(`${name}_${etat}`),
-        load(`${name}_${etat}_glowmask`),
-      ]);
+      const [map, glow] = await Promise.all([load(`${name}_${etat}`), load(`${name}_${etat}_glowmask`)]);
       skins[etat] = { map, glow };
-      if (blink) {
-        // Les paupières closes : la même texture, le regard éteint.
-        const [bmap, bglow] = await Promise.all([
-          load(`${name}_${etat}_blink`),
-          load(`${name}_${etat}_blink_glowmask`),
-        ]).catch(() => [null, null]);
-        if (bmap && bglow) skins[`${etat}_blink`] = { map: bmap, glow: bglow };
+    }
+    const lit = (options) => {
+      const m = new T.Material({ map: skins.creatrice.map, ...options });
+      if ('emissiveMap' in m) {
+        m.emissiveMap = skins.creatrice.glow;
+        m.emissive?.set?.(0xffffff);
+        m.emissiveIntensity = 1;
       }
-    }
-    const material = new T.Material({ map: skins.creatrice.map, alphaTest: 0.5 });
-    if ('emissiveMap' in material) {
-      material.emissiveMap = skins.creatrice.glow;
-      material.emissive?.set?.(0xffffff);
-      material.emissiveIntensity = 1;
-    }
-    let current = 'creatrice';
-    let closed = false;
-    const show = () => {
-      const sk = (closed && skins[`${current}_blink`]) || skins[current];
-      material.map = sk.map;
-      if ('emissiveMap' in material) material.emissiveMap = sk.glow;
-      material.needsUpdate = true;
+      return m;
     };
+    const base = lit({ alphaTest: 0.5 });
+    const verre = lit({ transparent: true, depthWrite: false });
+    // L'énergie : sa propre lumière, sans ombrage.
+    const energie = new T.Material({ map: skins.creatrice.map, transparent: true, depthWrite: false });
+    energie.color?.set?.(0x000000);
+    energie.emissive?.set?.(0xffffff);
+    energie.emissiveMap = skins.creatrice.map;
     const setEtat = (etat) => {
-      current = etat;
-      show();
+      const sk = skins[etat];
+      for (const m of [base, verre]) {
+        m.map = sk.map;
+        m.emissiveMap = sk.glow;
+        m.needsUpdate = true;
+      }
+      energie.map = sk.map;
+      energie.emissiveMap = sk.map;
+      energie.needsUpdate = true;
     };
-    const setBlink = (on) => {
-      if (closed === Boolean(on)) return;
-      closed = Boolean(on);
-      show();
+    /** L'éclat de ses lumières (1 : normal). */
+    const setGlow = (k) => {
+      base.emissiveIntensity = k;
+      verre.emissiveIntensity = k;
+      energie.emissiveIntensity = 0.6 + 0.4 * k;
     };
     const dispose = () => {
       for (const sk of Object.values(skins)) {
         sk.map.dispose();
         sk.glow.dispose();
       }
-      material.dispose();
+      for (const m of [base, verre, energie]) m.dispose();
     };
-    return { material, setEtat, setBlink, dispose };
+    return { materials: { base, verre, energie }, setEtat, setGlow, dispose };
   }
 
-  const xenSkin = await skinned('xenodys', { blink: true });
-  const botSkin = await skinned('xenodys_assistant');
+  const xenSkin = await skinned('xenodys_tisseuse');
+  // Le bâtisseur se cache au coin du cadre ; la luciole flotte près d'elle.
+  const BOT_IDS = { peek: 'assistant_graine', idle: 'assistant_luciole' };
+  const botSkins = { peek: await skinned(BOT_IDS.peek), idle: await skinned(BOT_IDS.idle) };
 
   // Xenodys, de trois quarts, tournée vers le launcher.
-  const xen = buildModel(T, xenSkin.material);
+  const xen = buildRig(T, RIGS.xenodys_tisseuse, xenSkin.materials);
+  // Ses mains servent (elles tiennent le cadre) : le monde qu'elle crée flotte au-dessus d'elle.
+  xen.options = { hands: 0 };
   const holder = new T.Group();
   holder.add(xen.root);
   holder.rotation.y = Math.PI - 0.7;
@@ -329,12 +336,12 @@ export async function createXenodys(canvas, stage, frame) {
   // Ses deux assistants : l'un se cache derrière le coin bas-gauche du cadre,
   // l'autre se tient près d'elle, à droite.
   const bots = ['peek', 'idle'].map((role) => {
-    const model = buildModel(T, botSkin.material, ASSISTANT_GEO);
+    const model = buildRig(T, RIGS[BOT_IDS[role]], botSkins[role].materials);
     const h = new T.Group();
     h.add(model.root);
     h.rotation.y = Math.PI + (role === 'peek' ? 0.5 : -0.35);
     viewer.scene.add(h);
-    return { role, holder: h, bones: model.bones, time: Math.random() * 3, wave: null, nextWave: 8 + Math.random() * 10 };
+    return { role, holder: h, rig: model, bones: model.bones, time: Math.random() * 3, wave: null, nextWave: 8 + Math.random() * 10 };
   });
 
   const anims = { creatrice: compile('lean'), corrompue: compile('corrupted_lean') };
@@ -347,8 +354,16 @@ export async function createXenodys(canvas, stage, frame) {
   const root$ = document.documentElement;
   let etat = root$.dataset.xenodys === 'corrompue' ? 'corrompue' : 'creatrice';
   let time = 0;
-  /** Corrections des bras trouvées par fit() pour que les mains tombent juste. */
   const reach = { arm_right: [0, 0, 0], arm_left: [0, 0, 0] };
+  // Penchée sur le cadre, elle replie un peu ses ailes (la marge est étroite) et
+  // relève la tête : sa couronne ne cache pas sa visière.
+  const POSTURE = { wing_left: [0, 0, 26], wing_right: [0, 0, -26], head: [-12, -10, 0] };
+  /** Des décalages d'os, la posture en plus. */
+  const withPosture = (extra) => {
+    const out = { ...extra };
+    for (const [name, r] of Object.entries(POSTURE)) out[name] = out[name] ? out[name].map((v, i) => v + r[i]) : r;
+    return out;
+  };
   /** Orientation imposée des mains (locale), calculée par fit() : elles
    *  agrippent le cadre, de face, et ne bougent plus. */
   const handQuats = new Map();
@@ -391,7 +406,7 @@ export async function createXenodys(canvas, stage, frame) {
   /** La pose de Xenodys : animation, corrections des bras, mains de face
    *  (recalculées si `reface`, sinon celles mémorisées). */
   function poseXen(t, reface = false, head = null) {
-    pose(xen.bones, anims[etat], t, head ? { ...reach, head } : reach);
+    pose(xen, anims[etat], t, withPosture(head ? { ...reach, head } : reach));
     if (reface) faceHands();
     else for (const [name, q] of handQuats) xen.bones.get(name).group.quaternion.copy(q);
   }
@@ -406,7 +421,6 @@ export async function createXenodys(canvas, stage, frame) {
     });
     return list;
   };
-  const xenMeshes = meshesOf(holder);
   const handL = meshesOf(xen.bones.get('hand_left').group);
   const handR = meshesOf(xen.bones.get('hand_right').group);
 
@@ -435,6 +449,19 @@ export async function createXenodys(canvas, stage, frame) {
     }
     return b;
   }
+  /** La tête (sans ses ailes ni sa couronne), à l'écran. */
+  function headBox() {
+    const g = xen.bones.get('head').group;
+    const b = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
+    for (const x of [-3.4, 3.4]) for (const y of [-1.6, 8.6]) for (const z of [-3.4, 3.4]) {
+      const q = toPx(g.localToWorld(new V3(x, y, z)));
+      b.minX = Math.min(b.minX, q.x);
+      b.maxX = Math.max(b.maxX, q.x);
+      b.minY = Math.min(b.minY, q.y);
+      b.maxY = Math.max(b.maxY, q.y);
+    }
+    return b;
+  }
   /** Pixels par unité du monde, à la profondeur de l'objet. */
   const worldOf = (obj) => obj.getWorldPosition(new V3());
   const unitAt = (obj) => {
@@ -446,6 +473,8 @@ export async function createXenodys(canvas, stage, frame) {
 
   /** Recouvrement des doigts sur les bords du cadre, en pixels. */
   const GRIP = 26;
+  /** La hauteur de sa tête, en part de la hauteur de la fenêtre. */
+  const HEAD = 0.18;
   const FADE_RIGHT = 60;
   const FADE_BOTTOM = 90;
   let frameBox = null;
@@ -503,7 +532,7 @@ export async function createXenodys(canvas, stage, frame) {
   }
 
   /**
-   * Place Xenodys. Sa tête — sa taille en découle : 17 % de la hauteur de la
+   * Place Xenodys. Sa tête — sa taille en découle : 18 % de la hauteur de la
    * fenêtre — est dans la marge de droite, tout près du cadre : son corps est
    * en partie caché derrière lui. Puis chaque bras est résolu : la main gauche
    * agrippe le bord droit du cadre, la main droite son coin haut-droit — dos
@@ -514,19 +543,18 @@ export async function createXenodys(canvas, stage, frame) {
     const edge = frameBox.x + frameBox.w;
     const margin = W - edge;
     holder.scale.setScalar(MODEL_SCALE);
-    holder.position.set(0, -54 * MODEL_SCALE, 0);
+    holder.position.set(0, -46 * MODEL_SCALE, 0);
     tilt.position.set(0, 0, 0);
     reach.arm_right = [0, 0, 0];
     reach.arm_left = [0, 0, 0];
     handQuats.clear();
 
-    const headBox = meshesOf(xen.bones.get('head').group).filter((o) => o.geometry.parameters?.width === 12);
-    const headTarget = { x: edge + Math.max(60, margin * 0.36), y: frameBox.y + frameBox.h * 0.2 };
+    const headTarget = { x: edge + Math.max(64, margin * 0.36), y: frameBox.y + frameBox.h * 0.24 };
     for (let pass = 0; pass < 5; pass += 1) {
       poseXen(0);
       refresh();
-      const hb = boxOf(headBox);
-      const k = (H * 0.17) / Math.max(1, hb.maxY - hb.minY);
+      const hb = headBox();
+      const k = (H * HEAD) / Math.max(1, hb.maxY - hb.minY);
       const o = toPx(worldOf(holder));
       const unit = unitAt(holder);
       const scaled = (a, c) => c + k * (a - c);
@@ -555,7 +583,7 @@ export async function createXenodys(canvas, stage, frame) {
   function gripTarget(name) {
     const edge = frameBox.x + frameBox.w;
     return name === 'arm_left'
-      ? { x: edge - GRIP, y: frameBox.y + frameBox.h * 0.45 }
+      ? { x: edge - GRIP, y: frameBox.y + frameBox.h * 0.5 }
       : { x: edge - 46, y: frameBox.y + 30 };
   }
 
@@ -593,7 +621,7 @@ export async function createXenodys(canvas, stage, frame) {
     h.scale.setScalar(MODEL_SCALE);
     h.position.set(0, 0, 6);
     for (let pass = 0; pass < 4; pass += 1) {
-      pose(bot.bones, botAnims.idle, 0);
+      pose(bot.rig, botAnims.idle, 0);
       refresh();
       const b = boxOf(meshesOf(h));
       const k = height / Math.max(1, b.maxY - b.minY);
@@ -613,6 +641,13 @@ export async function createXenodys(canvas, stage, frame) {
     const sr = stage.getBoundingClientRect();
     const fr = frame.getBoundingClientRect();
     frameBox = { x: fr.left - sr.left, y: fr.top - sr.top, w: fr.width, h: fr.height };
+    // La caméra est loin : toute la précision de profondeur autour d'elle (sinon
+    // ses fines plaques se disputent la même surface).
+    const cam = viewer.camera;
+    const far = Math.abs(cam.position.z) || 100;
+    cam.near = far * 0.4;
+    cam.far = far * 1.8;
+    cam.updateProjectionMatrix();
     fitXenodys();
     const edge = frameBox.x + frameBox.w;
     // Le petit curieux : caché derrière le coin bas-gauche, il passe la tête.
@@ -636,16 +671,14 @@ export async function createXenodys(canvas, stage, frame) {
    *  cœur, ses mains, sa place et celle des assistants. */
   const marks = { head: { x: 0, y: 0 }, chest: { x: 0, y: 0 }, hands: [], yawPx: 1, pitchPx: 1 };
   let home = null;
-  const headMesh = () => meshesOf(xen.bones.get('head').group).find((o) => o.geometry.parameters?.width === 12);
   /** Un point devant le visage : c'est lui qui suit le regard. */
   const facePoint = () => {
-    const m = headMesh();
-    return toPx(m.localToWorld(new V3(0, 0, -16)));
+    return toPx(xen.bones.get('head').group.localToWorld(new V3(0, 4, -12)));
   };
   function measure() {
     home = transformNow();
     for (const bot of bots) bot.home = bot.holder.position.clone();
-    const hb = boxOf([headMesh()]);
+    const hb = headBox();
     marks.head = { x: (hb.minX + hb.maxX) / 2, y: (hb.minY + hb.maxY) / 2 };
     marks.chest = toPx(worldOf(xen.bones.get('chest').group));
     const L = boxOf(handL);
@@ -770,46 +803,16 @@ export async function createXenodys(canvas, stage, frame) {
   const cineAnims = { fly: compile('fly'), cradle: compile('cradle'), unveil: compile('unveil') };
   let cine = null;
 
-  /** Les rotations (et positions) d'une animation au temps `t`, par os. */
-  function sampleMap(anim, t, extra = null) {
-    const map = new Map();
-    for (const [name, ch] of Object.entries(anim.bones)) {
-      map.set(name, { r: ch.rotation ? sample(ch.rotation, t) : null, p: ch.position ? sample(ch.position, t) : null });
-    }
-    if (extra) {
-      for (const [name, r] of Object.entries(extra)) {
-        const cur = map.get(name) ?? { r: null, p: null };
-        cur.r = cur.r ? cur.r.map((v, i) => v + r[i]) : [...r];
-        map.set(name, cur);
-      }
-    }
-    return map;
-  }
-
   /** Mélange deux poses (`w` de 0 à 1) et l'applique. */
   function poseBlend(a, b, w) {
-    for (const bone of xen.bones.values()) {
-      bone.group.position.copy(bone.rest.position);
-      bone.group.rotation.set(...bone.rest.rotation);
-    }
-    const names = new Set([...a.keys(), ...b.keys()]);
     const mix = (u, v) => [0, 1, 2].map((i) => (u?.[i] ?? 0) * (1 - w) + (v?.[i] ?? 0) * w);
-    for (const name of names) {
-      const bone = xen.bones.get(name);
-      if (!bone) continue;
+    const map = new Map();
+    for (const name of new Set([...a.keys(), ...b.keys()])) {
       const ra = a.get(name);
       const rb = b.get(name);
-      const r = mix(ra?.r, rb?.r);
-      bone.group.rotation.x += -r[0] * DEG;
-      bone.group.rotation.y += -r[1] * DEG;
-      bone.group.rotation.z += r[2] * DEG;
-      if (ra?.p || rb?.p) {
-        const q = mix(ra?.p, rb?.p);
-        bone.group.position.x += -q[0];
-        bone.group.position.y += q[1];
-        bone.group.position.z += q[2];
-      }
+      map.set(name, { r: mix(ra?.r, rb?.r), p: ra?.p || rb?.p ? mix(ra?.p, rb?.p) : null });
     }
+    applyMap(xen, map);
   }
 
   const ease = (x) => (x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2);
@@ -836,7 +839,7 @@ export async function createXenodys(canvas, stage, frame) {
     const saved = transformNow();
     tilt.rotation.z = 0;
     holder.rotation.y = 0.12;
-    holder.scale.setScalar(lean.scale * 1.15);
+    holder.scale.setScalar(lean.scale * 0.95);
     const cradle = sampleMap(cineAnims.cradle, 0);
     const target = { x: frameBox.x + frameBox.w * 0.5, y: frameBox.y + frameBox.h * 0.36 };
     let point = target;
@@ -1129,7 +1132,7 @@ export async function createXenodys(canvas, stage, frame) {
     if (arr) finishArrival();
     if (wave) endWave();
     const lean = transformNow();
-    const leanMap = sampleMap(anims[etat], time % anims[etat].length, reach);
+    const leanMap = sampleMap(anims[etat], time % anims[etat].length, withPosture(reach));
     const { to, point } = frontPlacement(lean);
     const corrupted = etat === 'corrompue';
     const savedMask = stage.style.maskImage;
@@ -1532,7 +1535,7 @@ export async function createXenodys(canvas, stage, frame) {
       // Elle suit sa main du regard pendant qu'elle la pose.
       const glance = Math.sin(Math.PI * segment(t, 0.9, 2.4));
       extra.head = [-7 * (Math.sign(marks.pitchPx) || 1) * glance, 8 * (Math.sign(marks.yawPx) || 1) * glance, 0];
-      poseBlend(sampleMap(cineAnims.fly, t), sampleMap(anim, at, extra), ease(segment(t, 0.5, 1.4)));
+      poseBlend(sampleMap(cineAnims.fly, t), sampleMap(anim, at, withPosture(extra)), ease(segment(t, 0.5, 1.4)));
       turnHands({ arm_right: gR.turn, arm_left: gL.turn });
       tilt.position.y -= (dipAt(t, KR.c) + dipAt(t, KL.c)) / a$.unit;
       cue('clampR', 1.8, () => {
@@ -1590,7 +1593,7 @@ export async function createXenodys(canvas, stage, frame) {
       const open = 1 - ease(segment(t, 1.0, 1.12));
       openFingers(extra, anim, at, 'arm_right', open);
       openFingers(extra, anim, at, 'arm_left', open);
-      pose(xen.bones, anim, at, extra);
+      pose(xen, anim, at, withPosture(extra));
       turnHands({});
       if (t > 1.05 && t < 1.4) tilt.position.y -= (6 * Math.sin(Math.PI * segment(t, 1.05, 1.4))) / a$.unit;
       cue('slam', 1.05, () => {
@@ -1706,19 +1709,19 @@ export async function createXenodys(canvas, stage, frame) {
     look.yaw += (yaw - look.yaw) * f;
     look.pitch += (pitch - look.pitch) * f;
     look.glow += (glow - look.glow) * Math.min(1, dt * 4);
-    if ('emissiveIntensity' in xenSkin.material) xenSkin.material.emissiveIntensity = look.glow;
+    xenSkin.setGlow(look.glow);
     return [look.pitch + jitter[1], look.yaw + jitter[0], 0];
   }
 
   function blinkStep(dt) {
     if (blinkLeft > 0) {
       blinkLeft -= dt;
-      if (blinkLeft <= 0) xenSkin.setBlink(false);
+      if (blinkLeft <= 0) xen.options.blink = false;
       return;
     }
     blinkIn -= dt;
     if (blinkIn > 0) return;
-    xenSkin.setBlink(true);
+    xen.options.blink = true;
     blinkLeft = 0.11;
     // Corrompue, parfois : un second clignement, trop vite.
     if (!blinkSecond && etat === 'corrompue' && Math.random() < 0.4) {
@@ -1780,34 +1783,32 @@ export async function createXenodys(canvas, stage, frame) {
   function animateBots(dt, placing = false) {
     for (const bot of bots) {
       bot.time += dt;
+      bot.rig.clock = bot.time;
       const base = botAnims[bot.role];
-      pose(bot.bones, base, bot.time % base.length);
-      if (placing || bot.role !== 'idle' || reduced) continue;
-      if (!bot.wave) {
-        bot.nextWave -= dt;
-        if (bot.nextWave <= 0) bot.wave = { t: 0 };
-      } else {
-        bot.wave.t += dt;
-        const w = botAnims.wave;
-        for (const [name, channels] of Object.entries(w.bones)) {
-          const bone = bot.bones.get(name);
-          if (!bone || !channels.rotation) continue;
-          const r = sample(channels.rotation, bot.wave.t);
-          bone.group.rotation.x += -r[0] * DEG;
-          bone.group.rotation.y += -r[1] * DEG;
-          bone.group.rotation.z += r[2] * DEG;
-        }
-        if (bot.wave.t >= w.length) {
-          bot.wave = null;
-          bot.nextWave = 14 + Math.random() * 20;
+      const map = sampleMap(base, bot.time % base.length);
+      if (!placing && bot.role === 'idle' && !reduced) {
+        if (!bot.wave) {
+          bot.nextWave -= dt;
+          if (bot.nextWave <= 0) bot.wave = { t: 0 };
+        } else {
+          bot.wave.t += dt;
+          for (const [name, v] of sampleMap(botAnims.wave, bot.wave.t)) {
+            const cur = map.get(name)?.r ?? ZERO;
+            if (v.r) map.set(name, { r: cur.map((x, i) => x + v.r[i]), p: map.get(name)?.p ?? null });
+          }
+          if (bot.wave.t >= botAnims.wave.length) {
+            bot.wave = null;
+            bot.nextWave = 14 + Math.random() * 20;
+          }
         }
       }
+      applyMap(bot.rig, map);
     }
   }
 
   const applySkin = () => {
     xenSkin.setEtat(etat);
-    botSkin.setEtat(etat);
+    for (const b of Object.values(botSkins)) b.setEtat(etat);
     stage.dataset.etat = etat;
   };
   applySkin();
@@ -1818,6 +1819,7 @@ export async function createXenodys(canvas, stage, frame) {
   viewer.animation = new lib.FunctionAnimation((_player, _progress, delta) => {
     const dt = reduced ? 0 : Math.min(0.1, Math.max(0, delta || 0));
     time += dt;
+    xen.clock = time;
     if (cine) {
       cineFrame();
       return;
@@ -1892,7 +1894,7 @@ export async function createXenodys(canvas, stage, frame) {
       sizer.disconnect();
       document.removeEventListener('visibilitychange', onVisibility);
       xenSkin.dispose();
-      botSkin.dispose();
+      for (const b of Object.values(botSkins)) b.dispose();
       viewer.dispose();
     },
   };

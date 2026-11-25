@@ -120,7 +120,7 @@ qui l'installe lui-même dans le jeu) se passent le relais sans que rien ne se v
 5. **L'écran titre** (après une déconnexion, ou sans connexion directe) : le menu à
    gauche (rejoindre One Piece Minecraft — seul serveur possible —, options, mods,
    quitter ; statut du serveur, journal de bord) ; à droite, le joueur sur son socle et
-   Xenodys en vraie 3D (le modèle GeckoLib). Créatrice, elle veille sur lui ; son regard
+   Xenodys en vraie 3D (la Tisseuse, `client/Rig`). Créatrice, elle veille sur lui ; son regard
    suit la souris, regarde le bouton survolé, revient au joueur, et elle tend la main
    quand on rejoint le serveur. Corrompue, elle le tient sous son emprise : main en
    griffe au-dessus de lui, fils rouges, et lui qui se protège le visage.
@@ -136,7 +136,7 @@ qui l'installe lui-même dans le jeu) se passent le relais sans que rien ne se v
    orbe, qu'un anneau entoure jusqu'à l'entrée dans le monde.
 8. **La première arrivée** d'un compte sur le serveur (une seule fois, quel que soit le
    PC ; `/xenodys arrivee <joueur>` la rejoue) : un éclair, et Xenodys, immense, tout près, la
-   main tendue — elle dépose le joueur sur Grand Line, puis s'envole.
+   main tendue — elle dépose le joueur dans le monde, puis s'envole.
 9. **Xenodys en jeu** : `/xenodys apparaitre [anim]` (staff) — elle apparaît à 8 blocs,
    immense, et suit les joueurs du regard. Aucune installation sur le serveur.
 10. **L'écran titre suit le serveur** : hors ligne, elle se détourne et cherche le monde ;
@@ -172,20 +172,21 @@ launcher : « Chargement animé par Xenodys ».
   décor en pixel art (`components/surround.js`) : nappe sombre tramée, circuits (ou
   fissures), cubes, bords du cadre qui s'effritent. Les clics sur la marge vide traversent
   jusqu'au bureau. Sinon, mode compact : la fenêtre classique.
-- **Xenodys elle-même** (`components/xenodys3d.js`) : le modèle de `xenodys/`, immense,
+- **Xenodys elle-même** (`components/xenodys3d.js`) : la Tisseuse (modèle de `xenodys/tisseuse/`,
+  mouvements calculés dans `components/tisseuse.js`), immense, les ailes un peu repliées,
   courbée derrière le launcher (`lean` / `corrupted_lean`), le bas du corps caché par lui ;
   elle regarde le joueur. Sa main gauche agrippe le bord droit du cadre, sa main droite
   son coin haut-droit (les boutons de la fenêtre s'en écartent) ; seuls ses doigts passent
-  devant. Les mains ne bougent pas. Deux assistants l'accompagnent : l'un se cache au
-  coin bas-gauche du cadre et passe la tête, l'autre se tient près d'elle et salue.
+  devant. Les mains ne bougent pas. Deux assistants l'accompagnent : Graine se cache au
+  coin bas-gauche du cadre et passe la tête, Luciole flotte près d'elle et salue.
 - **Son arrivée** : à l'ouverture, le cadre se construit d'abord, ligne à ligne
   (`components/intro.js`), puis elle arrive. Créatrice : elle descend du haut, se penche ;
   chaque main approche ouverte, se pose sur sa prise et se referme (un « clac », le cadre
   qui tressaille) ; ses assistants accourent. Corrompue : elle surgit en glitch à deux ou
   trois endroits, se fige, et ses mains griffues s'abattent sur le cadre — des fissures
   partent de ses doigts. Rejouée au retour d'une partie.
-- **Sa vie** : sa tête suit la souris (jamais ses mains) ; elle cligne des yeux (textures
-  `*_blink`) ; au survol de JOUER, elle regarde le bouton et ses lumières s'avivent ; un
+- **Sa vie** : sa tête suit la souris (jamais ses mains) ; elle cligne (sa visière
+  ferme sa lumière) ; au survol de JOUER, elle regarde le bouton et ses lumières s'avivent ; un
   lancement raté : elle détourne la tête avec mépris (corrompue : un rire haché). Quand
   son état bascule launcher ouvert, l'onde part de son cœur et le thème change à son
   passage ; la grille du fond se casse un instant, le bocal tombe sur le joueur (ou

@@ -7,7 +7,9 @@
  * calculée dans la couleur des sommets.
  */
 
+import { layersOf } from '../data/xenodys-model.js';
 import { packBytes, packImage, packJson } from '../utils/pack.js';
+import { DRIVERS } from './tisseuse.js';
 
 export const DEG = Math.PI / 180;
 
@@ -301,6 +303,17 @@ export class GeoModel {
 
 /** Ajoute des décalages en degrés (convention Bedrock) et en unités. */
 export function add(p, bone, r, q) {
+  if (p.inp) {
+    if (r) {
+      const a = p.inp.get(bone) ?? ZERO;
+      p.inp.set(bone, [a[0] + r[0] * DEG, a[1] + r[1] * DEG, a[2] + r[2] * DEG]);
+    }
+    if (q) {
+      const a = p.off.get(bone) ?? ZERO;
+      p.off.set(bone, [a[0] + q[0], a[1] + q[1], a[2] + q[2]]);
+    }
+    return;
+  }
   const rot = p.rot.get(bone);
   if (!rot) return;
   if (r) {
@@ -316,21 +329,172 @@ export function add(p, bone, r, q) {
   }
 }
 
+/** Mélange deux poses de `Rig`. */
 export function blend(a, b, k) {
-  const out = { rot: new Map(), pos: new Map() };
-  for (const key of ['rot', 'pos']) {
-    for (const [n, x] of a[key]) {
-      const y = b[key].get(n) ?? x;
+  const out = { inp: new Map(), off: new Map(), t: a.t };
+  for (const key of ['inp', 'off']) {
+    for (const n of new Set([...a[key].keys(), ...b[key].keys()])) {
+      const x = a[key].get(n) ?? [0, 0, 0];
+      const y = b[key].get(n) ?? [0, 0, 0];
       out[key].set(n, [x[0] + (y[0] - x[0]) * k, x[1] + (y[1] - x[1]) * k, x[2] + (y[2] - x[2]) * k]);
     }
   }
   return out;
 }
 
-export function copyPose(p) {
-  const out = { rot: new Map(), pos: new Map() };
-  for (const key of ['rot', 'pos']) for (const [n, v] of p[key]) out[key].set(n, [...v]);
-  return out;
+/* ------------------------------------------------- la Tisseuse, ses assistants */
+
+const ZERO = [0, 0, 0];
+
+/**
+ * Un modèle préparé (xenodys/tisseuse.py) : des faces relatives à leur os, des os
+ * animés et d'autres calculés (components/tisseuse.js). Une pose garde les angles
+ * donnés par l'animation et les gestes ; les matrices se déduisent au dessin.
+ */
+export class Rig {
+  constructor({ id, meta, faces }, anims, prefix) {
+    this.faces = faces;
+    this.layers = layersOf({ meta });
+    this.drive = DRIVERS[id];
+    this.index = new Map();
+    const defs = meta.os.some((b) => b.nom === 'assistant') || !id.startsWith('assistant') ? meta.os
+      : [...meta.os, { nom: 'assistant', parent: null, pivot: ZERO, repos: ZERO, root: true }];
+    defs.forEach((b, i) => this.index.set(b.nom, i));
+    const rootIndex = defs.findIndex((b) => b.root);
+    this.bones = defs.map((b, i) => {
+      const parent = b.parent ? this.index.get(b.parent) : b.root ? -1 : rootIndex;
+      const pivot = vec(b.pivot);
+      const base = parent >= 0 ? vec(defs[parent].pivot) : ZERO;
+      return { name: b.nom, i, parent, pos: [pivot[0] - base[0], pivot[1] - base[1], pivot[2] - base[2]], rest: b.repos.map((v) => v * DEG) };
+    });
+    // Les parents d'abord.
+    const depth = (b) => (b.parent < 0 ? 0 : 1 + depth(this.bones[b.parent]));
+    this.order = [...this.bones].sort((a, b) => depth(a) - depth(b));
+    this.mats = new Float64Array(this.bones.length * 12);
+    this.anims = new Map();
+    for (const [name, a] of Object.entries(anims?.animations ?? {})) {
+      this.anims.set(name.replace(`${prefix}.`, ''), {
+        length: a.animation_length ?? 1, loop: a.loop === true,
+        bones: Object.entries(a.bones ?? {}).map(([b, ch]) => [b, track(ch.rotation), track(ch.position)]),
+      });
+    }
+  }
+
+  pose(anim, t) {
+    const p = { inp: new Map(), off: new Map(), t };
+    const a = anim ? this.anims.get(anim) : null;
+    if (a) {
+      const tt = a.length > 0 ? (a.loop ? t % a.length : Math.min(t, a.length)) : 0;
+      for (const [name, r, q] of a.bones) add(p, name, r && sample(r, tt), q && sample(q, tt));
+    }
+    return p;
+  }
+
+  /** Un os → sa matrice locale, ajoutée à droite de `m` (12 nombres : 3 colonnes et la translation). */
+  local(m, o, b, rot, pos, scale) {
+    const x = -rot[0];
+    const y = -rot[1];
+    const z = rot[2];
+    const [cx, sx, cy, sy, cz, sz] = [Math.cos(x), Math.sin(x), Math.cos(y), Math.sin(y), Math.cos(z), Math.sin(z)];
+    // Rz · Ry · Rx, puis l'échelle.
+    const r = [cz * cy, sz * cy, -sy, cz * sy * sx - sz * cx, sz * sy * sx + cz * cx, cy * sx, cz * sy * cx + sz * sx, sz * sy * cx - cz * sx, cy * cx];
+    if (scale) {
+      const [a, c, d] = scale.length === 1 ? [scale[0], scale[0], scale[0]] : scale;
+      for (let i = 0; i < 3; i += 1) {
+        r[i] *= a;
+        r[3 + i] *= c;
+        r[6 + i] *= d;
+      }
+    }
+    const t = [b.pos[0] - pos[0], b.pos[1] + pos[1], b.pos[2] + pos[2]];
+    for (let c = 0; c < 3; c += 1) {
+      for (let l = 0; l < 3; l += 1) o[c * 3 + l] = m[l] * r[c * 3] + m[3 + l] * r[c * 3 + 1] + m[6 + l] * r[c * 3 + 2];
+    }
+    for (let l = 0; l < 3; l += 1) o[9 + l] = m[l] * t[0] + m[3 + l] * t[1] + m[6 + l] * t[2] + m[9 + l];
+  }
+
+  /** Toutes les matrices des os, dans le monde. */
+  solve(pose, world, options) {
+    const extra = new Map();
+    const inp = (n) => pose.inp.get(n) ?? ZERO;
+    this.drive?.(pose.t, inp, (n, r, p, s, abs) => extra.set(n, { r, p, s, abs }), options ?? {});
+    const w = world.m;
+    const root = [w[0], w[1], w[2], w[4], w[5], w[6], w[8], w[9], w[10], w[12], w[13], w[14]];
+    const out = new Array(12);
+    for (const b of this.order) {
+      const e = extra.get(b.name);
+      const a = e?.abs ? ZERO : pose.inp.get(b.name) ?? ZERO;
+      const d = e?.r ?? ZERO;
+      const q = pose.off.get(b.name) ?? ZERO;
+      const f = e?.p ?? ZERO;
+      const from = b.parent < 0 ? root : this.mats.subarray(b.parent * 12, b.parent * 12 + 12);
+      this.local(from, out, b, [b.rest[0] + a[0] + d[0], b.rest[1] + a[1] + d[1], b.rest[2] + a[2] + d[2]], [q[0] + f[0], q[1] + f[1], q[2] + f[2]], e?.s);
+      this.mats.set(out, b.i * 12);
+    }
+  }
+
+  /** Où se trouve un os, dans le repère du modèle (chaîne animée seulement). `over` : décalages en degrés. */
+  point(pose, name, over = null) {
+    const chain = [];
+    for (let i = this.index.get(name); i >= 0; i = this.bones[i].parent) chain.unshift(this.bones[i]);
+    let m = [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0];
+    for (const b of chain) {
+      const a = pose.inp.get(b.name) ?? ZERO;
+      const v = over?.[b.name] ?? ZERO;
+      const o = new Array(12);
+      this.local(m, o, b, [b.rest[0] + a[0] + v[0] * DEG, b.rest[1] + a[1] + v[1] * DEG, b.rest[2] + a[2] + v[2] * DEG], pose.off.get(b.name) ?? ZERO, null);
+      m = o;
+    }
+    return [m[9], m[10], m[11]];
+  }
+
+  /** Écrit une couche dans un lot (après `solve`). `viewRot` : l'ombrage par face (`null` : pleine lumière). */
+  emit(batch, layer, viewRot, rgb, alpha) {
+    const [first, count] = this.layers[layer];
+    batch.reserve(count * 4);
+    const F = this.faces;
+    const M = this.mats;
+    const D = batch.data;
+    let n = batch.n;
+    const v = viewRot?.m;
+    let lum = 1;
+    for (let f = first; f < first + count; f += 1) {
+      const o = f * 24;
+      const b = F[o] * 12;
+      if (v) {
+        const nx = F[o + 1];
+        const ny = F[o + 2];
+        const nz = F[o + 3];
+        const wx = M[b] * nx + M[b + 3] * ny + M[b + 6] * nz;
+        const wy = M[b + 1] * nx + M[b + 4] * ny + M[b + 7] * nz;
+        const wz = M[b + 2] * nx + M[b + 5] * ny + M[b + 8] * nz;
+        const ex = v[0] * wx + v[4] * wy + v[8] * wz;
+        const ey = v[1] * wx + v[5] * wy + v[9] * wz;
+        const ez = v[2] * wx + v[6] * wy + v[10] * wz;
+        const l = Math.sqrt(ex * ex + ey * ey + ez * ez) || 1;
+        lum = 0.55 + 0.45 * Math.max(0, (ex * LIGHT[0] + ey * LIGHT[1] + ez * LIGHT[2]) / l);
+      }
+      const r = rgb[0] * lum;
+      const g = rgb[1] * lum;
+      const bl = rgb[2] * lum;
+      for (let k = 0; k < 4; k += 1) {
+        const q = o + 4 + k * 5;
+        const x = F[q];
+        const y = F[q + 1];
+        const z = F[q + 2];
+        D[n++] = M[b] * x + M[b + 3] * y + M[b + 6] * z + M[b + 9];
+        D[n++] = M[b + 1] * x + M[b + 4] * y + M[b + 7] * z + M[b + 10];
+        D[n++] = M[b + 2] * x + M[b + 5] * y + M[b + 8] * z + M[b + 11];
+        D[n++] = F[q + 3];
+        D[n++] = F[q + 4];
+        D[n++] = r;
+        D[n++] = g;
+        D[n++] = bl;
+        D[n++] = alpha;
+      }
+    }
+    batch.n = n;
+  }
 }
 
 /* ------------------------------------------------------------------ dessin */
@@ -344,12 +508,18 @@ class Batch {
     this.n = 0;
   }
 
+  /** La place pour `count` sommets de plus. */
+  reserve(count) {
+    let size = this.data.length;
+    while (this.n + count * STRIDE > size) size *= 2;
+    if (size === this.data.length) return;
+    const bigger = new Float32Array(size);
+    bigger.set(this.data.subarray(0, this.n));
+    this.data = bigger;
+  }
+
   vertex(x, y, z, u, v, r, g, b, a) {
-    if (this.n + STRIDE > this.data.length) {
-      const bigger = new Float32Array(this.data.length * 2);
-      bigger.set(this.data);
-      this.data = bigger;
-    }
+    this.reserve(1);
     const d = this.data;
     let n = this.n;
     d[n++] = x; d[n++] = y; d[n++] = z; d[n++] = u; d[n++] = v; d[n++] = r; d[n++] = g; d[n++] = b; d[n++] = a;

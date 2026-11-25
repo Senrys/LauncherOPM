@@ -25,6 +25,9 @@ Ce qu'il fait (détail dans `docs/XENODYS.md`, « Du launcher au jeu ») :
 - **la fluidité** : hors partie, l'affichage suit la limite d'images du joueur (Minecraft se
   bride sinon à 60 au minuteur), et une image en retard ne fait pas sauter la scène ;
 - **le menu pause** : les liens vers le site et le Discord d'OPM. Xenodys n'y vient plus ;
+- **Xenodys la Tisseuse et ses assistants** (`client/Rig`, `client/Tisseuse`) : modèles préparés du
+  paquet, animations GeckoLib, et des os calculés (ailes, robe, cheveux, planétaire, monde entre ses
+  mains) ; les mêmes formules que le launcher (`components/tisseuse.js`) ;
 - **Xenodys dans le monde** (`client/WorldXenodys`) : partout où le serveur pose un marqueur
   nommé `opm:xenodys[:animation]` (`/xenodys apparaitre`, minecraft/xenodys.sk), immense,
   la tête vers le joueur ; et **la première arrivée** de chaque compte (une seule fois, retenue
@@ -62,6 +65,7 @@ est versionné (`client/Pack`). Après une modification :
 
 ```bash
 python3 xenodys/labo.py && python3 xenodys/sprites.py   # régénère les ressources
+python3 xenodys/tisseuse.py                            # Xenodys et ses assistants (xenodys/tisseuse/, livré par OPMTech)
 node scripts/paquet.js                                  # les chiffre
 ```
 

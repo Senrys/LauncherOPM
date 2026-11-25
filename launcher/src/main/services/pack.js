@@ -15,7 +15,7 @@ const logger = require('./logger');
 
 const PAK = path.join(__dirname, '..', '..', 'assets', 'opm.pak');
 const LOCAL_KEY = path.join(__dirname, '..', '..', '..', '..', '.cle-ressources');
-const NAME = /^(labo|geckolib|entity)\/[\w./-]{1,80}$/;
+const NAME = /^(labo|geckolib|entity|modeles)\/[\w./-]{1,80}$/;
 
 let files = null;
 

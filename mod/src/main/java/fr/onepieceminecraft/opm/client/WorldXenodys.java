@@ -14,6 +14,7 @@ import java.util.Set;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.Vec3;
@@ -30,7 +31,7 @@ import net.neoforged.neoforge.common.util.TriState;
  * <p><b>Les apparitions du staff</b> : le serveur place une entité invisible
  * dont le nom commence par {@code opm:xenodys} (un support d'armure marqueur,
  * voir minecraft/xenodys.sk, {@code /xenodys apparaitre}) ; le mod dessine
- * Xenodys à sa place — immense (1,95 × le modèle), tournée comme l'entité, la
+ * Xenodys à sa place — immense (3,315 × le modèle), tournée comme l'entité, la
  * tête vers le joueur. Le nom choisit l'animation : {@code opm:xenodys:greet},
  * {@code opm:xenodys:fly}… ; corrompue, {@code idle} devient
  * {@code corrupted_idle}.
@@ -41,9 +42,9 @@ import net.neoforged.neoforge.common.util.TriState;
  * elle face à lui, la main tendue, puis elle s'envole.
  */
 public final class WorldXenodys {
-    private static final float SCALE = 1.95f / 16f;
+    private static final float SCALE = 3.315f / 16f;
     private static final Set<String> ANIMS = Set.of("idle", "greet", "fly", "cradle", "unveil", "lean",
-            "corrupted_idle", "corrupted_lean");
+            "corrupted_idle", "corrupted_lean", "vol", "vol_corrompu");
     private static final Map<Integer, Object[]> STARTS = new HashMap<>();
     private static final double ARRIVAL = 7.0;
 
@@ -61,7 +62,8 @@ public final class WorldXenodys {
         String name = e.getCustomName().getString();
         String anim = name.length() > "opm:xenodys:".length() ? name.substring("opm:xenodys:".length()) : "idle";
         if (!ANIMS.contains(anim)) anim = "idle";
-        if (OpmSession.get().corrupted() && anim.equals("idle")) anim = "corrupted_idle";
+        // Au repos, elle tient entre ses mains le monde qu'elle crée.
+        if (anim.equals("idle")) anim = OpmSession.get().corrupted() ? "vol_corrompu" : "vol";
         if (OpmSession.get().corrupted() && anim.equals("lean")) anim = "corrupted_lean";
         return anim;
     }
@@ -110,9 +112,9 @@ public final class WorldXenodys {
 
     private static void draw(PoseStack ps, Minecraft mc, Vec3 pos, float yaw, String anim, double t, Vec3 cam,
                              float alpha, int seed) {
-        GeoModel.Pose p = Xen.model().pose(anim, (float) t);
+        Rig.Pose p = Xen.model().pose(anim, t);
         // La tête vers la caméra (repère du modèle : y vers le haut, visage vers −z).
-        double headY = pos.y + 89 * SCALE;
+        double headY = pos.y + 51 * SCALE;
         double dx = cam.x - pos.x;
         double dz = cam.z - pos.z;
         double r = Math.toRadians(yaw);
@@ -127,17 +129,26 @@ public final class WorldXenodys {
         if (!anim.startsWith("fly")) {
             // Si le joueur est tout près, elle se penche vers lui.
             double near = Math.max(0, Math.min(1, (14 - Math.hypot(dx, dz)) / 8));
-            GeoModel.add(p, "chest", new float[]{(float) (near * 22), 0, 0}, null);
-            GeoModel.add(p, "head", new float[]{headPitch * 0.75f, headYaw * 0.75f, 0}, null);
-            GeoModel.add(p, "neck", new float[]{headPitch * 0.25f, headYaw * 0.25f, 0}, null);
+            Rig.add(p, "chest", new float[]{(float) (near * 22), 0, 0}, null);
+            Rig.add(p, "head", new float[]{headPitch * 0.75f, headYaw * 0.75f, 0}, null);
+            Rig.add(p, "neck", new float[]{headPitch * 0.25f, headYaw * 0.25f, 0}, null);
         }
-        int light = LevelRenderer.getLightColor(mc.level, BlockPos.containing(pos.x, pos.y + 6, pos.z));
+        // Elle est immense : la meilleure lumière sur sa hauteur (un bloc plein n'en a aucune).
+        int sky = 0;
+        int block = 0;
+        for (int h = 1; h <= 13; h += 3) {
+            int l = LevelRenderer.getLightColor(mc.level, BlockPos.containing(pos.x, pos.y + h, pos.z));
+            sky = Math.max(sky, LightTexture.sky(l));
+            block = Math.max(block, LightTexture.block(l));
+        }
+        int light = LightTexture.pack(block, sky);
         ps.pushPose();
         ps.translate(pos.x - cam.x, pos.y - cam.y, pos.z - cam.z);
         ps.mulPose(Axis.YP.rotationDegrees(180 - yaw));
         ps.scale(SCALE, SCALE, SCALE);
         String etat = OpmSession.get().etat;
-        Xen.render(ps, mc.renderBuffers().bufferSource(), p, etat, Xen.blinking(t, seed & 7), light, alpha, null);
+        Xen.render(ps, mc.renderBuffers().bufferSource(), p, etat,
+                new Rig.Options().hands(anim.startsWith("vol") ? 1 : 0).blink(Xen.blinking(t, seed & 7)), light, alpha);
         ps.popPose();
     }
 
@@ -218,8 +229,8 @@ public final class WorldXenodys {
         if (player == null) return;
         float yaw = player.getYRot();
         double r = Math.toRadians(yaw);
-        // Tout près : il faut lever les yeux pour voir son visage.
-        arrivalPos = player.position().add(-Math.sin(r) * 8, -3.5, Math.cos(r) * 8);
+        // Assez près pour devoir lever les yeux, assez loin pour voir sa visière et ses ailes.
+        arrivalPos = player.position().add(-Math.sin(r) * 11.5, -3.5, Math.cos(r) * 11.5);
         arrivalYaw = yaw + 180;
     }
 

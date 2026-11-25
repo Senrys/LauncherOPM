@@ -1,53 +1,58 @@
 package fr.onepieceminecraft.opm.client;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import java.util.Set;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.resources.ResourceLocation;
 
 /**
- * Xenodys, en 3D : le modèle GeckoLib (client/GeoModel) et ses textures,
- * créatrice ou corrompue, yeux ouverts ou clos, avec son glowmask en pleine
- * lumière — comme l'AutoGlowingGeoLayer de GeckoLib. Partagé par l'écran
- * titre, le menu pause et Xenodys dans le monde.
+ * Xenodys la Tisseuse, en 3D : son modèle (client/Rig) et ses textures, créatrice ou
+ * corrompue. Dessinée en couches : la matière, ses lueurs (additives, pleine lumière),
+ * le verre, l'énergie. Partagée par le laboratoire, l'avertissement et le monde.
  */
 public final class Xen {
-    private static GeoModel model;
+    static final String ID = "xenodys_tisseuse";
+    private static Rig model;
     private static boolean tried;
 
     private Xen() {}
 
-    public static GeoModel model() {
+    public static Rig model() {
         if (!tried) {
             tried = true;
-            model = GeoModel.load("xenodys", "animation.xenodys");
+            model = Rig.load(ID, ID, "animation.xenodys");
         }
         return model;
     }
 
-    public static ResourceLocation texture(String etat, boolean blink, boolean glow) {
-        return LabScene.tex("xenodys_" + etat + (blink ? "_blink" : "") + (glow ? "_glowmask" : ""));
+    public static ResourceLocation texture(String id, String etat, boolean glow) {
+        return LabScene.tex(id + "_" + etat + (glow ? "_glowmask" : ""));
     }
 
     /**
      * Dessine Xenodys dans le repère courant (y vers le haut, une unité du
      * modèle par unité). `alpha` < 1 : en fondu (pas de lueur sous 0,5).
      */
-    public static void render(PoseStack ps, MultiBufferSource.BufferSource buffers, GeoModel.Pose pose, String etat,
-                              boolean blink, int light, float alpha, Set<String> only) {
-        GeoModel m = model();
+    public static void render(PoseStack ps, MultiBufferSource.BufferSource buffers, Rig.Pose pose, String etat,
+                              Rig.Options options, int light, float alpha) {
+        Rig m = model();
         if (m == null) return;
         int a = Math.round(Math.max(0, Math.min(1, alpha)) * 255);
-        m.render(ps, buffers.getBuffer(RenderType.entityTranslucent(texture(etat, blink, false))), pose, only, light,
-                (a << 24) | 0xFFFFFF);
+        int color = (a << 24) | 0xFFFFFF;
+        ResourceLocation tex = texture(ID, etat, false);
+        m.solve(pose, ps.last().pose(), options);
+        m.emitEntity(buffers.getBuffer(alpha > 0.98f ? RenderType.entityCutoutNoCull(tex) : RenderType.entityTranslucent(tex)),
+                Rig.Layer.BASE, false, light, color);
         buffers.endBatch();
         if (alpha > 0.5f) {
-            m.render(ps, buffers.getBuffer(RenderType.eyes(texture(etat, blink, true))), pose, only,
-                    LightTexture.FULL_BRIGHT, -1);
+            m.emitEntity(buffers.getBuffer(RenderType.eyes(texture(ID, etat, true))), Rig.Layer.GLOW, false, LightTexture.FULL_BRIGHT, -1);
             buffers.endBatch();
         }
+        m.emitEntity(buffers.getBuffer(RenderType.entityTranslucent(tex)), Rig.Layer.GLASS, false, light, color);
+        buffers.endBatch();
+        m.emitEntity(buffers.getBuffer(RenderType.entityTranslucentEmissive(tex)), Rig.Layer.ENERGY, true, LightTexture.FULL_BRIGHT, color);
+        buffers.endBatch();
     }
 
     /** Un clignement : vrai pendant 0,13 s, toutes les 2 à 6 s (déterministe par graine). */
