@@ -249,6 +249,12 @@ const opm = {
     on: (cb) => subscribe('updater:event', cb, 'updater.on'),
   },
 
+  /* ---------------------------------------------------------- RESSOURCES */
+  resources: {
+    /** Une ressource du paquet (`Uint8Array`), ou `null`. */
+    get: async (name) => call('resources:get', assertString(name, 'ressource')),
+  },
+
   /* ------------------------------------------------------------- JOURNAL */
   log: {
     on: (cb) => subscribe('log:line', cb, 'log.on'),

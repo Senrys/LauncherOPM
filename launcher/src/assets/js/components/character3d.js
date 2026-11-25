@@ -33,7 +33,7 @@ const JAR_DROP = 20;
 /** Le personnage actuellement affiché (un seul à la fois : l'accueil). */
 let live = null;
 
-/** @returns {null | {capture: () => any}} */
+/** @returns {null | {capture: () => any, skin: () => any, feet: () => any}} */
 export function liveCharacter() {
   return live;
 }
@@ -267,7 +267,30 @@ export function createCharacter(canvas, { width, height, zoom = 0.86 }) {
     return { rect, body, jar: glass };
   }
 
-  const handle = { capture };
+  /** Le skin affiché (data: URL, bras fins ou larges), ou `null`. */
+  function skin() {
+    try {
+      const data = viewer.skinCanvas.toDataURL('image/png');
+      return { data, slim: viewer.playerObject.skin.modelType === 'slim', own: true };
+    } catch {
+      return null;
+    }
+  }
+
+  /** Où sont ses pieds, à l'écran (coordonnées de mise en page), ou `null`. */
+  function feet() {
+    if (canvas.hidden || !canvas.offsetWidth) return null;
+    let x = canvas.offsetWidth * 0.5;
+    let y = canvas.offsetHeight * 0.8;
+    for (let el = canvas; el; el = el.offsetParent) {
+      x += el.offsetLeft;
+      y += el.offsetTop;
+      if (el.dataset?.el === 'frame') break;
+    }
+    return { x, y };
+  }
+
+  const handle = { capture, skin, feet };
   live = handle;
 
   return {

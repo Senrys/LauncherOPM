@@ -67,7 +67,30 @@ async function authlib() {
   return data;
 }
 
+/**
+ * La clé du paquet de ressources, en deux moitiés à recomposer, pour le launcher
+ * (src/main/services/pack.js). Générée, jamais versionnée.
+ */
+async function writePackKey() {
+  const { readKey } = require('../scripts/paquet');
+  const key = readKey();
+  const target = path.join(ROOT, 'src', 'main', 'services', 'pack-key.js');
+  if (!key) {
+    if (process.env.CI) throw new Error('OPM_PACK_KEY manque : ajoutez le secret GitHub Actions.');
+    await fsp.rm(target, { force: true });
+    return;
+  }
+  const mask = crypto.randomBytes(32);
+  const half = Buffer.from(key.map((b, i) => b ^ mask[i]));
+  await fsp.writeFile(
+    target,
+    `'use strict';\n\n// Généré par game-files.js : ne pas versionner.\nconst A = [${[...half]}];\nconst B = [${[...mask]}];\n` +
+      'exports.key = () => Buffer.from(A.map((v, i) => v ^ B[i]));\n'
+  );
+}
+
 async function prepareGameFiles({ skipMod = process.env.OPM_SKIP_MOD === '1' } = {}) {
+  await writePackKey();
   await fsp.mkdir(OUT_DIR, { recursive: true });
   for (const f of await fsp.readdir(OUT_DIR)) await fsp.rm(path.join(OUT_DIR, f), { force: true });
 

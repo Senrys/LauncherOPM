@@ -25,7 +25,7 @@ import net.minecraft.resources.ResourceLocation;
  * transmise par le launcher (skins de joueurs OPM, anonymes), **dans son ordre**
  * — le même que la scène du launcher, pour que le relais ne se voie pas — et le
  * skin du joueur lui-même. Chaque skin devient une texture, posée sur le modèle
- * 3D du joueur (`joueur` / `joueur_fin`, client/Choreo).
+ * 3D du joueur (`joueur` / `joueur_fin`, client/LabScene).
  *
  * Téléchargés hors du fil de rendu ; les textures sont créées sur lui.
  */
@@ -39,7 +39,6 @@ public final class Skins {
     private static final List<Printed> PRINTED = Collections.synchronizedList(new ArrayList<>());
     private static int gallerySize;
     private static Printed own;
-    private static int[] ownPixels;
     private static boolean started;
     private static boolean fallbackAsked;
     private static int counter;
@@ -123,17 +122,6 @@ public final class Skins {
             try {
                 NativeImage skin = NativeImage.read(new ByteArrayInputStream((byte[]) item[0]));
                 boolean slim = (Boolean) item[1];
-                if ((Boolean) item[2]) {
-                    // Ses pixels (rendu en volume, première image), pour le voir se défaire
-                    // en pixels à la connexion (client/ConnectFx).
-                    try (NativeImage sheet = PlayerRaster.sheet(skin, slim)) {
-                        int[] px = new int[PlayerRaster.W * PlayerRaster.H];
-                        for (int y = 0; y < PlayerRaster.H; y++) {
-                            for (int x = 0; x < PlayerRaster.W; x++) px[y * PlayerRaster.W + x] = sheet.getPixelRGBA(x, y);
-                        }
-                        ownPixels = px;
-                    }
-                }
                 ResourceLocation id = ResourceLocation.fromNamespaceAndPath(Opm.ID, "dyn/skin_" + (counter++));
                 Minecraft.getInstance().getTextureManager().register(id, new DynamicTexture(skin));
                 Printed p = new Printed(id, (Boolean) item[2], slim);
@@ -196,10 +184,4 @@ public final class Skins {
         t.setDaemon(true);
         t.start();
     }
-
-    /** Les pixels (ABGR) de la première image du joueur, W × H, ou `null`. */
-    public static int[] ownPixels() {
-        return ownPixels;
-    }
-
 }

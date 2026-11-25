@@ -61,6 +61,7 @@ const COPIED_EXTENSIONS = new Set([
   '.png', '.webp', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.icns',
   '.mp4', '.webm', '.mp3', '.ogg',
   '.jar', // src/game : le mod OPM et authlib-injector (game-files.js)
+  '.pak', // assets/opm.pak : les ressources chiffrées (scripts/paquet.js)
   '.json', '.plist', '.txt', '.md',
 ]);
 

@@ -10,7 +10,12 @@ import net.minecraft.network.chat.Component;
  * en boucle à la place de l'écran titre, pour la regarder et la capturer.
  */
 public final class ScenePreview extends Screen {
+    static {
+        LabScene.reset();
+    }
+
     private final LoadingScene scene = new LoadingScene();
+    private static final double DURATION = Double.parseDouble(System.getProperty("opm.debug.duration", "26"));
     private final long start = Util.getMillis();
 
     public ScenePreview() {
@@ -28,11 +33,11 @@ public final class ScenePreview extends Screen {
         float s = (float) (k / window.getGuiScale());
         g.pose().pushPose();
         g.pose().scale(s, s, 1);
-        float ratio = (float) Math.min(1, t / 40);
-        scene.render(g, vw, vh, t, ratio, "Assemblage de Grand Line", OpmSession.get().etat, -1, OpmSession.get().playerName);
+        float ratio = (float) Math.min(1, t / DURATION * 1.25);
+        scene.render(g, vw, vh, t, ratio, "Assemblage du monde", OpmSession.get().etat, true, -1, OpmSession.get().playerName);
         g.pose().popPose();
         DebugShots.maybe("scene", t);
-        if (t > 26) minecraft.stop();
+        if (t > DURATION) minecraft.stop();
     }
 
     @Override

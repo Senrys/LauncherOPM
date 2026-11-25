@@ -770,6 +770,7 @@ function register(windowGetter) {
 
   // Les lignes en direct sont diffusées par `logger.attach(win)` sur `log:line` :
   // ne rien rebrancher ici, sous peine de doublons dans la console du renderer.
+  handle('resources:get', (name) => require('./services/pack').get(name));
   handle('log:history', () => logger.history());
 
   logger.info('Canaux IPC enregistrés.');

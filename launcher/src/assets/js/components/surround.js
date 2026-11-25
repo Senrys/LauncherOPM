@@ -8,12 +8,13 @@
  *
  *   - Derrière le cadre (`[data-el="surround"]`) : une nappe sombre tramée qui
  *     prolonge le launcher dans le décor, des circuits (ou des fissures), des
- *     cubes en suspension, des bits qui scintillent. Ce qui
+ *     blocs d'OPMTech en suspension, des bits qui scintillent. Ce qui
  *     passe derrière le cadre est caché par lui : la scène a de la profondeur.
  *
  *   - Devant le cadre (`[data-el="surround-front"]`) : ce qui l'incruste dans la
  *     scène — ses bords s'assombrissent en trame, des cubes s'en détachent, les
- *     circuits y entrent, des grappes de cristaux mordent ses coins.
+ *     circuits y entrent, des équerres de métal tiennent ses coins et des broches
+ *     dorées courent le long de ses bords, comme le connecteur d'une carte.
  *
  *   - Le cadre lui-même reçoit un masque en escalier (coins pixelisés, quelques
  *     encoches) : plus aucune bordure lisse ni arrondie.
@@ -39,13 +40,15 @@ const THEMES = {
     ink: '#061211',
     inkMid: 'rgba(6, 18, 17, .78)',
     inkGrain: '#0D2522',
-    trace: 'rgba(79, 170, 160, .55)',
+    trace: 'rgba(46, 127, 114, .85)',
+    traceEdge: 'rgba(29, 92, 81, .5)',
     traceHi: '#91D9D1',
     pulse: '#ECFFFC',
-    node: '#91D9D1',
+    node: '#D3AE59',
+    nodeHi: '#F2DC9A',
+    metal: ['#0A0F13', '#6A7688', '#C9D6D4', '#12161D'],
     bits: ['#91D9D1', '#ECFFFC', '#5BBDB1'],
     cube: { top: '#BFF1EA', hi: '#ECFFFC', left: '#78CBC1', right: '#3F9C91', line: '#0E3531' },
-    crystal: ['#F0FFFD', '#A6E8E0', '#5BBDB1', '#2A7A70'],
     particle: ['#2E6E67', '#4FAAA0', '#91D9D1'],
     glitch: null,
   },
@@ -53,13 +56,15 @@ const THEMES = {
     ink: '#0B0410',
     inkMid: 'rgba(11, 4, 16, .78)',
     inkGrain: '#1E0A20',
-    trace: 'rgba(176, 40, 80, .6)',
+    trace: 'rgba(142, 58, 176, .75)',
+    traceEdge: 'rgba(106, 31, 143, .5)',
     traceHi: '#F0506E',
     pulse: '#FFD3DD',
     node: '#C77DFF',
+    nodeHi: '#E6C4FF',
+    metal: ['#0B060E', '#5E4A5C', '#9C8299', '#1B1020'],
     bits: ['#F0506E', '#C77DFF', '#FFD3DD'],
     cube: { top: '#3B1838', hi: '#F0506E', left: '#24101F', right: '#170A15', line: '#B02850' },
-    crystal: ['#FFD3DD', '#F0506E', '#9E1F5A', '#4A0F2E'],
     particle: ['#5A1F4A', '#B02850', '#F0506E'],
     glitch: ['#F0506E', '#C77DFF', '#FFFFFF', '#0B0410'],
   },
@@ -160,25 +165,56 @@ function shardSprite(h, c) {
   return canvas;
 }
 
-/** Un cristal : une colonne de 3 pixels, pointe en biseau, qui pousse dans la
- *  direction (dx, dy) — dx est une pente, dy vaut -1 (vers le haut) ou 1. */
-function drawCrystal(g, ax, ay, h, slope, dy, c) {
-  for (let r = 0; r < h; r += 1) {
-    const cx = ax + Math.round(r * slope);
-    const cy = ay + r * dy;
-    const tip = h - 1 - r;
-    if (tip === 0) {
-      dot(g, cx, cy, c[0]);
-    } else if (tip === 1) {
-      dot(g, cx - 1, cy, c[1]);
-      dot(g, cx, cy, c[0]);
-    } else {
-      dot(g, cx - 1, cy, c[1]);
-      dot(g, cx, cy, r % 4 === 1 ? c[0] : c[1]);
-      dot(g, cx + 1, cy, c[2]);
+/** Un vrai bloc d'OPMTech, en isométrie : ses textures, et ses pixels lumineux.
+ *  `a` : demi-largeur ; `tile(nom)` : la case 16 × 16 d'une texture, déjà lumineuse. */
+function blockSprite(a, top, side) {
+  const { canvas, g } = surface(a * 2, a * 2 + 1);
+  const read = (img) => img.getContext('2d').getImageData(0, 0, 16, 16).data;
+  const t = read(top);
+  const s = read(side);
+  const put = (x, y, px, u, v, k) => {
+    const i = (Math.min(15, Math.floor(v * 16)) * 16 + Math.min(15, Math.floor(u * 16))) * 4;
+    // Les pixels clairs (lumineux) gardent leur éclat sur les faces à l'ombre.
+    const bright = Math.max(px[i], px[i + 1], px[i + 2]) > 190 ? Math.max(k, 0.9) : k;
+    dot(g, x, y, `rgb(${px[i] * bright},${px[i + 1] * bright},${px[i + 2] * bright})`);
+  };
+  for (let x = 0; x < a * 2; x += 1) {
+    const cx = x + 0.5;
+    for (let y = 0; y < a; y += 1) {
+      const dx = (cx - a) / a;
+      const dy = (y + 0.5 - a / 2) / (a / 2);
+      const u = (dx + dy) / 2 + 0.5;
+      const v = (dy - dx) / 2 + 0.5;
+      if (u >= 0 && u < 1 && v >= 0 && v < 1) put(x, y, t, u, v, 1);
     }
+    const left = cx < a;
+    const from = Math.round(a / 2 + (left ? cx : a * 2 - cx) / 2);
+    for (let y = 0; y < a; y += 1) put(x, from + y, s, left ? cx / a : (cx - a) / a, (y + 0.5) / a, left ? 0.72 : 0.5);
   }
-  dot(g, ax - 1, ay, c[3], 3, 1);
+  return canvas;
+}
+
+/** Les blocs en suspension : dessus, côté. */
+const BLOCKS = [
+  ['circuit:puce', 'circuit:cote'], ['circuit:coeur', 'circuit:coeur'], ['labo:mur', 'labo:mur'], ['circuit:via', 'circuit:cote'],
+  ['labo:sol_lumineux', 'labo:mur_bande'], ['circuit:emetteur', 'circuit:condensateur'], ['labo:m_acier', 'labo:mur_neon'],
+  ['circuit:dalle', 'circuit:radiateur'],
+];
+
+/** Une équerre de métal sur un coin du cadre (sx, sy : vers l'extérieur), et sa vis dorée. */
+function drawBracket(g, x, y, sx, sy, c) {
+  const [dark, metal, hi, inner] = c.metal;
+  const bar = (dx, dy, w, h, color) => dot(g, sx > 0 ? x - dx - w + 1 : x + dx, sy > 0 ? y - dy - h + 1 : y + dy, color, w, h);
+  bar(-2, -2, 15, 5, dark);
+  bar(-2, -2, 5, 13, dark);
+  bar(-1, -1, 13, 3, metal);
+  bar(-1, -1, 3, 11, metal);
+  bar(-1, -1, 13, 1, hi);
+  bar(-1, -1, 1, 11, hi);
+  bar(0, 0, 11, 1, inner);
+  bar(0, 0, 1, 9, inner);
+  bar(0, 0, 2, 2, c.node);
+  bar(0, 0, 1, 1, c.nodeHi);
 }
 
 /* ------------------------------------------------------------------ décor */
@@ -186,7 +222,7 @@ function drawCrystal(g, ax, ay, h, slope, dy, c) {
 /**
  * Démarre le décor.
  * @param {{back: HTMLCanvasElement, front: HTMLCanvasElement, frame: HTMLElement, stage?: HTMLElement|null}} parts
- * @returns {{dispose: () => void}}
+ * @returns {{setTiles: (provider: (etat: string, tile: string) => HTMLCanvasElement) => void, dispose: () => void}}
  */
 export function createSurround({ back, front, frame, stage }) {
   const bctx = back.getContext('2d');
@@ -197,6 +233,8 @@ export function createSurround({ back, front, frame, stage }) {
   let W = 0;
   let H = 0;
   let fb = { x: 0, y: 0, w: 0, h: 0 };
+  /** `(état, texture) → canevas 16 × 16` : les blocs d'OPMTech, une fois le laboratoire prêt. */
+  let tiles = null;
   let layers = null; // { creatrice: {...}, corrompue: {...} }
   let particles = [];
   let glitches = [];
@@ -398,6 +436,10 @@ export function createSurround({ back, front, frame, stage }) {
       path.cells.forEach(([x, y], k) => {
         const g = insideFrame(x, y) ? fg : bg;
         if (name === 'creatrice') {
+          // Une piste : son cœur, et deux bords plus sombres.
+          const [px, py] = path.cells[Math.max(0, k - 1)];
+          if (px !== x) dot(g, x, y - 1, c.traceEdge, 1, 3);
+          else dot(g, x - 1, y, c.traceEdge, 3, 1);
           dot(g, x, y, c.trace);
         } else {
           dot(g, x, y, c.traceHi);
@@ -408,6 +450,7 @@ export function createSurround({ back, front, frame, stage }) {
       if (name === 'creatrice') {
         // Pastille de fin : un anneau de 3 × 3 au cœur sombre.
         dot(bg, ex - 1, ey - 1, c.node, 3, 3);
+        dot(bg, ex - 1, ey - 1, c.nodeHi);
         dot(bg, ex, ey, c.ink);
       } else {
         dot(bg, ex, ey, c.node);
@@ -430,30 +473,21 @@ export function createSurround({ back, front, frame, stage }) {
       }
     }
 
-    // 4. Grappes de cristaux sur les coins gauches : le cadre est serti dans la roche.
-    const rand = seeded(seed + 21);
-    const clusters = [
-      { ax: fb.x + 1, ay: fb.y + 1, dy: -1, slopes: [-1.1, -0.6, -0.2, -1.6] },
-      { ax: fb.x + 1, ay: fb.y + fb.h - 2, dy: 1, slopes: [-1.2, -0.5, -0.1, -1.8, 0.2] },
-    ];
-    for (const cl of clusters) {
-      // Socle sombre tramé, à cheval sur le coin.
-      for (let y = -3; y <= 3; y += 1) {
-        for (let x = -3; x <= 3; x += 1) {
-          const d = Math.hypot(x, y) / 3.2;
-          if (d < 1 && 1 - d > bayer(cl.ax + x, cl.ay + y) * 0.8) dot(fg, cl.ax + x, cl.ay + y, c.ink);
-        }
-      }
-      cl.slopes.forEach((slope, k) => {
-        const h = 5 + Math.floor(rand() * 9) - (k > 2 ? 3 : 0);
-        drawCrystal(fg, cl.ax + k - 1, cl.ay + (k % 2) * cl.dy, h, slope, cl.dy, c.crystal);
-      });
-    }
+    // 4. Les équerres des coins gauches, et les broches dorées du connecteur.
+    drawBracket(fg, fb.x, fb.y, -1, -1, c);
+    drawBracket(fg, fb.x, fb.y + fb.h - 1, -1, 1, c);
+    const pin = (x, y, w, h) => {
+      dot(fg, x, y, c.node, w, h);
+      dot(fg, x, y, c.nodeHi, 1, 1);
+    };
+    for (let y = fb.y + 18; y < fb.y + fb.h - 18; y += 5) if (hash(y, 3, seed) < 0.8) pin(fb.x - 2, y, 3, 2);
+    for (let x = fb.x + 22; x < fb.x + fb.w - 30; x += 5) if (hash(x, 7, seed) < 0.55) pin(x, fb.y + fb.h - 1, 2, 3);
 
     // 5. Sprites animés de cet état.
     const cubes = shared.cubes.map((cube, k) => ({
       ...cube,
-      sprite: name === 'corrompue' && k % 3 === 0 ? shardSprite(cube.a * 2 + 2, c.cube) : cubeSprite(cube.a, c.cube),
+      sprite: tiles ? blockSprite(cube.a, ...BLOCKS[k % BLOCKS.length].map((n) => tiles(name, n)))
+        : name === 'corrompue' && k % 3 === 0 ? shardSprite(cube.a * 2 + 2, c.cube) : cubeSprite(cube.a, c.cube),
     }));
 
     return { c, back: backLayer.canvas, front: frontLayer.canvas, cubes, paths };
@@ -466,8 +500,8 @@ export function createSurround({ back, front, frame, stage }) {
 
     // Cubes en suspension, dans la marge, hors de Xenodys.
     const cubes = [];
-    for (let k = 0; k < 120 && cubes.length < 18; k += 1) {
-      const a = 2 + Math.floor(rand() * 4);
+    for (let k = 0; k < 160 && cubes.length < 16; k += 1) {
+      const a = 4 + Math.floor(rand() * 5);
       const x = Math.floor(rand() * W);
       const y = Math.floor(rand() * H);
       const rect = { x: x - 1, y: y - 1, w: a * 2 + 2, h: a * 2 + 2 };
@@ -728,6 +762,13 @@ export function createSurround({ back, front, frame, stage }) {
   schedule();
 
   return {
+    /** Les vrais blocs d'OPMTech remplacent les cubes unis. */
+    setTiles(provider) {
+      tiles = provider;
+      measure();
+      still();
+      schedule();
+    },
     dispose() {
       disposed = true;
       if (raf) cancelAnimationFrame(raf);

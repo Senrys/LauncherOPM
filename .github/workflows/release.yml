@@ -95,6 +95,9 @@ jobs:
         run: node build.js --obf=false --build=${{ matrix.target }} --publish=always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # La clé du paquet de ressources (scripts/paquet.js) : le dépôt est public, les
+          # ressources n'y figurent que chiffrées.
+          OPM_PACK_KEY: ${{ secrets.OPM_PACK_KEY }}
 
       - name: Conserver les paquets
         # Filet de sécurité : même si la publication échoue, les binaires

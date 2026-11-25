@@ -7,19 +7,23 @@ Rien à déposer sur le serveur ; une mise à jour du launcher met le mod à jou
 
 Ce qu'il fait (détail dans `docs/XENODYS.md`, « Du launcher au jeu ») :
 
-- **l'écran de chargement** de Xenodys, à la place de ceux de Mojang et de NeoForge
-  (`mixin/MinecraftMixin` → `client/OpmLoadingOverlay`, `client/LoadingScene`), et son
-  **envol** à la fin ;
-- **l'écran titre** d'OPM (`client/OpmTitleScreen`) : Xenodys en 3D (`client/GeoModel`,
-  le modèle GeckoLib sans GeckoLib), le joueur sur son socle (`client/PlayerRaster`) ;
-  ni solo ni liste de serveurs ;
-- **les menus hors partie** aux couleurs du launcher (`client/MenuStyle`,
+- **l'écran de chargement** : le laboratoire de Xenodys en 3D (`client/LabScene`,
+  `client/LabData` ; `mixin/MinecraftMixin` → `client/OpmLoadingOverlay`,
+  `client/LoadingScene`). La salle s'assemble bloc par bloc, un joueur flotte dans la grande
+  cuve, Xenodys va d'un poste à l'autre, construit et expérimente. À la fin, la cuve
+  descend et la caméra glisse vers le menu, sans coupure ;
+- **l'écran titre** (`client/OpmTitleScreen`) : la même salle, et le menu en terminal
+  (`client/Terminal`, le style « circuit » d'OPMTech) ; ni solo, ni liste de serveurs, ni
+  liste des mods ;
+- **les menus hors partie** (`client/OpmBackground`, `client/MenuStyle`,
   `mixin/GuiGraphicsMixin`, `mixin/ScreenMixin`) — jamais en jeu ni par-dessus le pack de
   ressources du serveur, qui garde la main sur l'apparence de la partie — et la
   **musique** du launcher dans les menus (`client/OpmMusic`) ;
 - **l'écran titre réagit au serveur** (`client/OpmLive`, relu toutes les 20 s) : hors
   ligne, Xenodys se détourne et cherche ; complet, elle lève la main (« patience ») ;
-- **la connexion** (`client/ConnectFx`) : le joueur se défait en pixels vers un orbe ;
+- **la connexion** (`client/ConnectFx`) : une porte s'ouvre en iris de gros pixels ;
+- **la fluidité** : hors partie, l'affichage suit la limite d'images du joueur (Minecraft se
+  bride sinon à 60 au minuteur), et une image en retard ne fait pas sauter la scène ;
 - **le menu pause** : les liens vers le site et le Discord d'OPM. Xenodys n'y vient plus ;
 - **Xenodys dans le monde** (`client/WorldXenodys`) : partout où le serveur pose un marqueur
   nommé `opm:xenodys[:animation]` (`/xenodys apparaitre`, minecraft/xenodys.sk), immense,
@@ -45,15 +49,25 @@ cd mod
 
 Captures de développement (dans `run/screenshots/`) :
 `./gradlew runClient -PopmShots=0.5,2,4 -PopmOptions=6 -PopmQuit=9`. `-PopmStatus=offline|full`
-force l'état du serveur ; `-PopmWorld=1` crée un monde de test en solo, y invoque Xenodys et
+force l'état du serveur ; `-PopmEtat=corrompue` force l'état de Xenodys ; `-PopmScene=1
+-PopmDuration=60` joue le chargement au ralenti ; `-PopmProfile=1` mesure la fluidité ;
+`-PopmJoin=5` rejoint ; `-PopmWorld=1` crée un monde de test en solo, y invoque Xenodys et
 ouvre le menu pause. `run/opm/session.json` simule ce qu'écrit le launcher.
 
-## Ressources générées
+## Ressources
 
-Ne pas retoucher à la main : `python3 xenodys/sprites.py` régénère les planches de
-sprites (`assets/opm/scene/`), le modèle GeckoLib (`assets/opm/geckolib/`,
-`assets/opm/textures/entity/`) et les textures des menus (`assets/opm/textures/gui/sprites/widget/`, `assets/minecraft/textures/gui/`). La
-musique (`assets/opm/sounds/music/`) vient de `xenodys/musique/`.
+Textures, modèles, animations et laboratoire ne sont **pas** dans ce dépôt, qui est public :
+ils vivent dans `xenodys/` (ignoré par git), et seul le paquet chiffré `assets/opm/opm.pak`
+est versionné (`client/Pack`). Après une modification :
+
+```bash
+python3 xenodys/labo.py && python3 xenodys/sprites.py   # régénère les ressources
+node scripts/paquet.js                                  # les chiffre
+```
+
+La clé vient de `.cle-ressources` (fichier local, ignoré) ou de `OPM_PACK_KEY` (secret GitHub
+Actions). Sans clé, le mod se compile, mais ses scènes 3D restent vides et la musique des
+menus se tait (`client/PackSounds`).
 
 ## Anti-triche
 

@@ -24,16 +24,15 @@ import org.lwjgl.glfw.GLFW;
  * couvrait jusque-là le chargement des mods, s'efface à ce signal.
  */
 public final class OpmLoadingOverlay extends Overlay {
-    private static final double FADE = 0.6;
+    private static final double FADE = 0.25;
     private static final String[] STEPS = {
-            "Compilation des fruits du démon",
-            "Synchronisation des primes",
-            "Assemblage de Grand Line",
-            "Calibrage des vents de la simulation",
+            "Mise sous tension du laboratoire",
+            "Synthèse des fruits du démon",
+            "Assemblage du monde",
+            "Calibrage du Den Den Mushi",
             "Ouverture du monde",
     };
     private static boolean readySent;
-    private static final long sceneFallback = System.currentTimeMillis();
     private static LoadingScene scene;
 
     private final Minecraft minecraft;
@@ -84,8 +83,11 @@ public final class OpmLoadingOverlay extends Overlay {
         if (outro >= 0 && finishedAt < 0 && (outro >= LoadingScene.OUTRO || skipPressed())) finish(g);
 
         double fade = finishedAt >= 0 ? (clock - finishedAt) / FADE : 0;
+        // L'écran titre reprend la même salle au même instant : on lui laisse la place d'un coup.
+        boolean same = minecraft.screen instanceof OpmTitleScreen;
         if (finishedAt >= 0 && minecraft.screen != null) {
             minecraft.screen.render(g, 0, 0, partialTick);
+            if (same) fade = 1;
         }
         if (fade < 1) {
             int stepIndex = Math.min(STEPS.length - 1, (int) Math.floor(progress * STEPS.length));
@@ -111,10 +113,7 @@ public final class OpmLoadingOverlay extends Overlay {
         // Fondu de sortie : la scène pâlit au-dessus de l'écran qui l'attend.
         Sprites.alpha = alpha;
         try {
-            // L'horloge de la scène : celle du launcher (scene_debut), pour continuer sa chorégraphie.
-            long epoch = session.sceneStart > 0 ? session.sceneStart : sceneFallback;
-            double sceneT = (System.currentTimeMillis() - epoch) / 1000.0;
-            scene.render(g, vw, vh, sceneT, ratio, step, session.etat, outro, session.playerName);
+            scene.render(g, vw, vh, LabScene.clock(), ratio, step, session.etat, first, outro, session.playerName);
             g.flush();
         } finally {
             Sprites.alpha = 1f;

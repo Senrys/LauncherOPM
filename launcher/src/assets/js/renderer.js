@@ -31,8 +31,9 @@ import { createSurround } from './components/surround.js';
 import { createXenodys } from './components/xenodys3d.js';
 import { createAmbiance } from './components/ambiance.js';
 import { createSfx } from './components/sfx.js';
-import { createVideoCircuits } from './components/circuits.js';
+import { liveCharacter } from './components/character3d.js';
 import { createLab } from './components/lab.js';
+import { createLabBackground } from './components/labScene.js';
 import { createLoadingScene } from './components/loadingScene.js';
 import { frameBuilt } from './components/intro.js';
 
@@ -929,7 +930,7 @@ function wireCinematic(xen) {
       // La musique continue jusqu'à ce que le jeu la reprenne (au plus 4 min).
       holdMusic(true, 240_000);
       sceneExpected = true;
-      scene?.setGallery(event.gallery, event.epoch);
+      scene?.setGallery([...(event.gallery ?? []), ...[liveCharacter()?.skin()].filter(Boolean)], event.epoch);
     }
     if (event?.type === 'loading') scene?.progress(event.ratio, event.step);
     if (event?.type === 'loaded') {
@@ -1027,26 +1028,39 @@ function wireSfx() {
 }
 
 /**
- * Le fond : la salle de simulation (components/lab.js), qui bat sur les temps
- * de la musique, et les circuits de Xenodys incrustés par-dessus
- * (components/circuits.js).
+ * Le fond : le laboratoire de Xenodys (components/labScene.js), qui bat sur les temps
+ * de la musique — à défaut, la salle de simulation (components/lab.js).
  */
+let labTiles = null;
+let surroundRef = null;
+
 function wireLab() {
   const lab = $('[data-el="bg-lab"]');
   if (lab) {
-    try {
-      createLab(lab, { pulse: () => ambianceRef?.pulse?.() ?? 0 });
-    } catch (err) {
-      // Le repli (un aplat sombre) reste dessous.
-      console.error('opm : salle de simulation indisponible.', err);
-    }
-  }
-  const canvas = $('[data-el="bg-circuits"]');
-  if (!canvas) return;
-  try {
-    createVideoCircuits(canvas);
-  } catch (err) {
-    console.error('opm : circuits du fond indisponibles.', err);
+    const pulse = () => ambianceRef?.pulse?.() ?? 0;
+    // La plateforme de la salle se place sous les pieds du personnage.
+    const anchor = () => {
+      const feet = liveCharacter()?.feet();
+      return feet && lab.offsetWidth ? { x: feet.x / lab.offsetWidth, y: feet.y / lab.offsetHeight } : null;
+    };
+    createLabBackground(lab, { pulse, anchor })
+      .then(({ data }) => {
+        document.documentElement.dataset.labo = '';
+        labTiles = (etat, name) => data.tile(etat, name);
+        surroundRef?.setTiles(labTiles);
+      })
+      .catch((err) => {
+        console.error('opm : laboratoire indisponible.', err);
+        try {
+          // Un canevas neuf : celui-ci a déjà servi à la 3D.
+          const plain = lab.cloneNode();
+          lab.replaceWith(plain);
+          createLab(plain, { pulse });
+        } catch (e) {
+          // Le repli (un aplat sombre) reste dessous.
+          console.error('opm : salle de simulation indisponible.', e);
+        }
+      });
   }
 }
 
@@ -1062,7 +1076,8 @@ function wireOpenWindow() {
     const front = $('[data-el="surround-front"]');
     const frame = $('[data-el="frame"]');
     if (back && front && frame) {
-      createSurround({ back, front, frame, stage: $('[data-el="xeno-stage"]') });
+      surroundRef = createSurround({ back, front, frame, stage: $('[data-el="xeno-stage"]') });
+      if (labTiles) surroundRef.setTiles(labTiles);
     }
     // Xenodys elle-même, derrière le cadre, qu'elle domine depuis la droite.
     const stage = $('[data-el="xeno-stage"]');

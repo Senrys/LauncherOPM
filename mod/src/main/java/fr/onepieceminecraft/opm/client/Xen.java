@@ -28,8 +28,7 @@ public final class Xen {
     }
 
     public static ResourceLocation texture(String etat, boolean blink, boolean glow) {
-        return ResourceLocation.fromNamespaceAndPath("opm", "textures/entity/xenodys_" + etat + (blink ? "_blink" : "")
-                + (glow ? "_glowmask" : "") + ".png");
+        return LabScene.tex("xenodys_" + etat + (blink ? "_blink" : "") + (glow ? "_glowmask" : ""));
     }
 
     /**

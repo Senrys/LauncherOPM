@@ -41,7 +41,8 @@ public final class Opm {
     /** Log4j directement : un journal SLF4J peut être détourné par certains modpacks. */
     public static final Logger LOG = LogManager.getLogger("OPM");
 
-    public Opm() {
+    public Opm(net.neoforged.bus.api.IEventBus modBus) {
+        modBus.addListener(fr.onepieceminecraft.opm.client.PackSounds::register);
         // Le launcher lit cette ligne : le mod est là, l'écran de chargement suivra.
         fr.onepieceminecraft.opm.client.Signal.send("hello", "mod OPM chargé");
         NeoForge.EVENT_BUS.addListener(ScreenEvent.Opening.class, event -> {
@@ -65,13 +66,21 @@ public final class Opm {
                 event.setCanceled(true);
                 return;
             }
+            // La liste des mods : le modpack est imposé, il n'y a rien à y régler.
+            if (next instanceof net.neoforged.neoforge.client.gui.ModListScreen) {
+                event.setCanceled(true);
+                return;
+            }
             if (next instanceof TitleScreen || next instanceof JoinMultiplayerScreen || next instanceof SelectWorldScreen) {
                 event.setNewScreen("1".equals(System.getProperty("opm.debug.scene", ""))
                         ? new fr.onepieceminecraft.opm.client.ScenePreview() : new OpmTitleScreen());
             }
         });
         NeoForge.EVENT_BUS.addListener(ScreenEvent.Init.Post.class, event -> {
-            if (event.getScreen() instanceof PauseScreen pause) relinkPause(event, pause);
+            if (event.getScreen() instanceof PauseScreen pause) {
+                removeMods(event);
+                relinkPause(event, pause);
+            }
             if (event.getScreen() instanceof net.minecraft.client.gui.screens.options.OptionsScreen) lockResourcePacks(event);
         });
         // L'écran de connexion : le joueur se défait en pixels vers l'orbe.
@@ -124,6 +133,17 @@ public final class Opm {
                 b.active = false;
                 b.setTooltip(net.minecraft.client.gui.components.Tooltip.create(
                         Component.literal("Sur One Piece Minecraft, le pack de ressources est fourni par le serveur.")));
+            }
+        }
+    }
+
+    /** Le menu pause : le bouton « Mods » s'en va, ceux du dessous remontent. */
+    private static void removeMods(ScreenEvent.Init.Post event) {
+        for (var listener : new ArrayList<>(event.getListenersList())) {
+            if (!(listener instanceof Button b) || !"fml.menu.mods".equals(key(b.getMessage()))) continue;
+            event.removeListener(b);
+            for (var other : event.getListenersList()) {
+                if (other instanceof AbstractWidget w && w.getY() > b.getY() && w.getX() == b.getX()) w.setY(w.getY() - b.getHeight() - 4);
             }
         }
     }

@@ -162,8 +162,8 @@ Xenodys près de lui, immense. La liste des mods admis est le modpack lui-même
 
 Le launcher écrit pour le mod `opm/session.json` (état, pseudo, serveur, galerie,
 liens ; jamais de jeton) ; le mod n'en a pas besoin pour fonctionner (valeurs par
-défaut). Réglages du launcher : « Rejoindre directement le serveur » et « Chargement
-animé par Xenodys ».
+défaut). JOUER mène à l'écran titre : c'est là que l'on rejoint le serveur. Réglage du
+launcher : « Chargement animé par Xenodys ».
 
 ## Dans le launcher
 

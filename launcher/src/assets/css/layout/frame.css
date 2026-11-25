@@ -290,18 +290,7 @@ html,
   height: 100%;
   image-rendering: pixelated;
 }
-
-/* Le bandeau de la scène : net, à la résolution de l'écran (même place que dans le jeu). */
-.opm-loading .opm-loading__bandeau {
-  position: absolute;
-  inset: auto;
-  left: 4.4vh;
-  top: 3.7vh;
-  width: 44.4vh;
-  height: auto;
-  image-rendering: auto;
-  pointer-events: none;
-}
+.opm-loading .opm-loading__3d { image-rendering: auto; }
 .opm-loading__reduire {
   position: absolute;
   top: 3vh;

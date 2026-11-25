@@ -12,8 +12,6 @@
  *     authlib-injector (embarqué par le launcher, `authlib-injector.jar` à la racine
  *     de l'instance, embarqué par le launcher) s'en charge et fait aussi accepter nos skins signés ; à
  *     défaut, les propriétés système d'authlib redirigent au moins le `join` ;
- *   - **la connexion directe** : `--quickPlayMultiplayer`, le jeu entre sur le
- *     serveur OPM sans passer par l'écran titre ;
  *   - **le fichier de session** `opm/session.json`, lu par le mod OPM du modpack
  *     (état de Xenodys, pseudo, serveur, galerie de skins…). Aucun jeton n'y
  *     figure : un fichier du dossier de jeu n'est pas un coffre ;
@@ -264,16 +262,6 @@ function authArguments(instanceDir, apiBase) {
 }
 
 /**
- * Arguments de jeu de la connexion directe.
- * @param {{host: string, port: number}} server
- * @returns {string[]}
- */
-function directConnectArguments(server) {
-  const address = server.port === 25565 ? server.host : `${server.host}:${server.port}`;
-  return ['--quickPlayMultiplayer', address];
-}
-
-/**
  * Écrit `opm/session.json` dans l'instance, pour le mod OPM.
  * @param {string} instanceDir
  * @param {object} data
@@ -290,7 +278,6 @@ async function writeSession(instanceDir, data) {
     message: data.message,
     joueur: { nom: data.name || null, uuid: data.uuid || null },
     serveur: { hote: data.server.host, port: data.server.port },
-    connexion_directe: Boolean(data.direct),
     animations: Boolean(data.animations),
     api: data.apiBase,
     progression_depart: data.scene ? LAUNCHER_SHARE : 0,
@@ -571,7 +558,6 @@ module.exports = {
   prepareContext,
   hasOpmMod,
   authArguments,
-  directConnectArguments,
   writeSession,
   setEarlyWindow,
   prepareOptions,

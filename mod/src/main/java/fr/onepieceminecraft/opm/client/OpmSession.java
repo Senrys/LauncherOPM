@@ -29,7 +29,6 @@ public final class OpmSession {
     public final String playerUuid;
     public final String host;
     public final int port;
-    public final boolean direct;
     public final boolean animations;
     public final String api;
     public final float progressStart;
@@ -45,6 +44,7 @@ public final class OpmSession {
         fromLauncher = o != null;
         JsonObject j = o != null ? o : new JsonObject();
         etat = "corrompue".equals(str(j, "etat")) ? "corrompue" : "creatrice";
+        if (!System.getProperty("opm.debug.etat", "").isEmpty()) etat = System.getProperty("opm.debug.etat");
         message = str(j, "message");
         String version = str(j, "launcher");
         launcher = version == null ? "" : version.substring(0, Math.min(24, version.length()));
@@ -56,7 +56,6 @@ public final class OpmSession {
         host = h != null && h.matches("[A-Za-z0-9.-]{1,253}") ? h : "play.onepieceminecraft.fr";
         int p = serveur.has("port") ? serveur.get("port").getAsInt() : 25565;
         port = p > 0 && p < 65536 ? p : 25565;
-        direct = !j.has("connexion_directe") || j.get("connexion_directe").getAsBoolean();
         animations = !j.has("animations") || j.get("animations").getAsBoolean();
         String a = str(j, "api");
         api = a != null && a.startsWith("https://") ? a.replaceAll("/+$", "") : "https://auth.onepieceminecraft.fr";

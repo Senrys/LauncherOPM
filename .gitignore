@@ -38,3 +38,11 @@ auth-server/data/
 # ── Système ─────────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
+
+# ── Ressources d'OPM : jamais en clair dans ce dépôt public ─────────────────
+# Textures, modèles, animations, laboratoire et leurs outils vivent hors du dépôt ;
+# seul le paquet chiffré (opm.pak, scripts/paquet.js) est versionné. La clé aussi reste
+# dehors : secret GitHub OPM_PACK_KEY, ou fichier local .cle-ressources.
+xenodys/
+.cle-ressources
+launcher/src/main/services/pack-key.js

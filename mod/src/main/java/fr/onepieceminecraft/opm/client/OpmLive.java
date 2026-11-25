@@ -80,6 +80,16 @@ public final class OpmLive {
     }
 
     private static void xenodys() {
+        // Développement : -Dopm.debug.etat=corrompue
+        String forced = System.getProperty("opm.debug.etat", "");
+        if ("bascule".equals(forced)) {
+            OpmSession.get().etat = OpmSession.get().corrupted() ? "creatrice" : "corrompue";
+            return;
+        }
+        if (!forced.isEmpty()) {
+            OpmSession.get().etat = forced;
+            return;
+        }
         JsonObject o = get("/api/v1/xenodys");
         if (o == null) return;
         OpmSession s = OpmSession.get();

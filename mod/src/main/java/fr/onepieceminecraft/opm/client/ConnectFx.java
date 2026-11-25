@@ -1,32 +1,22 @@
 package fr.onepieceminecraft.opm.client;
 
-import java.util.Random;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 
 /**
- * L'écran de connexion au serveur, comme la cinématique du launcher : le
- * joueur, sur son socle, se défait en pixels qui filent vers un orbe ; l'orbe
- * attend, un anneau tourne autour, jusqu'à l'entrée dans le monde.
- * Dessiné sous le texte et le bouton de l'écran (ScreenEvent.BackgroundRendered).
+ * L'écran de connexion au serveur : dans le laboratoire, une porte s'ouvre en
+ * iris de gros pixels — le champ des portes d'OPMTech — et ondule jusqu'à
+ * l'entrée dans le monde. Dessiné sous le texte et le bouton de l'écran
+ * (ScreenEvent.BackgroundRendered).
  */
 public final class ConnectFx {
+    private static final int CELL = 6;
     private static Screen current;
     private static long start;
-    private static float[] seeds;
 
     private ConnectFx() {}
-
-    private static double ease(double k) {
-        k = Math.max(0, Math.min(1, k));
-        return k * k * (3 - 2 * k);
-    }
-
-    private static int argb(int rgb, double a) {
-        return ((int) Math.round(Math.max(0, Math.min(1, a)) * 255) << 24) | (rgb & 0xFFFFFF);
-    }
 
     public static void render(Screen screen, GuiGraphics g) {
         if (screen != current) {
@@ -34,90 +24,53 @@ public final class ConnectFx {
             start = Util.getMillis();
         }
         double t = (Util.getMillis() - start) / 1000.0;
-        Minecraft mc = Minecraft.getInstance();
-        var window = mc.getWindow();
+        var window = Minecraft.getInstance().getWindow();
         int k = Math.max(1, window.getHeight() / 270);
         int vw = (int) Math.ceil(window.getWidth() / (double) k);
         int vh = (int) Math.ceil(window.getHeight() / (double) k);
         float s = (float) (k / window.getGuiScale());
-        OpmSession session = OpmSession.get();
-        String etat = session.etat;
-        int accent = session.corrupted() ? 0xF0506E : 0x91D9D1;
-        int core = session.corrupted() ? 0xFFD3DD : 0xE9FFFC;
+        boolean corrupted = OpmSession.get().corrupted();
+        int accent = Terminal.accent(corrupted);
+        int core = Terminal.core(corrupted);
 
         g.pose().pushPose();
         g.pose().scale(s, s, 1);
-        float px = vw * 0.5f;
-        float stand = vh * 0.86f;
-        float ox = vw * 0.5f;
-        float oy = vh * 0.24f;
-        Sprites.draw(g, Sprites.get("socle", etat), 0, px, stand);
-
-        // Le joueur se défait de haut en bas : chaque pixel parti file vers l'orbe.
-        int[] pixels = Skins.ownPixels();
-        double cut = ease((t - 0.3) / 1.4);
-        if (pixels != null) {
-            int W = PlayerRaster.W;
-            int H = PlayerRaster.H;
-            // Ce qui ne s'est pas encore défait : le joueur, pixel par pixel.
-            int keepFrom = (int) Math.round(cut * H);
-            float dd = PlayerRaster.DENSITY;
-            for (int y = keepFrom - keepFrom % 2; y < H; y += 2) {
-                for (int x = 0; x < W; x += 2) {
-                    int c = pixels[y * W + x];
-                    if (((c >>> 24) & 255) < 128) continue;
-                    int rgb = ((c & 255) << 16) | (c & 0xFF00) | ((c >> 16) & 255);
-                    int sx = (int) (px - PlayerRaster.OX / dd + x / dd);
-                    int sy = (int) (stand - PlayerRaster.OY / dd + y / dd);
-                    g.fill(sx, sy, sx + 1, sy + 1, 0xFF000000 | rgb);
+        double open = LabScene.ease(t / 1.1);
+        double ox = vw / 2.0;
+        double oy = vh * 0.44;
+        double radius = Math.min(vw * 0.4, vh * 0.36) * open;
+        int n = (int) Math.ceil(radius / CELL) + 2;
+        double ticks = t * 20;
+        for (int cy = -n; cy <= n; cy++) {
+            for (int cx = -n; cx <= n; cx++) {
+                double px = (cx + 0.5) * CELL;
+                double py = (cy + 0.5) * CELL;
+                double dist = Math.hypot(px, py);
+                // Un bord dentelé, qui respire.
+                double angle = Math.atan2(py, px);
+                double edge = radius + Math.sin(angle * 6 + ticks * 0.05) * 3;
+                if (dist > edge) continue;
+                int x = (int) (ox + cx * CELL);
+                int y = (int) (oy + cy * CELL);
+                if (dist > edge - CELL * 1.1) {
+                    g.fill(x, y, x + CELL, y + CELL, Terminal.argb(core, 0.9));
+                    continue;
                 }
-            }
-            if (seeds == null) {
-                Random r = new Random(7);
-                seeds = new float[W * H];
-                for (int i = 0; i < seeds.length; i++) seeds[i] = r.nextFloat();
-            }
-            float d = PlayerRaster.DENSITY;
-            for (int y = 0; y < H; y += 2) {
-                double leftAt = (y / (double) H) * 1.4 + 0.3;
-                double q = (t - leftAt) / 0.9;
-                if (q <= 0 || q >= 1) continue;
-                for (int x = 0; x < W; x += 2) {
-                    int c = pixels[y * W + x];
-                    if (((c >>> 24) & 255) < 128) continue;
-                    float sd = seeds[y * W + x];
-                    double qq = ease(q * (0.8 + sd * 0.4));
-                    double sx = px - PlayerRaster.OX / d + x / d;
-                    double sy = stand - PlayerRaster.OY / d + y / d;
-                    double bend = Math.sin(qq * Math.PI) * (sd - 0.5) * 50;
-                    double fx = sx + (ox - sx) * qq + bend;
-                    double fy = sy + (oy - sy) * qq - Math.sin(qq * Math.PI) * 20;
-                    int rgb = ((c & 255) << 16) | (c & 0xFF00) | ((c >> 16) & 255);
-                    int col = qq > 0.7 ? accent : rgb;
-                    g.fill((int) fx, (int) fy, (int) fx + 1, (int) fy + 1, argb(col, 1 - qq * 0.3));
-                }
+                double d = dist / (radius + 1) * 3.2;
+                double wave = 0.5 + 0.5 * Math.sin(4.2 * d - 0.22 * ticks + 0.8 * Math.sin(6 * angle + 0.05 * ticks));
+                double rim = LabScene.seg(dist / (radius + 1), 0.45, 1);
+                g.fill(x, y, x + CELL, y + CELL, Terminal.argb(0x05080C, 0.78));
+                g.fill(x, y, x + CELL, y + CELL, Terminal.argb(accent, (0.05 + 0.45 * rim) * Math.round(wave * 4) / 4.0));
             }
         }
-
-        // L'orbe, puis l'anneau qui tourne : le monde se prépare.
-        double grow = ease((t - 0.6) / 1.6);
-        int r = (int) Math.round(2 + 9 * grow + Math.sin(t * 4) * grow);
-        for (int yy = -r; yy <= r; yy++) {
-            for (int xx = -r; xx <= r; xx++) {
-                double dist = Math.sqrt(xx * xx + yy * yy);
-                if (dist > r) continue;
-                int col = dist < r * 0.45 ? core : accent;
-                g.fill((int) ox + xx, (int) oy + yy, (int) ox + xx + 1, (int) oy + yy + 1, argb(col, grow * (1 - dist / (r + 1) * 0.5)));
-            }
-        }
-        if (t > 2.0) {
-            int n = 40;
-            for (int i = 0; i < n; i++) {
-                double a = i / (double) n * Math.PI * 2 + t * 2.4;
-                double on = (i + (int) (t * 10)) % 5 == 0 ? 1 : 0.35;
-                int x = (int) Math.round(ox + Math.cos(a) * (r + 7));
-                int y = (int) Math.round(oy + Math.sin(a) * (r + 7));
-                g.fill(x, y, x + 1, y + 1, argb(i % 5 == 0 ? core : accent, on * Math.min(1, (t - 2.0) * 2)));
+        // Les repères de calage, qui tournent autour.
+        if (open > 0.6) {
+            for (int i = 0; i < 24; i++) {
+                double a = i * Math.PI / 12 + t * 0.5;
+                int x = (int) Math.round(ox + Math.cos(a) * (radius + 14));
+                int y = (int) Math.round(oy + Math.sin(a) * (radius + 14));
+                boolean hot = (i + (int) (t * 8)) % 6 == 0;
+                g.fill(x - 1, y - 1, x + 2, y + 2, Terminal.argb(hot ? core : i % 6 == 0 ? Terminal.GOLD : accent, (open - 0.6) * 2.5 * (hot ? 1 : 0.5)));
             }
         }
         g.pose().popPose();

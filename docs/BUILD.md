@@ -204,3 +204,16 @@ launcher servent en page de téléchargement.
 4. Publier la première version signée, déclarer les éventuels faux positifs restants.
 5. Activer `verifyUpdateCodeSignature` dans `electron-updater` — la mise à jour automatique
    devient alors vérifiée de bout en bout.
+
+## Les ressources chiffrées
+
+Le dépôt est public : les textures, modèles et animations d'OPM n'y figurent que dans
+`opm.pak`, chiffré (`scripts/paquet.js`). La compilation a besoin de la clé :
+
+- sur votre machine : le fichier `.cle-ressources`, à la racine (jamais versionné) ;
+- en CI : le secret **`OPM_PACK_KEY`** (Settings → Secrets and variables → Actions). S'il
+  manque, la compilation s'arrête.
+
+La clé voyage, brouillée, dans le mod et le launcher : cela empêche de se servir dans le
+dépôt ou dans le `.jar`, pas quelqu'un de déterminé. Perdue, elle se refait
+(`node scripts/paquet.js --cle`) tant que vous avez `xenodys/`.

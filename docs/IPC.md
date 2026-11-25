@@ -284,6 +284,7 @@ textures:pick        textures:upload        textures:remove
 updater:check        updater:event (→ renderer)
 
 log:history          log:line (→ renderer)
+resources:get        une ressource du paquet chiffré (assets/opm.pak), ou null
 ```
 
 ---

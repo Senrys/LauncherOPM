@@ -455,14 +455,13 @@ function jvmArguments(text) {
  * @param {boolean} verify       force la vérification complète des fichiers
  * @returns {object}
  */
-function buildOptions(instance, config, authenticator, verify, extraGameArgs = []) {
+function buildOptions(instance, config, authenticator, verify) {
   const loader = instance.loadder;
   const withLoader = loader.loadder_type && loader.loadder_type !== 'none';
 
   // La bibliothèque n'exploite pas `screen.fullscreen` : le plein écran passe donc
   // par l'argument de jeu, que Minecraft comprend depuis toujours.
   const gameArgs = config.game.fullscreen ? ['--fullscreen'] : [];
-  gameArgs.push(...extraGameArgs);
 
   return {
     url: instance.url,
@@ -1213,14 +1212,12 @@ async function launch(instanceName) {
     run.clientToken = typeof authenticator.client_token === 'string' ? authenticator.client_token : '';
 
     const world = await context;
-    const direct = config.game.direct_connect;
     const launcher = createLauncher(run, false);
     const options = buildOptions(
       instance,
       config,
       authenticator,
-      false,
-      direct ? bridge.directConnectArguments(world.server) : []
+      false
     );
     const instanceDir = path.join(paths.gameDir, 'instances', instance.name);
 
@@ -1273,7 +1270,6 @@ async function launch(instanceName) {
         name: authenticator.name,
         uuid: authenticator.uuid,
         server: world.server,
-        direct,
         animations: config.game.intro,
         apiBase: api.baseUrl(),
         scene,

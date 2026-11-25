@@ -65,8 +65,6 @@ const DEFAULT_CONFIG = deepFreeze({
     height: 720,
     fullscreen: false,
     remember_size: true,
-    // JOUER entre directement sur le serveur OPM (--quickPlayMultiplayer).
-    direct_connect: true,
     // Scène de chargement et intro de Xenodys dans le jeu (mod OPM du modpack).
     intro: true,
   },
@@ -243,7 +241,6 @@ function normalizeConfig(input, pinned = null) {
       height: clampInt(game.height, RESOLUTION_MIN, RESOLUTION_MAX, DEFAULT_CONFIG.game.height),
       fullscreen: toBool(game.fullscreen, DEFAULT_CONFIG.game.fullscreen),
       remember_size: toBool(game.remember_size, DEFAULT_CONFIG.game.remember_size),
-      direct_connect: toBool(game.direct_connect, DEFAULT_CONFIG.game.direct_connect),
       intro: toBool(game.intro, DEFAULT_CONFIG.game.intro),
     },
     launcher: {

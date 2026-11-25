@@ -4,56 +4,35 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 
 /**
- * L'écran de chargement : la salle de simulation en fond (pixel art), la scène
- * 3D de Xenodys au milieu (client/Choreo), le bandeau, la barre et son étape
- * par-dessus. Le chargement fini, Xenodys s'envole (`outro`), le joueur
- * s'imprime sur son circuit, et le monde s'ouvre dans un éclair.
+ * L'écran de chargement : le laboratoire de Xenodys (client/LabScene), qui
+ * s'assemble au fil du chargement, et la barre. Le chargement fini, la cuve se
+ * vide et descend dans la plateforme, et la caméra glisse vers le menu : l'écran
+ * titre reprend la même salle, au même instant.
  *
- * La même composition que la scène du launcher (launcher/src/assets/js/
- * components/loadingScene.js), à la même horloge : d'une fenêtre à l'autre,
- * rien ne saute.
+ * La même scène que celle du launcher (components/loadingScene.js), à la même
+ * horloge : d'une fenêtre à l'autre, rien ne saute.
  */
 public final class LoadingScene {
-    /** Durée de l'envol, jusqu'à l'ouverture du monde. */
-    public static final double OUTRO = 3.8;
+    /** Durée du passage au menu. */
+    public static final double OUTRO = 3.6;
 
     private final Lab lab = new Lab();
-    private final Choreo choreo = new Choreo();
+    private final LabScene scene = LabScene.get();
+    private final LabScene.View view = new LabScene.View();
     private double last = -1;
-
-    private static double seg(double t, double a, double b) {
-        return Math.max(0, Math.min(1, (t - a) / (b - a)));
-    }
-
-    private static double ease(double k) {
-        k = Math.max(0, Math.min(1, k));
-        return k * k * (3 - 2 * k);
-    }
-
-    private static int accent(String etat) {
-        return "corrompue".equals(etat) ? 0xF0506E : 0x91D9D1;
-    }
-
-    private static int core(String etat) {
-        return "corrompue".equals(etat) ? 0xFFD3DD : 0xE9FFFC;
-    }
-
-    private static int argb(int rgb, double a) {
-        return ((int) Math.round(Math.max(0, Math.min(1, a * Sprites.alpha)) * 255) << 24) | (rgb & 0xFFFFFF);
-    }
 
     /**
      * @param vw, vh  la scène en pixels virtuels (l'interface 2D)
      * @param t       horloge de la scène (secondes, partagée avec le launcher)
      * @param ratio   avancement global, 0 → 1
      * @param step    étape affichée sous la barre
+     * @param first   premier chargement : la salle s'assemble
      * @param outro   secondes depuis la fin du chargement, ou négatif
      */
-    public void render(GuiGraphics g, int vw, int vh, double t, float ratio, String step, String etat,
+    public void render(GuiGraphics g, int vw, int vh, double t, float ratio, String step, String etat, boolean first,
                        double outro, String playerName) {
         double dt = last < 0 ? 0 : Math.max(0, Math.min(0.1, t - last));
         last = t;
-        Skins.pump();
         boolean corrupted = "corrompue".equals(etat);
         lab.render(g, vw, vh, dt, etat, 1f);
 
@@ -61,40 +40,36 @@ public final class LoadingScene {
         g.flush();
         var window = Minecraft.getInstance().getWindow();
         if (Sprites.alpha > 0.02f) {
-            choreo.render(window.getWidth(), window.getHeight(), t, ratio, etat, outro);
+            view.etat = etat;
+            view.assemble = first;
+            view.ratio = outro >= 0 ? 1 : ratio;
+            view.drain = (float) LabScene.seg(outro, 0.3, 1.4);
+            view.tankDown = (float) LabScene.seg(outro, 1.1, 2.5);
+            view.menu = (float) LabScene.seg(outro, 1.5, 3.5);
+            scene.render(window.getWidth(), window.getHeight(), t, view);
         }
-
-        // Le bandeau.
-        Sprites.Sheet banner = Sprites.get(corrupted ? "bandeau_960_corrompue" : "bandeau_960");
-        if (banner != null) Sprites.draw(g, banner, 0, 12, 10, false, 1f, 0.125f);
 
         // La barre et son étape.
-        float mx = vw * 0.5f;
-        float bw = Math.min(vw * 0.46f, 240);
-        float bx0 = mx - bw / 2;
-        float by0 = vh - 16;
-        float shownRatio = outro >= 0 ? 1f : Math.max(0, Math.min(1, ratio));
-        g.fill((int) bx0 - 1, (int) by0 - 1, (int) (bx0 + bw) + 1, (int) by0 + 5, argb(0x000000, 0.55));
-        g.fill((int) bx0 - 1, (int) by0 - 1, (int) (bx0 + bw) + 1, (int) by0, argb(accent(etat), 0.5));
-        int segs = (int) (bw / 4);
-        int lit = (int) Math.floor(shownRatio * segs);
-        for (int i = 0; i < lit; i++) {
-            int x0 = (int) bx0 + i * 4;
-            g.fill(x0, (int) by0 + 1, x0 + 3, (int) by0 + 4, argb(i == lit - 1 ? core(etat) : accent(etat), 1));
-        }
-        String label = outro >= 0 ? (corrupted ? "Le monde vous attend… sous contrôle" : "Xenodys vous ouvre le monde") : step;
-        PixelFont.draw(g, label, bx0, by0 - 11, core(etat), 0.95f, 1f);
-        String pct = Math.round(shownRatio * 100) + " %";
-        PixelFont.draw(g, pct, bx0 + bw - PixelFont.width(pct), by0 - 11, accent(etat), 0.95f, 1f);
-
-        if (outro >= 0.8 && playerName != null) {
-            double a = seg(outro, 0.8, 1.3) * (1 - seg(outro, 3.0, 3.5));
-            PixelFont.drawCentered(g, "Bienvenue, " + playerName, mx, vh * 0.16f, core(etat), (float) a, 2f);
-        }
-
-        // L'ouverture du monde.
-        if (outro >= 3.0) {
-            g.fill(0, 0, vw, vh, argb(core(etat), ease(seg(outro, 3.0, OUTRO))));
+        double a = outro >= 0 ? 1 - LabScene.seg(outro, 1.4, 1.9) : 1;
+        if (a > 0.01) {
+            int w = Math.min(Math.round(vw * 0.62f), 300);
+            int x0 = (vw - w) / 2;
+            int y0 = vh - 42;
+            Terminal.frame(g, x0, y0, x0 + w, y0 + 34, corrupted, null, a);
+            float shownRatio = outro >= 0 ? 1f : Math.max(0, Math.min(1, ratio));
+            String label = outro >= 0 ? (playerName != null ? "Bienvenue, " + playerName : "Bienvenue") : step;
+            PixelFont.draw(g, label, x0 + 13, y0 + 10, Terminal.TEXT, (float) a, 1f);
+            String pct = Math.round(shownRatio * 100) + " %";
+            PixelFont.draw(g, pct, x0 + w - 13 - PixelFont.width(pct), y0 + 10, Terminal.accent(corrupted), (float) a, 1f);
+            int segs = (w - 26) / 6;
+            int lit = (int) Math.floor(shownRatio * segs);
+            for (int i = 0; i < segs; i++) {
+                int x = x0 + 13 + i * 6;
+                int c = i < lit - 1 ? Terminal.accent(corrupted) : i == lit - 1 ? Terminal.core(corrupted) : corrupted ? 0x3A1A34 : 0x1F4A4A;
+                // Une impulsion court sur la barre.
+                boolean pulse = i < lit && Math.abs(i - (t * 26) % (segs + 30)) < 1.5;
+                g.fill(x, y0 + 21, x + 4, y0 + 26, Terminal.argb(pulse ? Terminal.core(corrupted) : c, a));
+            }
         }
     }
 

@@ -39,7 +39,8 @@
   background: linear-gradient(180deg, var(--abyss) 0%, var(--hull) 45%, var(--abyss) 100%);
 }
 
-/* La salle : un canevas en gros pixels, agrandi sans lissage. */
+/* Le laboratoire (components/labScene.js) ; à défaut, la salle de simulation, un canevas
+   en gros pixels agrandi sans lissage. */
 .opm-bg__lab {
   position: absolute;
   inset: 0;
@@ -72,6 +73,24 @@
               rgb(var(--veil-ink) / 0) 20%,
               rgb(var(--veil-ink) / 0) 60%,
               rgb(var(--veil-ink) / .86) 100%);
+}
+
+:root[data-labo] .opm-bg__lab { image-rendering: auto; }
+
+/* Le laboratoire est clair : les voiles se renforcent, pour que les textes restent lisibles. */
+:root[data-labo] .opm-bg__veil-a {
+  background: linear-gradient(102deg,
+              rgb(var(--veil-ink) / .90) 0%,
+              rgb(var(--veil-ink) / .74) 40%,
+              rgb(var(--veil-ink) / .30) 68%,
+              rgb(var(--veil-ink) / .46) 100%);
+}
+:root[data-labo] .opm-bg__veil-b {
+  background: linear-gradient(180deg,
+              rgb(var(--veil-ink) / .82) 0%,
+              rgb(var(--veil-ink) / .18) 22%,
+              rgb(var(--veil-ink) / .06) 62%,
+              rgb(var(--veil-ink) / .92) 100%);
 }
 
 /* ============================================================================

@@ -1,7 +1,7 @@
 /**
  * Xenodys en 3D — hors du cadre, en mode « fenêtre ouverte ».
  *
- * Lit le modèle GeckoLib généré par xenodys/generer.py (assets/js/data/
+ * Lit le modèle GeckoLib du paquet de ressources (assets/js/data/
  * xenodys-model.js : géométrie Bedrock et animations, les mêmes que dans le
  * jeu) et le fait vivre dans un canevas posé à cheval sur le bord droit du
  * launcher (layout/frame.css, `.opm-xeno-stage`).
@@ -28,6 +28,7 @@
  */
 
 import { ANIMATIONS, ASSISTANT_ANIMATIONS, ASSISTANT_GEO, GEO } from '../data/xenodys-model.js';
+import { packImage } from '../utils/pack.js';
 import { liveCharacter } from './character3d.js';
 import { rebuildFrame } from './intro.js';
 
@@ -219,6 +220,7 @@ export function pose(bones, anim, t, extra = null) {
  * @param {HTMLElement} frame  le cadre du launcher
  */
 export async function createXenodys(canvas, stage, frame) {
+  if (!GEO || !ANIMATIONS) throw new Error('ressources de Xenodys absentes');
   const lib = window.skinview3d;
   if (!lib) throw new Error('skinview3d absent');
 
@@ -249,35 +251,29 @@ export async function createXenodys(canvas, stage, frame) {
   viewer.playerObject.visible = false;
   if (viewer.globalLight) viewer.globalLight.intensity *= 0.85;
 
-  const load = (src) =>
-    new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => {
-        const t = new T.Texture(img);
-        t.magFilter = NEAREST;
-        t.minFilter = NEAREST;
-        t.generateMipmaps = false;
-        t.needsUpdate = true;
-        resolve(t);
-      };
-      img.onerror = () => reject(new Error(`texture introuvable : ${src}`));
-      img.src = src;
-    });
+  const load = async (name) => {
+    const t = new T.Texture(await packImage(`entity/${name}.png`));
+    t.magFilter = NEAREST;
+    t.minFilter = NEAREST;
+    t.generateMipmaps = false;
+    t.needsUpdate = true;
+    return t;
+  };
 
   /** Les textures d'un modèle, dans ses deux états, et son matériau. */
   async function skinned(name, { blink = false } = {}) {
     const skins = {};
     for (const etat of ['creatrice', 'corrompue']) {
       const [map, glow] = await Promise.all([
-        load(`assets/xenodys/${name}_${etat}.png`),
-        load(`assets/xenodys/${name}_${etat}_glowmask.png`),
+        load(`${name}_${etat}`),
+        load(`${name}_${etat}_glowmask`),
       ]);
       skins[etat] = { map, glow };
       if (blink) {
         // Les paupières closes : la même texture, le regard éteint.
         const [bmap, bglow] = await Promise.all([
-          load(`assets/xenodys/${name}_${etat}_blink.png`),
-          load(`assets/xenodys/${name}_${etat}_blink_glowmask.png`),
+          load(`${name}_${etat}_blink`),
+          load(`${name}_${etat}_blink_glowmask`),
         ]).catch(() => [null, null]);
         if (bmap && bglow) skins[`${etat}_blink`] = { map: bmap, glow: bglow };
       }

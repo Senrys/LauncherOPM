@@ -26,6 +26,10 @@ neoForge {
             systemProperty 'opm.debug.quit', (project.findProperty('opmQuit') ?: '-1').toString()
             systemProperty 'opm.debug.status', (project.findProperty('opmStatus') ?: '').toString()
             systemProperty 'opm.debug.world', (project.findProperty('opmWorld') ?: '').toString()
+            systemProperty 'opm.debug.profile', (project.findProperty('opmProfile') ?: '').toString()
+            systemProperty 'opm.debug.etat', (project.findProperty('opmEtat') ?: '').toString()
+            systemProperty 'opm.debug.join', (project.findProperty('opmJoin') ?: '-1').toString()
+            systemProperty 'opm.debug.duration', (project.findProperty('opmDuration') ?: '26').toString()
             systemProperty 'opm.debug.scene', (project.findProperty('opmScene') ?: '').toString()
         }
     }
@@ -53,6 +57,52 @@ tasks.withType(ProcessResources).configureEach {
 
 // Le même code donne le même fichier, quelle que soit la machine : son empreinte peut
 // être connue du serveur (OPM_MOD_SHA1).
+// La clé du paquet de ressources (scripts/paquet.js) : OPM_PACK_KEY, ou le fichier local
+// .cle-ressources. Générée à la compilation, jamais versionnée. Sans clé, le mod se
+// compile, mais le paquet reste fermé ; en CI, c'est une erreur.
+def packKeyDir = layout.buildDirectory.dir('generated/packkey')
+def packKeyValue = provider {
+    def env = (System.getenv('OPM_PACK_KEY') ?: '').trim()
+    def file = rootProject.file('../.cle-ressources')
+    env ?: (file.exists() ? file.text.trim() : '')
+}
+def generatePackKey = tasks.register('generatePackKey') {
+    inputs.property 'empreinte', packKeyValue.map { it.sha256() }
+    outputs.dir packKeyDir
+    doLast {
+        def hex = packKeyValue.get()
+        if (!(hex ==~ /(?i)[0-9a-f]{64}/)) {
+            if (System.getenv('CI')) throw new GradleException('OPM_PACK_KEY manque : ajoutez le secret GitHub Actions.')
+            hex = ''
+        }
+        // Deux moitiés à recomposer, tirées de la clé elle-même : la compilation reste reproductible.
+        def bytes = hex ? hex.decodeHex() : new byte[0]
+        def mask = java.security.MessageDigest.getInstance('SHA-256').digest(('opm' + hex.reverse()).bytes)
+        def half = { i -> (byte) (bytes[i] ^ mask[i]) }
+        def list = { l -> l.collect { "(byte) ${it}" }.join(', ') }
+        def out = packKeyDir.get().file('fr/onepieceminecraft/opm/PackKey.java').asFile
+        out.parentFile.mkdirs()
+        out.text = """package fr.onepieceminecraft.opm;
+
+/** Généré à la compilation (build.gradle) : ne pas versionner. */
+public final class PackKey {
+    private static final byte[] A = {${list((0..<bytes.length).collect { half(it) })}};
+    private static final byte[] B = {${hex ? list(mask as List) : ''}};
+
+    private PackKey() {}
+
+    public static byte[] get() {
+        if (A.length != 32) return null;
+        byte[] k = new byte[32];
+        for (int i = 0; i < 32; i++) k[i] = (byte) (A[i] ^ B[i]);
+        return k;
+    }
+}
+"""
+    }
+}
+sourceSets.main.java.srcDir generatePackKey
+
 tasks.withType(AbstractArchiveTask).configureEach {
     preserveFileTimestamps = false
     reproducibleFileOrder = true

@@ -3,13 +3,9 @@ package fr.onepieceminecraft.opm.client;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import fr.onepieceminecraft.opm.Opm;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -91,11 +87,11 @@ public final class GeoModel {
         }
     }
 
-    /** Charge un modèle du jar : `assets/opm/geckolib/{geo,animations}/<nom>…` (animations facultatives). */
+    /** Charge un modèle du paquet : `geckolib/{geo,animations}/<nom>…` (animations facultatives). */
     public static GeoModel load(String name, String prefix) {
         try {
-            JsonObject anims = read("/assets/opm/geckolib/animations/" + name + ".animation.json");
-            return new GeoModel(read("/assets/opm/geckolib/geo/" + name + ".geo.json"), anims,
+            JsonObject anims = read("geckolib/animations/" + name + ".animation.json");
+            return new GeoModel(read("geckolib/geo/" + name + ".geo.json"), anims,
                     prefix != null ? prefix : "animation." + name);
         } catch (Exception e) {
             Opm.LOG.error("Modèle « {} » illisible", name, e);
@@ -104,10 +100,7 @@ public final class GeoModel {
     }
 
     private static JsonObject read(String path) throws Exception {
-        try (InputStream in = GeoModel.class.getResourceAsStream(path)) {
-            if (in == null) return null;
-            return JsonParser.parseReader(new InputStreamReader(in, StandardCharsets.UTF_8)).getAsJsonObject();
-        }
+        return Pack.has(path) ? Pack.json(path) : null;
     }
 
     private static float[] vec(JsonArray a) {
