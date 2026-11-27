@@ -998,17 +998,18 @@ function abort(run, note) {
 }
 
 /**
- * La cinématique du lancement (fenêtre ouverte) : Xenodys emporte le launcher
- * dans ses mains. Elle commence au clic sur JOUER (`prepare`) : le launcher
- * n'est plus qu'un orbe pendant la préparation des fichiers ; le passage ne
- * s'ouvre qu'au démarrage de la machine virtuelle (`launching`).
+ * La cinématique du lancement (fenêtre ouverte). Pendant la préparation des
+ * fichiers (dès `prepare`), le launcher reste ouvert : Xenodys tisse la barre de
+ * progression. Au démarrage de la machine virtuelle (`launching`), elle prend le
+ * joueur et le launcher dans ses mains, tisse un monde où le joueur plonge, et le
+ * passage s'ouvre (au moins 1,5 s de tissage avant ce départ, voir le renderer).
  *
  * À partir de là, le launcher reste au premier plan : la fenêtre du jeu s'ouvre
  * DERRIÈRE lui, et n'apparaît qu'une fois la cinématique jouée — le renderer
  * l'annonce —, au plus tard après CINEMATIC_MAX_MS. La fenêtre n'est masquée
  * qu'à ce moment.
  */
-const CINEMATIC_MAX_MS = 7_000;
+const CINEMATIC_MAX_MS = 12_000;
 /**
  * Avec la scène de chargement (mod OPM présent), le launcher couvre tout le
  * chargement des mods : il ne s'efface qu'à `[OPM:READY]`, ou à ce délai si le

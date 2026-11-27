@@ -19,8 +19,9 @@
  * Le bocal descend sur lui quand Xenodys bascule, et remonte quand elle revient.
  *
  * `liveCharacter()` donne le personnage affiché : la cinématique du lancement
- * (components/xenodys3d.js) en prend une image, calque par calque, pour le
- * défaire en pixels.
+ * (components/xenodys3d.js) en prend une image, calque par calque, pour
+ * l'emporter dans sa main ; pendant la préparation, il regarde, émerveillé, la
+ * barre qu'elle tisse (`wonder`).
  *
  * `prefers-reduced-motion` : pas de respiration, pas de tremblement.
  */
@@ -33,7 +34,7 @@ const JAR_DROP = 20;
 /** Le personnage actuellement affiché (un seul à la fois : l'accueil). */
 let live = null;
 
-/** @returns {null | {capture: () => any, skin: () => any, feet: () => any}} */
+/** @returns {null | {capture: () => any, skin: () => any, feet: () => any, wonder: (el: Element|null) => void, setPresent: (on: boolean) => void, cheer: () => void, setMood: (m: string|null) => void}} */
 export function liveCharacter() {
   return live;
 }
@@ -123,6 +124,11 @@ export function createCharacter(canvas, { width, height, zoom = 0.86 }) {
   const headY = player.skin.head.position.y;
   /** `fear` de 0 à 1 : de la respiration calme à la peur. */
   let fear = 0;
+  /** `awe` de 0 à 1 : il regarde, émerveillé, ce que Xenodys tisse (voir `wonder`). */
+  let awe = 0;
+  /** Ce qu'il regarde alors : un élément de la page, et où il est par rapport à lui. */
+  let wonderAt = null;
+  let gaze = { yaw: 0, pitch: 0, body: YAW };
   const breathe = (t) => {
     const sk = player.skin;
     const b = Math.cos(t * 2);
@@ -148,17 +154,85 @@ export function createCharacter(canvas, { width, height, zoom = 0.86 }) {
       shake = f * tremble * 0.18;
       legs = f * 0.18;
     }
-    player.rotation.set(PITCH, YAW, 0);
+    const w = awe * (1 - fear);
+    const mix = (a, b, k) => a + (b - a) * k;
+    const bump = (x, a, b) => (x <= a || x >= b ? 0 : Math.sin(Math.PI * ((x - a) / (b - a))));
+    // L'impatience (le téléchargement stagne) et la tristesse (il a échoué).
+    const imp = moodK.stalled * w;
+    const sad = moodK.sad * (1 - fear);
+    let rArmX = null;
+    let rArmZ = null;
+    if (w > 0) {
+      // L'émerveillement : il tourne la tête vers la barre, l'incline ; les bras
+      // s'écartent un peu, les mains à demi levées ; il sautille sur place.
+      const hop = Math.max(0, Math.sin(t * 3.1)) ** 3;
+      lax = lax * (1 - w) + w * (0.42 + 0.04 * Math.sin(t * 2.3));
+      rax = rax * (1 - w) + w * (-0.42 - 0.04 * Math.sin(t * 2.3));
+      armsX = armsX * (1 - w) + w * (-0.55 + 0.06 * Math.sin(t * 2.3));
+      headX = headX * (1 - w) + w * gaze.pitch;
+      headYaw = headYaw * (1 - w) + w * gaze.yaw;
+      wonderHop = w * hop * 0.6 * (1 - imp);
+      // De temps en temps, il pointe la barre du doigt…
+      const point = w * bump(t % 7, 2.0, 3.6) * (1 - imp);
+      rArmX = mix(armsX, -1.15, point);
+      rArmZ = mix(rax, -0.12, point);
+      // … et lève les yeux vers Xenodys, là-haut à droite.
+      const look = w * bump(t % 9.5, 5.2, 6.6) * (1 - imp);
+      headYaw = mix(headYaw, Math.min(1.25, 0.9 - (gaze.body - YAW) * 0.4), look);
+      headX = mix(headX, -0.3, look);
+      // Un palier franchi : il saute de joie, les bras en l'air.
+      const c = bump(clock - cheerAt, 0, 0.9);
+      if (c > 0) {
+        armsX = mix(armsX, -2.9, c);
+        rArmX = mix(rArmX, -2.9, c);
+        lax = mix(lax, 0.35, c);
+        rArmZ = mix(rArmZ, -0.35, c);
+        wonderHop += 1.8 * c;
+      }
+      // Il s'impatiente : les mains sur les hanches, il tape du pied, secoue la tête.
+      if (imp > 0) {
+        lax = mix(lax, 0.75, imp);
+        rArmZ = mix(rArmZ, -0.75, imp);
+        armsX = mix(armsX, 0.35, imp);
+        rArmX = mix(rArmX, 0.35, imp);
+        legs = mix(legs, 0, imp);
+        headYaw += 0.22 * Math.sin(t * 2.6) * imp;
+      }
+    } else {
+      wonderHop = 0;
+    }
+    if (sad > 0) {
+      // Déçu : la tête basse, les bras ballants, les épaules qui tombent.
+      headX = mix(headX, 0.55, sad);
+      headYaw = mix(headYaw, 0, sad);
+      lax = mix(lax, 0.03, sad);
+      rax = mix(rax, -0.03, sad);
+      armsX = mix(armsX, 0.12, sad);
+      if (rArmX !== null) rArmX = mix(rArmX, 0.12, sad);
+      if (rArmZ !== null) rArmZ = mix(rArmZ, -0.03, sad);
+      wonderHop *= 1 - sad;
+    }
+    // Émerveillé, il se tourne de tout son corps vers la barre.
+    player.rotation.set(PITCH, YAW + (gaze.body - YAW) * w, 0);
     player.position.x = shake;
     sk.leftArm.rotation.set(armsX, 0, lax);
-    sk.rightArm.rotation.set(armsX, 0, rax);
-    sk.head.rotation.set(headX, headYaw, 0);
+    sk.rightArm.rotation.set(rArmX ?? armsX, 0, rArmZ ?? rax);
+    sk.head.rotation.set(headX, headYaw, w > 0 ? w * 0.12 * Math.sin(t * 0.9) : 0);
     sk.leftLeg.rotation.x = legs;
-    sk.rightLeg.rotation.x = -legs * 0.6;
-    const rise = 0.12 * (1 + Math.sin(t * (fear > 0.5 ? 6 : 2))) - fear * 0.8;
+    sk.rightLeg.rotation.x = -legs * 0.6 - (imp > 0 ? 0.32 * Math.max(0, Math.sin(t * 9)) * imp : 0);
+    const rise = 0.12 * (1 + Math.sin(t * (fear > 0.5 ? 6 : 2))) - fear * 0.8 - sad * 0.35;
     sk.body.position.y = bodyY + rise;
     sk.head.position.y = headY + rise;
+    player.position.y = wonderHop;
   };
+  let wonderHop = 0;
+  /** Le dernier palier fêté (instant, sur l'horloge de l'animation). */
+  let cheerAt = -10;
+  /** Son humeur (`stalled` : il s'impatiente ; `sad` : déçu), lissée. */
+  let mood = null;
+  const moodK = { stalled: 0, sad: 0 };
+  /** Faux pendant que Xenodys l'emporte : ni lui ni son bocal ne sont sur le socle. */
+  let present = true;
   breathe(0);
 
   const platform = buildPlatform(T);
@@ -226,13 +300,62 @@ export function createCharacter(canvas, { width, height, zoom = 0.86 }) {
     const fall = corrupted ? bounceOut(jarIn) : jarIn * jarIn * (3 - 2 * jarIn);
     jar.root.position.y = FLOOR + JAR_DROP * (1 - fall);
     fadeJar(Math.min(1, jarIn * 2.5));
-    jar.root.visible = jarIn > 0.002;
+    jar.root.visible = present && jarIn > 0.002;
     const fearTarget = corrupted ? (jarIn > 0.6 ? 1 : 0) : 0;
     const step = reduced ? 1 : dt * 2;
     fear += Math.max(-step, Math.min(step, fearTarget - fear));
+    const aweTarget = wonderAt?.isConnected ? 1 : 0;
+    awe += reduced ? aweTarget - awe : Math.max(-dt * 1.6, Math.min(dt * 1.6, aweTarget - awe));
+    if (wonderAt?.isConnected) aim();
+    for (const m of ['stalled', 'sad']) {
+      const goal = mood === m ? 1 : 0;
+      moodK[m] += reduced ? goal - moodK[m] : Math.max(-dt * 2.5, Math.min(dt * 2.5, goal - moodK[m]));
+    }
     jar.update(dt);
     breathe(reduced ? 0 : clock);
   });
+
+  /**
+   * Où regarder : il se tourne vers l'élément suivi (`wonder`), à partir de
+   * sa place à l'écran — le corps d'abord, la tête rattrape le reste.
+   */
+  function aim() {
+    const r = wonderAt.getBoundingClientRect();
+    const c = canvas.getBoundingClientRect();
+    if (!c.width || !r.width) return;
+    const hx = c.left + c.width * 0.5;
+    const hy = c.top + c.height * 0.32;
+    const tx = r.left + r.width * 0.6;
+    const ty = r.top + r.height / 2;
+    // Le corps se tourne vers la barre ; la tête fait le reste (dans des limites naturelles).
+    const full = Math.atan2(tx - hx, c.width * 0.45);
+    const body = Math.max(-1.3, Math.min(1.0, Math.atan2(tx - hx, c.width * 0.55)));
+    const yaw = Math.max(-0.5, Math.min(0.5, full - body));
+    const pitch = Math.max(-0.4, Math.min(0.6, Math.atan2(ty - hy, c.height * 0.9) - PITCH));
+    gaze = { yaw, pitch, body };
+  }
+
+  /** Il regarde un élément, émerveillé (la barre que Xenodys tisse) ; `null` : il reprend sa pose. */
+  function wonder(el) {
+    wonderAt = el ?? null;
+  }
+
+  /** Un palier de la barre est franchi : il saute de joie. */
+  function cheer() {
+    if (clock - cheerAt > 1) cheerAt = clock;
+  }
+
+  /** Son humeur : `stalled` (il s'impatiente), `sad` (déçu), ou `null`. */
+  function setMood(m) {
+    mood = m === 'stalled' || m === 'sad' ? m : null;
+  }
+
+  /** Le joueur est-il sur son socle ? (Xenodys l'emporte pendant le départ.) */
+  function setPresent(on) {
+    present = Boolean(on);
+    player.visible = present;
+    if (!present) jar.root.visible = false;
+  }
 
   /**
    * Une image du personnage, en deux calques : lui et son socle, puis le bocal
@@ -262,9 +385,14 @@ export function createCharacter(canvas, { width, height, zoom = 0.86 }) {
       player.visible = true;
       platform.root.visible = true;
     }
+    // Lui seul, sans son socle ni son bocal : ce que Xenodys emporte.
+    platform.root.visible = false;
+    jar.root.visible = false;
+    const alone = grab();
+    platform.root.visible = true;
     jar.root.visible = jarShown;
     viewer.render();
-    return { rect, body, jar: glass };
+    return { rect, body, alone, jar: glass };
   }
 
   /** Le skin affiché (data: URL, bras fins ou larges), ou `null`. */
@@ -290,7 +418,7 @@ export function createCharacter(canvas, { width, height, zoom = 0.86 }) {
     return { x, y };
   }
 
-  const handle = { capture, skin, feet };
+  const handle = { capture, skin, feet, wonder, setPresent, cheer, setMood };
   live = handle;
 
   return {

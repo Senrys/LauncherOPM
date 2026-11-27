@@ -91,7 +91,7 @@ demande de réduire les animations.
 Le launcher et le **mod OPM** (`mod/`, voir `mod/README.md` ; embarqué dans le launcher,
 qui l'installe lui-même dans le jeu) se passent le relais sans que rien ne se voie :
 
-1. **JOUER** : la cinématique (ci-dessous). À l'éclair du passage, la **scène de
+1. **JOUER** : la préparation, puis la cinématique du départ (ci-dessous). À l'éclair du passage, la **scène de
    chargement** du launcher apparaît (`components/loadingScene.js`), en **vraie 3D** à la
    résolution de l'écran, sur la salle de simulation. Chorégraphie en boucle de 10 s :
    Xenodys façonne un monde de blocs entre ses mains (il grandit avec le chargement) ;
@@ -210,12 +210,38 @@ launcher : « Chargement animé par Xenodys ».
   exposé sur un socle de circuit imprimé en voxels, tourné vers la droite, il respire ; les
   circuits de Xenodys se dessinent autour de lui. Corrompue : il est enfermé dans un bocal
   d'expérience, et il a peur.
-- **La cinématique du lancement** (fenêtre ouverte) : dès le clic sur JOUER, Xenodys lâche
-  le cadre, vole devant lui, nous tourne le dos ; le joueur se défait en pixels et file
-  entre ses mains (corrompue : son bocal éclate) ; le launcher rétrécit jusqu'à n'être
-  qu'un orbe. Pendant la préparation des fichiers, l'orbe attend : un anneau et une
-  étiquette en disent l'avancement, et le cliquer ramène le launcher. Quand le jeu
-  démarre, elle ouvre les bras et une onde de lumière (ou de blocs rouges et violets)
-  envahit la fenêtre. Le launcher reste au premier plan pendant ce temps (la fenêtre du
-  jeu s'ouvre derrière lui) et ne se masque qu'à la fin. Au retour du jeu, le cadre se
-  reconstruit et elle revient.
+- **La préparation** (fenêtre ouverte) : pendant la vérification, le téléchargement et
+  la mise à jour des fichiers, le launcher reste ouvert. Xenodys tisse la barre de
+  progression : sa main gauche quitte le bord du cadre, s'agrandit, passe devant son corps
+  et tourne la paume vers la barre ; ses doigts pincent les fils
+  l'un après l'autre (geste `weave` ; corrompue, `corrupted_weave` : elle les arrache) et
+  des fils de lumière filent jusqu'à la tête de la barre, devenue une étoffe qui se tisse.
+  Les fils suivent la préparation : le débit fait courir les éclats et ses doigts ; la
+  vérification les parcourt à rebours ; l'extraction y fait des nœuds ; un téléchargement
+  qui stagne détend les fils et arrête l'étoffe. Le joueur, sur son socle, se tourne vers
+  la barre, émerveillé : il la pointe du doigt, lève les yeux vers Xenodys, saute de joie
+  à chaque quart, s'impatiente (mains sur les hanches, il tape du pied) quand rien ne
+  vient. Un échec : les fils claquent et tombent, il baisse la tête. Le tissage dure au
+  moins 1,5 s avant le départ, même quand les fichiers sont déjà à jour.
+- **La cinématique du départ** (le jeu démarre) : toujours penchée sur le launcher,
+  Xenodys prend le joueur — sa main gauche se tourne paume vers le ciel et s'ouvre en
+  grand ; il quitte son socle, glisse jusqu'à elle (des fils le portent, une traînée de
+  lumière le suit) et se pose au creux de sa paume ; elle arrondit les doigts (`take`) et
+  ramène sa main contre le cadre. Puis sa main droite s'ouvre et le launcher s'y replie, au coin qu'elle
+  tient (`grasp_right` : il se soulève, des fils le tirent par ses coins, elle apparaît
+  derrière lui à mesure qu'il se retire). Elle se redresse, s'avance, les mains en coupe :
+  la lueur du launcher devient le cœur d'un monde qu'elle tisse de sa main droite, couche
+  après couche — cœur, roche, océan et terres, nuages —, avec les blocs du laboratoire (le
+  même atlas que la salle de simulation) ; le bâtisseur lui lance des blocs, la luciole en
+  fait le tour, la fileuse l'entoure d'un fil d'or. Halo, poussière d'étoiles, étincelles,
+  reflets sur le fil. Le joueur quitte sa paume et plonge dedans ; le monde s'éveille en
+  rayons, le passage s'ouvre depuis lui. Corrompue : son bocal éclate, elle serre le
+  joueur dans sa main tremblante, broie le launcher dans son poing (l'écran tremble, des
+  fissures partent de ses doigts), tisse un monde de travers, y jette le joueur, et le
+  monde se déchire. Le launcher reste au premier plan pendant ce temps (la fenêtre du
+  jeu s'ouvre derrière lui) et ne se masque qu'à la fin.
+- **Le retour** (fin de partie) : le départ à l'envers — elle réapparaît redressée, le
+  joueur dans une main et le launcher dans l'autre, se repenche à sa place ; le launcher
+  se déplie de sa main droite ; elle ouvre la paume et le joueur retourne sur son socle ; ses assistants
+  reviennent. Les gestes viennent du paquet de ressources (`xenodys/tisseuse.py`,
+  `animations_opm`) : le mod du jeu peut les utiliser aussi.

@@ -834,17 +834,19 @@ function wireAmbiance() {
 /**
  * La cinématique du lancement (components/xenodys3d.js).
  *
- * - Clic sur JOUER (`prepare`) : Xenodys emporte le launcher ; il n'est plus
- *   qu'un orbe entre ses mains pendant la préparation des fichiers (un anneau
- *   en dit l'avancement ; cliquer l'orbe ramène le launcher).
- * - Le jeu démarre (`launching`) : le passage s'ouvre. Le processus principal
+ * - Pendant la préparation des fichiers (vérification, téléchargement, mise à
+ *   jour), le launcher reste ouvert : Xenodys tisse la barre de progression,
+ *   la paume de sa main gauche tournée vers elle ; le joueur, sur son socle,
+ *   la regarde, émerveillé.
+ * - Le jeu démarre (`launching`) : elle s'envole, prend le joueur dans sa main
+ *   gauche, le launcher se réduit, le passage s'ouvre. Le processus principal
  *   garde la fenêtre au premier plan et ne la masque qu'à `cinematicEnd`.
  * - Fin de partie, échec : le launcher se reconstruit et elle revient ; après
  *   un échec, elle réagit.
  * @param {Awaited<ReturnType<typeof createXenodys>>} xen
  */
 function wireCinematic(xen) {
-  let phase = 'idle'; // idle | playing | gone
+  let phase = 'idle'; // idle | waiting | playing | gone
   let returnPending = false;
   const OVER = new Set(['closed', 'error', 'idle']);
 
@@ -895,19 +897,12 @@ function wireCinematic(xen) {
     returnPending = false;
   };
 
-  /** Le joueur clique l'orbe : le launcher revient, la préparation continue. */
-  const abortToLauncher = () => {
-    comeBack();
-    // Plus rien à attendre : si le jeu démarre ensuite, une nouvelle
-    // cinématique (sans attente) prendra le relais.
-    opm.window.cinematicEnd();
-  };
-
   const begin = () => {
     phase = 'playing';
     cineDone = false;
     sceneLoaded = false;
-    xen.begin(sfx, { progress: () => store.get().game, onAbort: abortToLauncher, onFlash: showScene }).then((done) => {
+    setWeaving(false);
+    xen.launch(sfx, { onFlash: showScene }).then((done) => {
       if (!done) return;
       cineDone = true;
       if (sceneExpected && sceneLoaded) {
@@ -920,11 +915,71 @@ function wireCinematic(xen) {
     });
   };
 
-  opm.game.on((event) => {
-    if (event?.type === 'prepare' && phase === 'idle') {
-      sceneExpected = false;
-      begin();
+  // La préparation : elle tisse la barre, le joueur la regarde.
+  const PREPARING = new Set(['check', 'download', 'extract', 'patch']);
+  /**
+   * Le tissage dure au moins ce temps avant le départ : quand les fichiers sont
+   * déjà à jour, la vérification est si courte que le geste n'aurait pas le
+   * temps de se lire.
+   */
+  const WEAVE_MIN_MS = 1500;
+  const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+  let weaving = false;
+  let weaveSince = 0;
+  let departTimer = 0;
+  let milestone = 0;
+  const setWeaving = (on) => {
+    if (on === weaving) return;
+    weaving = on;
+    const bar = document.querySelector('[data-el="progress"]');
+    if (on) {
+      weaveSince = performance.now();
+      milestone = Math.floor((store.get().game?.ratio ?? 0) * 4);
     }
+    // La barre devient une étoffe (layout/bottombar.css, `data-weaving`).
+    if (bar) {
+      if (on && !reducedMotion) bar.dataset.weaving = '';
+      else delete bar.dataset.weaving;
+    }
+    xen.weave(on, { bar, fill: document.querySelector('[data-el="progress-fill"]') });
+    if (on) xen.weaveInfo(store.get().game);
+    const who = liveCharacter();
+    who?.wonder?.(on ? bar : null);
+    if (!on) who?.setMood?.(null);
+  };
+  /**
+   * Pendant le tissage, l'avancement réel anime la scène : les fils suivent le
+   * débit, le joueur fête chaque quart de la barre, s'impatiente quand le
+   * téléchargement stagne (et l'étoffe s'arrête).
+   */
+  const followWeaving = (game) => {
+    xen.weaveInfo(game);
+    const who = liveCharacter();
+    const quarter = Math.floor((game?.ratio ?? 0) * 4);
+    if (game?.state === 'download' && quarter > milestone && quarter < 4) who?.cheer?.();
+    if (quarter > milestone) milestone = quarter;
+  };
+  const stallTimer = setInterval(() => {
+    if (!weaving) return;
+    const stalled = xen.weaveStalled;
+    liveCharacter()?.setMood?.(stalled ? 'stalled' : null);
+    const bar = document.querySelector('[data-el="progress"]');
+    if (bar && 'weaving' in bar.dataset) bar.dataset.weaving = stalled ? 'lent' : '';
+  }, 400);
+  void stallTimer;
+  /** La préparation a échoué : les fils cassent, le joueur est déçu. */
+  const snapWeaving = () => {
+    xen.snap();
+    setWeaving(false);
+    const who = liveCharacter();
+    who?.setMood?.('sad');
+    setTimeout(() => {
+      if (!weaving) liveCharacter()?.setMood?.(null);
+    }, 2600);
+  };
+
+  opm.game.on((event) => {
+    if (event?.type === 'prepare' && phase === 'idle') sceneExpected = false;
     if (event?.type === 'music') holdMusic(false);
     if (event?.type === 'scene') {
       // La musique continue jusqu'à ce que le jeu la reprenne (au plus 4 min).
@@ -944,10 +999,30 @@ function wireCinematic(xen) {
   store.subscribe((state, changed) => {
     if (!changed.has('game')) return;
     const g = state.game?.state;
+    if (g === 'error' && weaving) snapWeaving();
+    if (weaving && PREPARING.has(g)) followWeaving(state.game);
     if (g === 'launching') {
-      if (phase === 'idle') begin();
-      if (phase === 'playing') xen.release();
+      if (phase !== 'idle') return;
+      // Le départ attend que le tissage ait duré assez longtemps (il commence
+      // ici s'il n'avait pas eu lieu).
+      const left = reducedMotion ? 0 : WEAVE_MIN_MS - (weaving ? performance.now() - weaveSince : 0);
+      if (left <= 0) {
+        begin();
+        return;
+      }
+      setWeaving(true);
+      phase = 'waiting';
+      departTimer = setTimeout(() => {
+        if (phase === 'waiting') begin();
+      }, left);
       return;
+    }
+    if (phase === 'idle') setWeaving(PREPARING.has(g));
+    if (OVER.has(g) && phase === 'waiting') {
+      // Le jeu s'est arrêté avant le départ : elle cesse de tisser.
+      clearTimeout(departTimer);
+      setWeaving(false);
+      phase = 'idle';
     }
     if (OVER.has(g) && musicHold) holdMusic(false);
     if (OVER.has(g) && sceneExpected) {
@@ -956,11 +1031,9 @@ function wireCinematic(xen) {
       void hideScene();
     }
     if (OVER.has(g) && phase !== 'idle') {
-      // Pendant l'attente (préparation), le launcher revient tout de suite ;
-      // une fois le passage ouvert, on laisse la cinématique finir.
       // Passage déjà joué (la scène a pu être réduite avant la fin du
       // chargement) : rien à attendre. Sinon, jamais plus de quelques secondes.
-      if (phase === 'gone' || !xen.released || cineDone) comeBack();
+      if (phase === 'gone' || cineDone) comeBack();
       else {
         returnPending = true;
         setTimeout(() => {
@@ -1048,6 +1121,7 @@ function wireLab() {
         document.documentElement.dataset.labo = '';
         labTiles = (etat, name) => data.tile(etat, name);
         surroundRef?.setTiles(labTiles);
+        xenScene?.setTiles?.(labTiles);
       })
       .catch((err) => {
         console.error('opm : laboratoire indisponible.', err);
@@ -1088,6 +1162,8 @@ function wireOpenWindow() {
       createXenodys(canvas, stage, frame)
         .then((xen) => {
           xenScene = xen;
+          // Le monde qu'elle tisse au départ porte les blocs du laboratoire.
+          if (labTiles) xen.setTiles(labTiles);
           wireCinematic(xen);
           wirePlayGaze(xen);
           return frameBuilt().then(() => xen.arrive(sfx));

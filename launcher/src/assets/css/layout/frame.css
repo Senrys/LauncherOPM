@@ -215,8 +215,9 @@ html,
 
 :root:not([data-fenetre="ouvert"]) .opm-xeno-stage { display: none; }
 
-/* La cinématique du lancement : l'orbe entre ses mains, puis le passage
-   (components/xenodys3d.js). Basse résolution, agrandie sans lissage. */
+/* Les effets de Xenodys : les fils qu'elle tisse vers la barre, la lueur de
+   sa main, puis le passage (components/xenodys3d.js). Basse résolution,
+   agrandie sans lissage. */
 .opm-cine {
   position: absolute;
   top: 0;
@@ -229,46 +230,18 @@ html,
 }
 
 
-/* Pendant l'attente (la préparation des fichiers) : cliquer l'orbe ramène le
-   launcher. Une étiquette sous l'orbe dit où en est la préparation. */
-.opm-cine-hit {
-  position: absolute;
+/* Le joueur, emporté dans la main de Xenodys pendant le départ : une image
+   de son rendu 3D, déplacée et réduite depuis ses pieds. */
+.opm-cine-player {
+  position: fixed;
   z-index: 7;
-  width: 120px;
-  height: 120px;
-  margin: -60px 0 0 -60px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: none;
-  cursor: pointer;
+  pointer-events: none;
+  transform-origin: 50% 100%;
+  transition: opacity .25s ease;
+  filter: drop-shadow(0 0 6px rgba(145, 217, 209, .55));
 }
-
-.opm-cine-hit[hidden] { display: none; }
-
-.opm-cine-hit__label {
-  position: absolute;
-  /* Au-dessus de l'orbe : ses mains sont dessous. */
-  bottom: 112px;
-  left: 50%;
-  transform: translateX(-50%);
-  white-space: nowrap;
-  font: 700 11px/1.5 var(--font-ui, sans-serif);
-  letter-spacing: .14em;
-  text-transform: uppercase;
-  color: var(--aqua);
-  text-shadow: 0 0 6px rgba(0, 0, 0, .9), 0 1px 0 #000;
-}
-
-.opm-cine-hit__label small {
-  display: block;
-  font-size: 9px;
-  font-weight: 600;
-  opacity: .75;
-  text-align: center;
-}
-
-:root[data-xenodys="corrompue"] .opm-cine-hit__label { color: #F0506E; }
+:root[data-xenodys="corrompue"] .opm-cine-player { filter: drop-shadow(0 0 6px rgba(240, 80, 110, .55)); }
+.opm-cine-player[hidden] { display: none; }
 
 /* La scène de chargement (components/loadingScene.js) : au-dessus de Xenodys,
    sous l'éclair du passage (`.opm-cine`, z 6) qui la découvre. Pixels nets. */

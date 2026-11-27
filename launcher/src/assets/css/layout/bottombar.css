@@ -367,3 +367,46 @@
   box-shadow: none;
   cursor: not-allowed;
 }
+
+/* ------------------------------------------------ JAUGE TISSÉE (Xenodys) */
+/* Pendant que Xenodys tisse la barre (components/xenodys3d.js, `data-weaving`
+   posé par le renderer), le remplissage devient une étoffe : une trame de
+   fils verticaux qui glisse, une chaîne horizontale, et une lisière vive là où
+   ses fils arrivent. */
+.opm-bottom__bar[data-weaving] .opm-bottom__fill {
+  background-image:
+    repeating-linear-gradient(90deg,
+      color-mix(in srgb, var(--white) 34%, transparent) 0 2px,
+      transparent 2px 4px,
+      color-mix(in srgb, #000 18%, transparent) 4px 5px,
+      transparent 5px 7px),
+    repeating-linear-gradient(0deg,
+      color-mix(in srgb, #000 22%, transparent) 0 1px,
+      transparent 1px 3px);
+  background-size: 7px 100%, 100% 3px;
+  animation: opmWeaveFill .7s steps(7) infinite;
+}
+.opm-bottom__bar[data-weaving] .opm-bottom__fill::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 6px;
+  height: 100%;
+  background: repeating-linear-gradient(0deg, var(--white) 0 2px, color-mix(in srgb, var(--white) 30%, transparent) 2px 3px);
+  box-shadow: 0 0 8px var(--aqua);
+  animation: opmWeaveEdge .35s steps(2) infinite;
+}
+:root[data-xenodys="corrompue"] .opm-bottom__bar[data-weaving] .opm-bottom__fill::after { box-shadow: 0 0 8px #F0506E; }
+.opm-bottom__bar[data-weaving] .opm-bottom__shimmer { opacity: 0; }
+/* Le téléchargement stagne : l'étoffe s'arrête, la lisière pâlit. */
+.opm-bottom__bar[data-weaving="lent"] .opm-bottom__fill { animation-play-state: paused; }
+.opm-bottom__bar[data-weaving="lent"] .opm-bottom__fill::after { opacity: .35; animation: none; }
+
+@keyframes opmWeaveFill { to { background-position: 7px 0, 0 0; } }
+@keyframes opmWeaveEdge { 50% { opacity: .55; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .opm-bottom__bar[data-weaving] .opm-bottom__fill,
+  .opm-bottom__bar[data-weaving] .opm-bottom__fill::after { animation: none; }
+}
